@@ -11,7 +11,10 @@ lit flash:
 * ``present_t`` - the best available "frame is on screen" time:
     - ``--tiles widget`` (default, same QLabel + repaint path as the real tiles): the next
       display vblank after the repaint flushed, from the Windows DWM composition clock
-      (``DwmGetCompositionTimingInfo``). This is an estimate, not a measurement.
+      (``DwmGetCompositionTimingInfo``). This is an estimate, not a measurement: the
+      offset is uniform over one frame (0-16.7 ms at 60 Hz) plus repaint time, so the jitter
+      sits near one frame period and is structurally under the 20 ms threshold. A widget-mode
+      PASS only rules out repaint stalls and missed frames.
     - ``--tiles gl``: Qt's ``QOpenGLWidget.frameSwapped`` with vsync on (swap-interval 1).
 
 It reports offset (present minus marker) mean / p95 / max, jitter, and the refresh rate, then
@@ -22,8 +25,9 @@ prints PASS or WARN. Run it on the judging laptop with the real display:
     python -m signal2speech.eeg.flash_timing --seconds 30 --csv logs/flash_timing.csv
     python -m signal2speech.eeg.flash_timing --compare logs/flash_timing.csv onsets.txt --tile target_1
 
-Software timestamps cannot see the panel's own scan-out or response time. For ground truth use
-the photodiode / slow-motion camera procedure in docs/eeg-hardware/README.md ("Flash timing").
+Software timestamps cannot see DWM composition latency, a late present for this window, or the
+panel's own scan-out and response time. ``--tiles gl`` is a stronger software check; for ground
+truth use the photodiode / slow-motion camera procedure in docs/eeg-hardware/README.md ("Flash timing").
 Under ``QT_QPA_PLATFORM=offscreen`` nothing reaches a screen, so the numbers are meaningless
 and the verdict is always WARN.
 """
@@ -283,10 +287,17 @@ def format_report(r: TimingReport) -> str:
         lines.append(f"  compositor frames missed: {r.frames_missed}")
     if r.source == SOURCE_DWM:
         lines.append("  note: dwm-vblank-estimate assumes the frame scans out at the next vblank "
-                     "after the flush; check absolute latency with the photodiode procedure.")
+                     "after the flush. It cannot see DWM composition latency or a late present.")
     lines.append("  positive offset = frame reached the screen after the marker.")
-    lines.append(f"{r.verdict}" + (": " + "; ".join(r.reasons) if r.reasons else
-                                    f": jitter within {r.threshold_ms:.0f} ms"))
+    if r.reasons:
+        verdict = f"{r.verdict}: " + "; ".join(r.reasons)
+    elif r.source == SOURCE_DWM:
+        verdict = (f"{r.verdict}: jitter within {r.threshold_ms:.0f} ms (widget estimate: rules "
+                   "out repaint stalls and missed frames only; the real test is --tiles gl or "
+                   "the photodiode/camera check)")
+    else:
+        verdict = f"{r.verdict}: jitter within {r.threshold_ms:.0f} ms"
+    lines.append(verdict)
     return "\n".join(lines)
 
 
@@ -419,9 +430,14 @@ def _make_gl_tile(name: str):
     from PySide6.QtGui import QColor
     from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
+    from PySide6.QtGui import QSurfaceFormat
+
     class GLTile(QOpenGLWidget):
         def __init__(self):
             super().__init__()
+            fmt = QSurfaceFormat.defaultFormat()
+            fmt.setSwapInterval(1)                 # vsync, so the swap tracks the flip
+            self.setFormat(fmt)                    # per widget: QApplication already exists
             self.setMinimumSize(300, 300)
             self._color = QColor(UNLIT)
 
@@ -454,12 +470,6 @@ class FlashTimingProbe:
         self.samples: List[FlashSample] = []
         self._current: Optional[FlashSample] = None
         self._awaiting_swap: Optional[FlashSample] = None
-
-        if tiles == "gl":
-            from PySide6.QtGui import QSurfaceFormat
-            fmt = QSurfaceFormat.defaultFormat()
-            fmt.setSwapInterval(1)                 # vsync, so the swap tracks the flip
-            QSurfaceFormat.setDefaultFormat(fmt)
 
         self.window = QWidget()
         self.window.setWindowTitle("Signal2Speech flash timing (#46)")

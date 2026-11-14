@@ -63,6 +63,15 @@ def test_frame_quantised_jitter_passes_at_60hz():
                         platform="windows", refresh_hz=60.0)
     assert r.stats.jitter_ms < ft.JITTER_WARN_MS
     assert r.verdict == "PASS"
+    assert "photodiode" not in ft.format_report(r).splitlines()[-1]
+
+
+def test_widget_pass_line_says_it_only_rules_out_stalls():
+    r = ft.build_report(_samples([8.0] * 40), source=ft.SOURCE_DWM, tiles="widget",
+                        platform="windows", refresh_hz=60.0, frames_missed=0)
+    last = ft.format_report(r).splitlines()[-1]
+    assert last.startswith("PASS") and "repaint stalls and missed frames only" in last
+    assert "--tiles gl" in last and "photodiode" in last
 
 
 def test_large_jitter_warns():

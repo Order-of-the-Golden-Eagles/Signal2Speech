@@ -148,17 +148,17 @@ python -m signal2speech.eeg.flash_timing --seconds 60 --csv logs/flash_timing.cs
 
 It flashes two tiles with the chooser's own `FlashScheduler` (100 ms flash, 75 ms gap). For every lit flash it records the time `on_flash` runs (where the chooser emits the Marker) and the best present time it can get:
 
-- **`--tiles widget` (default).** Same QLabel restyle plus `repaint()` path as the real tiles. The present time is the next display vblank after the repaint flushed, read from the Windows compositor clock (`DwmGetCompositionTimingInfo`, same QueryPerformanceCounter clock as the marker). This is an **estimate**. It shows frame quantisation and repaint cost, but it can't see the panel's own scan-out delay. Off Windows there is no source, and the tool says so.
+- **`--tiles widget` (default).** Same QLabel restyle plus `repaint()` path as the real tiles. The present time is the next display vblank after the repaint flushed, read from the Windows compositor clock (`DwmGetCompositionTimingInfo`, same QueryPerformanceCounter clock as the marker). This is an **estimate**, and a weak one. The offset is just "next vblank after the flush", so at 60 Hz it is spread evenly over 0–16.7 ms plus repaint time, and the jitter (about 15 ms) is built in and always under the 20 ms threshold. It can't see DWM composition latency, a late present for this window, or the panel's own scan-out delay. **A widget-mode PASS only rules out repaint stalls and missed frames.** The real test is `--tiles gl` or the light sensor / camera check below. Off Windows there is no source, and the tool says so.
 - **`--tiles gl`.** `QOpenGLWidget` tiles with vsync on. The present time is Qt's `frameSwapped` signal for the lit frame.
 
 It prints the offset (present minus marker) mean, p95, max, min, and standard deviation, then the jitter (the p95 − p5 spread of the offset), the refresh rate, repaint time, flash-onset interval, and frames the compositor missed. Then it prints:
 
-- **PASS:** the jitter is at most 20 ms (`--threshold-ms`), with at least 20 flashes, fewer than 10 % of flashes missing a present time, and no missed compositor frames.
+- **PASS:** the jitter is at most 20 ms (`--threshold-ms`), with at least 20 flashes, fewer than 10 % of flashes missing a present time, and no missed compositor frames. In widget mode the PASS line says plainly that it only rules out repaint stalls and missed frames.
 - **WARN:** anything else. It is always WARN under `QT_QPA_PLATFORM=offscreen`, which never draws to a screen. The exit code is 0 for PASS and 1 for WARN.
 
 At 60 Hz, a one-frame quantisation gives about 0–17 ms of offset and passes. If you get a WARN, close other apps, turn off Windows battery saver and variable refresh rate, keep the window on the laptop's own panel (not a projector mirror), and run it again.
 
-**Verified so far (2026-11-14, dev Windows laptop, offscreen only):** 17 headless tests cover the statistics, PASS/WARN logic, CSV, and ground-truth comparison. A 3 s offscreen run executes, reads a 60.00 Hz refresh from DWM, and reports WARN because it is offscreen. Offscreen numbers mean nothing. **Not verified:** a run on a real display, the `--tiles gl` swap timing (offscreen gives no swaps), and macOS or Linux.
+**Verified so far (2026-11-14, dev Windows laptop, offscreen only):** 18 headless tests cover the statistics, PASS/WARN logic, CSV, and ground-truth comparison. A 3 s offscreen run executes, reads a 60.00 Hz refresh from DWM, and reports WARN because it is offscreen. Offscreen numbers mean nothing. **Not verified:** a run on a real display, the `--tiles gl` swap timing (offscreen gives no swaps), and macOS or Linux.
 
 ### Ground truth with a light sensor or a phone camera
 
