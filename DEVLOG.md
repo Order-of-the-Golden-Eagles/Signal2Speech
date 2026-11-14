@@ -172,7 +172,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
 
-## 11/14/26 - 6:06 PM - Vasanth Anbukumar (with Claude) - #22 Fix duplicate event IDs between headset decoders (PR pending)
+## 11/14/26 - 6:06 PM - Vasanth Anbukumar (with Claude) - #22 Fix duplicate event IDs between headset decoders ([PR #82](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/82))
 - The live flow (P300 picks, eyes-closed alpha switch confirms) can now actually confirm
 - Why: the P300 chooser (#46) and the alpha switch (#47) each make their own live-EEG adapter. Both numbered events `e1`, `e2`…, so the app rejected the alpha confirm as a repeat of the P300 preview. I found this while reviewing #47 after it merged
 - Event IDs now come from one counter shared by every adapter, so they're unique for the whole run
