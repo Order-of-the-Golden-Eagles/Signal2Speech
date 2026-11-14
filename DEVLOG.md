@@ -229,3 +229,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why: the old switch-back step said to run `pip install` when the lock file changed, and that fails with Wi-Fi off
 - Switch-back rehearsal on a Mac: 3 seconds from `main` to the known-good build `eecc31a` and one map reveal (keyboard input; the lock file was the same)
 - Also updated the runbook for the smoke check (#41) and the 8-second map reveal (#81). Still needed: tag `judging-draft` and `judging-final` and rehearse the switch on the judging laptop
+
+## 11/14/26 - 6:56 PM - Long Le - #39 #4 #42 Judging laptop session script (PR pending)
+- Whoever sits at the judging laptop now has one ordered 40-minute checklist: `docs/devops/judging-laptop-session.md`
+    - Wi-Fi on: install, release check, smoke check, and the fallback copy. Wi-Fi off: keyboard and simulated runs, the AI fallback, the evidence view, and a timed switch-back
+- One sitting produces the evidence to close #39 and #4 and rehearses #42's rollback. Each step has a ready-to-paste result comment for the right issue
+- Turned on GitHub's "delete branch after merge" setting, and cleaned up the merged branches
+- Not run yet: it needs the judging laptop

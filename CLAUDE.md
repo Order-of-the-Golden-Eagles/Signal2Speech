@@ -50,3 +50,4 @@ gh project item-edit --id "$ITEM" --project-id PVT_kwDOFUMxq84BrozG \
 
 - Post long comments with `gh issue comment <n> --body-file <file>`, then run `gh issue close <n> --reason completed`. `gh issue close` has no body-file option.
 - Closing an issue or editing a teammate's PR is visible to the whole team. Confirm with the developer before doing it.
+- GitHub deletes a PR's branch automatically when it merges (repo setting). Locally, run `git fetch --prune`, then delete your branches that show `[gone]` in `git branch -vv`. Squash merges need `git branch -D`.
