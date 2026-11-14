@@ -172,6 +172,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
 
+## 11/14/26 - 5:59 PM - Long Le (with Claude) - #4 Real map in the app, bigger reveal ([PR #81](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/81))
+- The app now shows the real NASA/EPA map from #30 after a confirm. No code change was needed for that, and the stand-in panel is gone
+    - `python -m signal2speech.app --input keyboard`. Press 2, then 1, to see the county comparison
+- After a map reveal, the map takes most of the window and stays up for 8 seconds before the next question, so judges can read the AQI table. The input label stays visible the whole time
+- Checked with the real map: preview and cancel leave it blank, a confirm changes it once, and a repeated confirm changes nothing. One spoken line per confirm
+- Still to do for #4: the final run on the judging laptop with Wi-Fi off, and #26 (recovery checks)
 ## 11/14/26 - 5:58 PM - MagicJester2764 - #26 Recovery checks ([PR #80](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/80))
 - Proved that nothing goes wrong when things go wrong: cancelling, a headset drop, repeated keys, and late or replayed brain decisions never cause an extra map change or spoken line
     - Covers keyboard, the g.Pype simulator, and replayed recordings: `pytest tests/test_recovery.py`
@@ -189,5 +195,15 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why: the P300 chooser (#46) and the alpha switch (#47) each make their own live-EEG adapter. Both numbered events `e1`, `e2`…, so the app rejected the alpha confirm as a repeat of the P300 preview. I found this while reviewing #47 after it merged
 - Event IDs now come from one counter shared by every adapter, so they're unique for the whole run
 - Verified with a new test where two live-EEG adapters preview and then confirm (`tests/test_contract.py`). `tests/test_app.py` and `tests/test_recovery.py` no longer assume IDs like `k1`. Full suite: 176 passed
-- Also loosened a timing-sensitive evidence test (`tests/test_evidence.py`) that sometimes failed on slower CI machines; it now checks for a 1.5 µV gap instead of 2.5 µV
 - Still needs the headset: the combined P300 + alpha flow on a real wearer (#23)
+## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
+- A teammate can now run the whole OpenOrbit reveal with Wi-Fi off and explain it
+    - `python -m signal2speech.app --input keyboard`: press 2 then 1 to compare counties, or 1 then 1 for the satellite view
+- The compare view shows the two numbers judges confuse: Washtenaw had the biggest jump (+186), but Wayne ended highest (226)
+- Verified with Wi-Fi actually disconnected on InYoung-Song's laptop, on `main` after PR #65: one map change and one full spoken line per confirm, and nothing on cancel. Keyboard input only, not live EEG
+
+## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #35 Secret, AI key, and network checks ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
+- Checked how the app handles keys and the network. Results are in `docs/security-privacy/README.md`
+- No local bridge exists (the app is one process), so the bridge checks don't apply
+- The AI key is read only from `.env` or the environment and never logged. Only the typed question goes to the AI, never EEG
+- `python tools/release_check.py` re-runs the checks, including secrets in every branch's history (none found)
