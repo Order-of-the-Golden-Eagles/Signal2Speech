@@ -142,3 +142,56 @@ The synthetic P300 is a 5 µV Gaussian at 300 ms over 10 µV white noise plus 10
 2. Record a calibration run with the evidence view's `--record`.
 3. Offline, find each light onset in the photodiode channel and subtract the matching marker sample. The mean is the latency and the standard deviation is the jitter.
 4. If the standard deviation is above about 10 ms, pass the flip time to `on_flash(target_id, observed_at=...)`, for example `gp.stamp_clock()` taken in a `QWindow.frameSwapped` handler.
+
+## Alpha-switch confirm (#47): works on simulated input
+
+`signal2speech/eeg/alpha_confirm.py`. Closing the eyes for about 2 s in an armed Confirm round emits exactly one `target-1` (Confirm). **Verified on simulated input only** (g.Pype `Generator` plus injected 10 Hz bursts), on Linux with Python 3.12.13 and g.Pype 4.2.0. Live calibration on a wearer is pending the headset slot (#23).
+
+```
+python -m signal2speech.eeg.alpha_confirm                          # Generator: 10 s + 10 s calibration, 60 s rest, 3 closures, JSON report
+python -m signal2speech.eeg.alpha_confirm --demo                   # Generator: keyboard preview, then alpha confirm through the handler
+python -m signal2speech.eeg.alpha_confirm --source hybrid-black    # live: pair the Unicorn first, then follow the >>> prompts
+```
+
+Flags: `--calib-s`, `--rest-s`, `--closures`, `--dwell-s` (default 1.0), `--settle-s` (default 1.0), `--burst-uv` (Generator alpha amplitude, default 8), `--min-ratio` (default 2).
+
+**Pipeline**
+
+```
+source -> [AlphaBursts, simulated only] -> Bandpass 1-30 Hz -> ChannelSelector(indices 5,6,7 = PO7, Oz, PO8)
+  -> FFT(250, overlap 0.9) -> BandPower(alpha 8-13 Hz) -> ChannelMean -> Threshold(level, release, dwell 10 rows)
+  -> Tap -> AlphaConfirm.rising/.falling (queued Qt signals) -> main thread -> adapter.select_captured("target-1")
+```
+
+- **Calibration:** `Calibration.from_samples(open, closed)` refuses NaN or infinite rows, which come from a flat or railing electrode. Then it sets `level = sqrt(open_p95 × closed_median)` and `release = sqrt(open_p95 × level)`, a geometric midpoint with hysteresis. It refuses when the closed median is under 2× the open p95 (`CalibrationError`). The levels are applied live through `Threshold.set_control()`. Until calibration runs, the level is 1e12, so nothing fires.
+- **Gating, on top of the threshold:**
+  1. It only listens in an armed Confirm round. Arming happens through `handler.on_round_opened`; cancel or clear disarms it.
+  2. The eyes must have been open continuously for `settle_s`. That's measured from arming, or from the last time they opened. A closure that comes too early doesn't count, and the eyes have to open again. Arming reads the worker thread's Threshold state, so a closure still in flight from the previous round can't slip through.
+  3. Only a rising edge counts. It disarms after one decision, so one closure gives one event. If the handler rejects the decision and the Confirm round stays open (for example `RejectedLiveConfirmDisarmed`), it keeps listening in that round.
+- **Live EEG:** labelled `live-eeg`. The handler still returns `RejectedLiveConfirmDisarmed` until #23 sets `live_eeg_confirm_armed`. The decoder works, and the contract holds it back.
+- **Sharing the headset with #46:** a Unicorn opens only once. Pass `AlphaConfirm(handler, pipeline=p, upstream=bandpass_node, input_source=LIVE_EEG)` to hang the alpha branch off the P300 pipeline instead of opening a second source. If that stream isn't 250 Hz, pass `sampling_rate=`: the FFT window stays 1 s and the dwell stays in seconds. A mismatch raises at pipeline start.
+- **Lifecycle:** `close()` unhooks from the handler. The band-power buffer keeps the last 2 minutes, and edges and log entries keep the last 256, so a long demo can't grow memory.
+- **Tests:** `tests/test_alpha_confirm.py` covers the calibration math, every gating rule, the live-disarmed contract, and one Generator burst through the real pipeline giving exactly one confirm and no rest triggers.
+
+**Simulated results (Generator with 10 µV noise, 2026-11-14)**
+
+| Burst | Open p95 | Closed median | Ratio | Level / release | False triggers, 60 s eyes-open | Edges per closure | Latency from closure to edge |
+| --- | ---: | ---: | ---: | --- | ---: | --- | --- |
+| 8 µV | 10.6 | 68.8 | 6.5 | 27.0 / 16.9 | **0** | 1, 1, 1, 1, 1 | 1.21–1.45 s |
+| 4 µV (weak alpha) | 10.1 | 23.2 | 2.3 | 15.3 / 12.4 | **0** | 1, 1, 1, 1, 1 | 1.19–1.49 s |
+
+Latency is about 0.3–0.5 s for the 1 s FFT window to fill with alpha, plus the 1.0 s dwell. With `--dwell-s 0.5` the switch reacts faster but chatters more. Real eyes-closed alpha is typically 2–10× eyes-open, and some people have weak alpha, so the 2× floor is the first thing to check at the headset slot. Even at ratio 2.3 (4 µV), the simulated switch held: no false triggers and one edge per closure. Real EEG adds blinks and drift that the Generator lacks.
+
+**Fallback (if P300 is unreliable): not built yet.** The plan is to step through the options one at a time and confirm each with this switch. `AlphaConfirm` acts only in Confirm rounds today, so stepping needs a small driver:
+
+1. Highlight one tile at a time.
+2. Arm for each highlight.
+3. Send the highlighted target on a rising edge.
+
+Then confirm with `AlphaConfirm` as usual. The `rising` signal and the calibration are reusable as-is.
+
+**g.Pype facts we confirmed:**
+
+- `ChannelMean` and `AlphaBursts` are custom `gp.IONode`s. For a 1-channel output, `setup()` sets `channel_count`, `channel_roles`, and `channel_labels` in the output context.
+- `Threshold.set_control({"level", "release", "dwell"})` works while the pipeline runs.
+- More than one `Pipeline` can run in a process. g.Pype refuses only a faster-than-real-time replay beside another pipeline.
