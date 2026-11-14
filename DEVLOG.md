@@ -34,3 +34,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The headless runner handles longer scripts, and a run that times out now reports failure instead of success
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
+
+## 11/14/26 - 5:45 PM - Vasanth Anbukumar (with Claude) - #23 Guided live-run harness (PR pending)
+- Added one command for the headset slot: `python -m signal2speech.eeg.live --source hybridblack`. It walks through the device check, signal quality, P300 calibration, confirm calibration, 10 live attempts, and a summary
+- If the headset isn't paired, it says how to pair it and exits cleanly. If signal quality is bad, it names the bad channels and stops unless you choose to continue
+- The summary says whether it's safe to arm live EEG confirm. It only says yes on a live run where the alpha switch did the confirming, with no late decisions crossing rounds and no false confirms. A dry run never says yes
+- Every outcome, accuracy, and time per selection goes to `logs/` (not committed). The log refuses raw EEG on purpose
+- A dry run with the alpha switch from #47 showed that the P300 and alpha inputs both start their event IDs at 1, so the second one was thrown away as a duplicate. The harness tags them apart, and the app will need the same fix
+- Verified on simulated input only: `--source generator` ran start to finish (10/10 correct, 0 false confirms) and 105 tests pass. Nothing has run on the real headset yet

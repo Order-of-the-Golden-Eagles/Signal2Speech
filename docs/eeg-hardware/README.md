@@ -138,3 +138,58 @@ The synthetic P300 is a 5 µV Gaussian at 300 ms over 10 µV white noise plus 10
 2. Record a calibration run with the evidence view's `--record`.
 3. Offline, find each light onset in the photodiode channel and subtract the matching marker sample. The mean is the latency and the standard deviation is the jitter.
 4. If the standard deviation is above about 10 ms, pass the flip time to `on_flash(target_id, observed_at=...)`, for example `gp.stamp_clock()` taken in a `QWindow.frameSwapped` handler.
+
+## Live run
+
+`signal2speech/eeg/live.py` ([#23](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/23)) walks the headset slot step by step, so the live run is one command.
+
+```
+python -m signal2speech.eeg.live --source hybridblack   # Live EEG: Unicorn Hybrid Black, OSCAR on
+python -m signal2speech.eeg.live --source generator     # dry run, no hardware, labelled Simulated
+```
+
+**Before you start:** turn the headset on and pair it in the OS Bluetooth settings. Close anything else that might have it open, such as the evidence view or another g.Pype run.
+
+| Step | What happens | Stops when |
+| --- | --- | --- |
+| 1. Device check | Opens the source through the #46 P300 pipeline. One headset can be opened once, so every branch shares that pipeline. | The headset isn't paired or sends no samples within 5 s. It prints the pairing checklist and exits with code 3. |
+| 2. Signal quality | About 10 s of stream with OSCAR on (`--quality-s`). For each channel it shows the 1–30 Hz RMS and the 50/60 Hz RMS, then GO or NO-GO. | NO-GO, unless the operator types `y`. Exits with code 4. |
+| 3. P300 calibration | `P300Chooser.begin_calibration` / `finish_calibration` from `p300.py`, over `--calibration` sequences (default 10). The test tiles show which tile to attend. It prints a cross-validated epoch accuracy (chance is 0.50). | No epochs collected. Exits with code 5. |
+| 4. Confirm calibration | The #47 alpha switch (`measure()`: eyes open, eyes closed, a rest period to count false triggers, and 2 closures), if `signal2speech/eeg/alpha_confirm.py` is on the checkout. Otherwise it uses keyboard confirm. | Alpha calibration fails. Exits with code 5. |
+| 5. Attempts | `--attempts` choose+confirm attempts (default 10) through `SelectionHandler` and `InputAdapter`. Confirm a correct preview. Let a wrong one time out (alpha) or cancel it (keyboard). | — |
+| 6. Summary | P300 accuracy, correct and confirmed, mean seconds per selection, false confirms, `RejectedStaleRound` count, late P300 decisions, every outcome, and the arming verdict. | — |
+
+**Arming rule.** It is safe to set `live_eeg_confirm_armed = True` only if all of these are true:
+
+- the input was Live EEG, never Simulated
+- at least 5 confirm rounds were decided by the alpha switch, not the keyboard
+- no `RejectedStaleRound` was seen
+- there were 0 false confirms (a Confirmed after a wrong preview)
+
+The harness uses its own handler with a logging sink, so nothing is spoken and the map doesn't change. On a live alpha run it arms that handler for step 5 only. The app's handler stays disarmed until someone changes it after reading the summary.
+
+**Logs.** Each run writes `logs/live_<timestamp>_<simulated|live-eeg>.jsonl`. The `logs/` folder is gitignored. The log holds steps, the quality table, calibration counts, every handler outcome with its event, every P300 decision (and whether it was late), each attempt, and the summary. `RunLog` refuses arrays and long lists, so raw EEG can't end up in a log.
+
+**Event IDs.** Two `InputAdapter`s with the same source on one handler both count from 1. So the P300 branch's `s1` and the alpha branch's `s1` collide, and the alpha confirm is rejected as `RejectedDuplicateEvent`. The harness found this. `TaggedAdapter` adds a branch tag (`s1-p300`, `s1-alpha`). The app needs the same fix when it wires up both branches.
+
+**Verified (2026-11-14, Windows 11, Python 3.12.10, g.Pype 4.2.0)**
+
+| Check | Result |
+| --- | --- |
+| `--source generator` (defaults), Simulated, keyboard confirm | Ran to completion in 83 s. Quality GO on 8 channels. LDA on 50 target and 50 non-target epochs, CV epoch accuracy 0.97. 10/10 correct previews, 10 Confirmed, 0 false confirms, 0 `RejectedStaleRound`, 0 late decisions. Verdict: not safe (keyboard confirm, Simulated). |
+| `--source generator` with PR #58's `alpha_confirm.py` loaded by hand (not on main) | 6/6 confirmed by simulated eye closures, alpha ratio 8.2, 0 false triggers at rest. This run found the event-ID collision above. |
+| `--source hybridblack` with no headset | `ConnectionError: No Unicorn device available`. Prints the pairing checklist and exits with code 3 in about 8 s. |
+| `pytest tests/test_live.py` (16 tests) | Pass. Covers quality rules, arming rules, scoring, the log refusing samples, tagged adapters, step order and exit codes, plus one end-to-end Generator dry run. |
+
+**Not verified yet:** anything with the real headset. That includes the quality thresholds (`FLAT_RMS_UV` 0.5, `NOISY_RMS_UV` 50, `LINE_RMS_UV` 10 µV are starting guesses), whether the HybridBlack signal-role channels are the 8 EEG channels in Unicorn order, OSCAR's effect, real P300 and alpha accuracy, and whether a late decision ever crosses rounds. Fill in the table below after the run.
+
+| Live result (#23) | Value |
+| --- | --- |
+| Pairing steps that worked | |
+| Bad channels at first, and fix | |
+| Calibration time (P300 / alpha) | |
+| P300 accuracy (correct / attempts) | |
+| False confirms | |
+| `RejectedStaleRound` seen | |
+| Class → tile mapping | 1 → `target-1`, 2 → `target-2` (`EegClassMap.default()`) |
+| Arm `live_eeg_confirm_armed`? | |
