@@ -202,7 +202,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The AI key is read only from `.env` or the environment and never logged. Only the typed question goes to the AI, never EEG
 - `python tools/release_check.py` re-runs the checks, including secrets in every branch's history (none found)
 
-## 11/14/26 - 6:20 PM - Long Le (with Claude) - #33 First security pass (PR pending)
+## 11/14/26 - 6:20 PM - Long Le (with Claude) - #33 First security pass ([PR #85](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/85))
 - Did a first privacy and security check of the current code, ahead of making the repo and video public
     - `python tools/release_check.py --quick --all-branches`, plus manual checks for trained models, network use, and image metadata
 - No keys, raw EEG, recordings, or trained models are in git on any branch. Nothing sends EEG over the network. The only outbound call is the optional AI request, which sends the typed question only
