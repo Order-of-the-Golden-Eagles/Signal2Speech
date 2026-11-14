@@ -16,6 +16,7 @@
 
 ## Verification and next checkpoint
 
+- **Smoke command (#41):** `python -m signal2speech.app --smoke` needs no hardware and exits 0 or 1. It runs a keyboard confirm and a cancel with fake output, checks the demo numbers, the #29 assets and #30 view (SKIP until they land), and a g.Pype Generator stream. `--smoke=judging` turns every SKIP into a FAIL. It logs metadata only to `logs/smoke-*.jsonl`. Current result on Linux: 5 pass, 2 skip. [Details](devops/README.md#smoke-check-41)
 - **Environment verified (#19, 2026-11-14):** Python 3.12.10, g.Pype 4.2.0, and PySide6 6.11.3 plus scikit-learn 1.9.1 and h5py 3.16.0, are pinned in `requirements-lock.txt`. `pytest` passes 21 of 21, including the #24 UI tests. Step 6 is verified: the g.Pype scope window runs. Still open: the questions for the g.tec mentor.
 
 - The initial docs record the plan. Live EEG and app behavior are pending verification.

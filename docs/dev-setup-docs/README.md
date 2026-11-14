@@ -20,6 +20,7 @@ From the [g.Pype docs](https://gpype.gtec.at). **Each step is unverified until s
 | 6 | Run a g.Pype example with `Generator` (for example `s1e4_time_series_scope.py` from the g.Pype repo) | The scope window shows a moving signal | ✅ 2026-11-14 (scope window ran 15 s with no errors) |
 | 7 | Pair the Unicorn Hybrid Black in OS Bluetooth settings, then run `s3e2_hybrid_black.py` | 8 EEG traces at 250 Hz | ☐ (#23) |
 | 8 | `python -m signal2speech.app` once #25 lands | The demo window opens on the first choice round | ☐ |
+| 9 | `python -m signal2speech.app --smoke=judging` (#41) | `SMOKE PASS`, exit 0. Until #29 and #30 land, use `--smoke` and expect 2 SKIPs. | ☐ (judging laptop) |
 
 **Verified on 2026-11-14 (Windows 11):** Python 3.12.10, g.Pype 4.2.0, PySide6 6.11.3, `gtec_oscar` 1.3.2, `gtec_unicorn` 2.0.0. `pytest` passes 21 of 21. Built `Generator` → `Bandpass` → `TimeSeriesScope` with `HybridBlack` available. The install fails partway through on a flaky network unless you use `--resume-retries`.
 
