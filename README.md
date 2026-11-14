@@ -17,6 +17,8 @@ Signal2Speech is an accessibility prototype for people who have difficulty speak
 
 **Interaction:** Question → choices → EEG selection → preview → confirmation → speech or on-screen action.
 
+New to the project? [Follow one answer through the app](docs/architecture/README.md) for a plain-language walkthrough and architecture diagram.
+
 ## Live demo
 
 **“Which county’s AQI rose more when wildfire smoke reached southeast Michigan?”**
@@ -36,8 +38,8 @@ The wearer chooses **Compare counties** and confirms. OpenOrbit switches from th
 | --- | --- |
 | EEG hardware | **g.tec Unicorn Hybrid Black** |
 | EEG acquisition and selection | **g.tec Unicorn Suite** and the **Unity ERP starter with C#** |
-| Interface | **Plain HTML, CSS, and JavaScript** for a local browser UI, with **Unity** as a standalone option if it gets the live demo working sooner |
-| Local integration | **ASP.NET Core on localhost** if the browser UI needs a bridge to the Unity starter |
+| Interface | **Unity and C#** for the first live demo. A separate local browser UI is TBD. |
+| Local integration | In-process for the first Unity build. A localhost bridge is TBD. |
 | AI Answering | Short reply suggestions with explicit wearer confirmation. **Model, provider, and integration TBD.** |
 | Speech | Bundled audio for the OpenOrbit demo. **Speech synthesis for generated replies TBD.** |
 | OpenOrbit data | Locally bundled **NASA MODIS imagery** and **EPA AirData daily county AQI**. **NASA FIRMS fire detections** are a planned extension. |
@@ -47,7 +49,7 @@ Use platform APIs and hardware-required packages. Keep the OpenOrbit demo assets
 
 ## Implementation status
 
-**Planning and prototyping.** The app layout, final UI host, headset-to-app interface, AI provider, and setup instructions are **TBD**. The first milestone is a keyboard-driven selection that produces one confirmed map-and-speech reveal. The live milestone is the same flow driven by two deliberate EEG selections, one to preview and one to confirm.
+**Planning and prototyping.** The first demo targets Unity. The app layout, any separate browser host, AI provider, and setup instructions are **TBD**. The first milestone is a keyboard-driven selection that produces one confirmed map-and-speech reveal. The live milestone is the same flow driven by two deliberate EEG selections, one to preview and one to confirm.
 
 ## Resources
 

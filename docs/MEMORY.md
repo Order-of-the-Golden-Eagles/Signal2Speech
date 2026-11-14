@@ -9,7 +9,7 @@
 
 - Start with g.tec Unicorn Hybrid Black and the Unity ERP starter. Use keyboard or simulated input before live headset access.
 - Use platform APIs and hardware-required packages. Bundle OpenOrbit data and demo audio locally.
-- Final UI host, any localhost bridge, and AI provider are TBD. See [architecture](architecture/README.md) and [AI Answering](ai-answering/README.md).
+- Use Unity/C# for the first live demo. A separate browser UI, any localhost bridge, and AI provider are TBD. See the [architecture walkthrough and input contract](architecture/README.md) and [AI Answering](ai-answering/README.md).
 
 ## Verification and next checkpoint
 
