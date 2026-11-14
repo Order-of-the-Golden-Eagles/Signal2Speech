@@ -26,8 +26,9 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
         # 3.12 everywhere: the verified version the judging laptop runs (requirements-lock.txt).
         # One extra Ubuntu job on 3.13 is a forward-compat canary. It caught a 3.13-only test
-        # bug in #41 the day CI landed, and the docs say 3.10-3.14 should work. That's why
-        # ubuntu-latest appears twice: py3.12 and py3.13.
+        # bug in #41 the day CI landed. Other versions (3.10, 3.11, 3.14) are untested. That's
+        # why ubuntu-latest appears twice: py3.12 and py3.13. This comment is the one place
+        # that explains the matrix; docs link here.
         python: ["3.12"]
         include:
           - os: ubuntu-latest

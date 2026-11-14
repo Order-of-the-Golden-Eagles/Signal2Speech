@@ -82,7 +82,7 @@ self.diag = Diagnostics.to_file().attach(h, input_source=input_source,
 | --- | --- | --- |
 | [43648496045](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43648496045) | #68 final commit | ✅ all 4 jobs green |
 | [43649217606](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43649217606) | #38: a deliberately failing test (`tests/test_zz_ci_canary.py`) | ❌ all 4 jobs red with `1 failed, 104 passed`. The assertion message shows in the log and the `FAILED` line in the job summary. The smoke and manual-check steps still ran. |
-| see PR #75 | #38: canary removed | ✅ expected green (recorded in PR #75) |
+| [43650157549](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43650157549) | #38: canary removed | ✅ all 4 jobs green |
 
-- **Matrix:** Ubuntu appears twice on purpose. `py3.12` matches the judging laptop. `py3.13` is the forward-compat canary, and it caught a 3.13-only test bug in #41 on its first day.
-- **Known flake:** `tests/test_evidence.py:130` (#48, synthetic P300 peak `> 2.5`) failed once on macOS at 2.41 ([run](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43648196650)). Reported to the #48 owner. Re-run before treating a lone macOS evidence failure as real.
+- **Matrix:** Ubuntu appears twice on purpose. See the comment on `matrix:` in [`tests.yml`](../../.github/workflows/tests.yml), which is the single source for why.
+- **Known flake (open, #48 owner):** `tests/test_evidence.py::test_generator_average_separates_target_from_nontarget` failed once on macOS. It compares a synthetic P300 peak gap against `> 2.5`, and got 2.41 ([run](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43648196650)). The likely cause is a wall-clock capture that averages fewer epochs on a slow runner. The real fix is to wait for a fixed epoch count. Until then, re-run that job **once**. If it fails twice, or fails on any other OS, treat it as a real regression.
