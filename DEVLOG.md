@@ -172,7 +172,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
 
-## 11/14/26 - 5:59 PM - Long Le (with Claude) - #4 Real map in the app, bigger reveal (PR pending)
+## 11/14/26 - 5:59 PM - Long Le (with Claude) - #4 Real map in the app, bigger reveal ([PR #81](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/81))
 - The app now shows the real NASA/EPA map from #30 after a confirm. No code change was needed for that, and the stand-in panel is gone
     - `python -m signal2speech.app --input keyboard`. Press 2, then 1, to see the county comparison
 - After a map reveal, the map takes most of the window and stays up for 8 seconds before the next question, so judges can read the AQI table. The input label stays visible the whole time
