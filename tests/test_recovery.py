@@ -232,6 +232,8 @@ def test_late_simulated_decision_from_a_closed_round_is_dropped(qapp, rig):
 def test_gauntlet_then_one_good_confirm(qapp, rig):
     """Every bad input in one session, then one deliberate confirm: exactly one output."""
     app, log, cleared = rig(KB, confirm_timeout_ms=0)
+    accepted = []                                                 # ids the handler accepted
+    app.handler.on_handled.append(lambda e, o: accepted.append(e.eventId) if e and not o.rejected else None)
     preview(qapp, app, KB)
     app.window.press_cancel()                                     # cancel
     app.ask()
@@ -240,7 +242,8 @@ def test_gauntlet_then_one_good_confirm(qapp, rig):
     app.ask()
     preview(qapp, app, KB)
     assert app.handler.handle(recorded("stale.json", roundId="r1")) is Outcome.RejectedStaleRound
-    dup = SelectionEvent(KB, app.handler.current.id, "k1", T1)   # k1 was the first preview's id
+    # Replay the first preview's real id (ids come from one process-wide counter, not "k1").
+    dup = SelectionEvent(KB, app.handler.current.id, accepted[0], T1)
     assert app.handler.handle(dup) is Outcome.RejectedDuplicateEvent
     assert outputs(app) == (0, 0)
     assert app.window.press_target(T1) is Outcome.Confirmed       # the one real confirm
