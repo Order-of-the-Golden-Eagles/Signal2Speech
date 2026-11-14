@@ -43,3 +43,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Two smoke runs at the same moment get separate log files, and the log no longer claims to time how long speech plays (it only times starting it)
 - Verified: 89 tests pass, and `python -m signal2speech.app --smoke` reports 5 pass, 2 skip (#29, #30)
 - Follow-up: CI on Python 3.13 caught that the new version warning broke a test. Fixed; the smoke check still passes in dev mode on 3.13 and only fails in judging mode
+## 11/14/26 - 5:24 PM - MagicJester2764 - #37 CI follow-up ([PR #68](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/68))
+- Took over the CI that Vasanth drafted in #64 and fixed what its code review found
+- CI now installs the versions pinned in `requirements-lock.txt` (g.Pype, Qt, numpy, scikit-learn, and the rest), so it tests what the judging laptop runs instead of whatever is newest that day
+- Each run's summary shows the test result, every skipped test and why, the smoke check report, and the list of checks a person still has to do by hand
+- Merging two PRs back to back no longer cancels the first one's test run on `main`
+- The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
+- Code review follow-up: the summary is now written even when tests or the smoke check fail, and an app that can't start fails CI instead of looking like a skipped smoke check. The check is renamed `ci (...)` because it runs more than pytest
