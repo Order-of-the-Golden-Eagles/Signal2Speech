@@ -1,0 +1,7 @@
+{
+  "name": "Signal2Speech.Core",
+  "rootNamespace": "Signal2Speech.Core",
+  "references": [],
+  "noEngineReferences": true,
+  "autoReferenced": true
+}

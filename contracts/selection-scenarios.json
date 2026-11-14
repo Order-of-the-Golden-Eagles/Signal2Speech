@@ -1,0 +1,79 @@
+{
+  "comment": "Executable spec for SelectionHandler (#22). Steps: begin | event | cancel | disconnect | armLiveConfirm. 'effects' is the cumulative number of IActionSink.Execute calls; 'round' is the open round id after the step (null = none).",
+  "scenarios": [
+    {
+      "name": "keyboard preview then fresh confirm, replays rejected",
+      "steps": [
+        {"do":"begin","round":"r1"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r1","eventId":"k1","targetId":"target-2"},"expect":"Previewed","effects":0,"round":"r2"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r1","eventId":"k1","targetId":"target-2"},"expect":"RejectedStaleRound","effects":0,"round":"r2"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r2","eventId":"k2","targetId":"target-1"},"expect":"Confirmed","effects":1,"action":"compare_air_quality","round":null},
+        {"do":"event","event":{"source":"keyboard","roundId":"r2","eventId":"k2","targetId":"target-1"},"expect":"RejectedNoOpenRound","effects":1,"round":null},
+        {"do":"begin","round":"r3"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r2","eventId":"k3","targetId":"target-1"},"expect":"RejectedStaleRound","effects":1,"round":"r3"}
+      ]
+    },
+    {
+      "name": "late live callback from the choice round cannot confirm",
+      "steps": [
+        {"do":"armLiveConfirm"},
+        {"do":"begin","round":"r1"},
+        {"do":"event","event":{"source":"live-eeg","roundId":"r1","eventId":"e1","targetId":"target-2"},"expect":"Previewed","effects":0,"round":"r2"},
+        {"do":"event","event":{"source":"live-eeg","roundId":"r1","eventId":"e2","targetId":"target-1"},"expect":"RejectedStaleRound","effects":0,"round":"r2"},
+        {"do":"event","event":{"source":"live-eeg","roundId":"r2","eventId":"e3","targetId":"target-1"},"expect":"Confirmed","effects":1,"action":"compare_air_quality","round":null}
+      ]
+    },
+    {
+      "name": "live confirm is disarmed by default; keyboard can still confirm",
+      "steps": [
+        {"do":"begin","round":"r1"},
+        {"do":"event","event":{"source":"live-eeg","roundId":"r1","eventId":"e1","targetId":"target-1"},"expect":"Previewed","effects":0,"round":"r2"},
+        {"do":"event","event":{"source":"live-eeg","roundId":"r2","eventId":"e2","targetId":"target-1"},"expect":"RejectedLiveConfirmDisarmed","effects":0,"round":"r2"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r2","eventId":"k1","targetId":"target-1"},"expect":"Confirmed","effects":1,"action":"show_satellite","round":null}
+      ]
+    },
+    {
+      "name": "duplicate event id in the next round is rejected",
+      "steps": [
+        {"do":"begin","round":"r1"},
+        {"do":"event","event":{"source":"simulated","roundId":"r1","eventId":"s1","targetId":"target-1"},"expect":"Previewed","effects":0,"round":"r2"},
+        {"do":"event","event":{"source":"simulated","roundId":"r2","eventId":"s1","targetId":"target-1"},"expect":"RejectedDuplicateEvent","effects":0,"round":"r2"}
+      ]
+    },
+    {
+      "name": "cancel target clears preview with no effect",
+      "steps": [
+        {"do":"begin","round":"r1"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r1","eventId":"k1","targetId":"target-2"},"expect":"Previewed","effects":0,"round":"r2"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r2","eventId":"k2","targetId":"target-2"},"expect":"Cancelled","effects":0,"round":null}
+      ]
+    },
+    {
+      "name": "disconnect during preview, then confirm arrives",
+      "steps": [
+        {"do":"begin","round":"r1"},
+        {"do":"event","event":{"source":"simulated","roundId":"r1","eventId":"s1","targetId":"target-2"},"expect":"Previewed","effects":0,"round":"r2"},
+        {"do":"disconnect","round":null},
+        {"do":"event","event":{"source":"simulated","roundId":"r2","eventId":"s2","targetId":"target-1"},"expect":"RejectedNoOpenRound","effects":0,"round":null}
+      ]
+    },
+    {
+      "name": "judge cancel during preview",
+      "steps": [
+        {"do":"begin","round":"r1"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r1","eventId":"k1","targetId":"target-1"},"expect":"Previewed","effects":0,"round":"r2"},
+        {"do":"cancel","round":null},
+        {"do":"event","event":{"source":"keyboard","roundId":"r2","eventId":"k2","targetId":"target-1"},"expect":"RejectedNoOpenRound","effects":0,"round":null}
+      ]
+    },
+    {
+      "name": "unknown target and unknown source leave the round open",
+      "steps": [
+        {"do":"begin","round":"r1"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r1","eventId":"k1","targetId":"target-9"},"expect":"RejectedUnknownTarget","effects":0,"round":"r1"},
+        {"do":"event","event":{"source":"telepathy","roundId":"r1","eventId":"x1","targetId":"target-1"},"expect":"RejectedUnknownSource","effects":0,"round":"r1"},
+        {"do":"event","event":{"source":"keyboard","roundId":"r1","eventId":"k2","targetId":"target-1"},"expect":"Previewed","effects":0,"round":"r2"}
+      ]
+    }
+  ]
+}
