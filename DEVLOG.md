@@ -26,3 +26,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - It lists the checks that need a person: headset, live calibration, audio, Wi-Fi off
 - Every run writes a timing log to `logs/` (not committed) with the input mode and connection state. The log refuses raw EEG data on purpose
 - Breaking the app on purpose so it spoke twice made the smoke check fail, which shows it catches real problems
+
+## 11/14/26 - 5:15 PM - MagicJester2764 (with Claude) - #47 Code review fixes ([PR #58](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/58))
+- A code review found a way to confirm too early. A closure that came too soon could still count after the eyes had been open for less than the required second. Now every early closure restarts the clock
+- A closure still "in the pipes" from the previous screen can no longer sneak through when the Confirm screen appears
+- Calibration now refuses broken readings (for example a flat or noisy electrode) instead of silently making a switch that never fires
+- If the app turns down a live confirm, the switch keeps listening on that same screen, so #23 can enable live confirm without a restart
+- Long demos no longer grow memory, and the switch works with headset streams other than 250 Hz
+- Verified on simulated input: 84 tests pass, and a 10 s rest gave 0 false triggers and 1 confirm per closure

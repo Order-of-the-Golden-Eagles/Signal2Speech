@@ -54,13 +54,14 @@ source -> [AlphaBursts, simulated only] -> Bandpass 1-30 Hz -> ChannelSelector(i
   -> Tap -> AlphaConfirm.rising/.falling (queued Qt signals) -> main thread -> adapter.select_captured("target-1")
 ```
 
-- **Calibration:** `Calibration.from_samples(open, closed)` sets `level = sqrt(open_p95 × closed_median)` and `release = sqrt(open_p95 × level)`, a geometric midpoint with hysteresis. It refuses when the closed median is under 2× the open p95 (`CalibrationError`). The levels are applied live through `Threshold.set_control()`. Until calibration runs, the level is 1e12, so nothing fires.
+- **Calibration:** `Calibration.from_samples(open, closed)` refuses NaN or infinite rows, which come from a flat or railing electrode. Then it sets `level = sqrt(open_p95 × closed_median)` and `release = sqrt(open_p95 × level)`, a geometric midpoint with hysteresis. It refuses when the closed median is under 2× the open p95 (`CalibrationError`). The levels are applied live through `Threshold.set_control()`. Until calibration runs, the level is 1e12, so nothing fires.
 - **Gating, on top of the threshold:**
   1. It only listens in an armed Confirm round. Arming happens through `handler.on_round_opened`; cancel or clear disarms it.
-  2. The eyes must have been open for `settle_s` since arming. If they were closed when the preview appeared, they have to open first.
-  3. Only a rising edge counts. It disarms after one decision, so one closure gives one event.
+  2. The eyes must have been open continuously for `settle_s`. That's measured from arming, or from the last time they opened. A closure that comes too early doesn't count, and the eyes have to open again. Arming reads the worker thread's Threshold state, so a closure still in flight from the previous round can't slip through.
+  3. Only a rising edge counts. It disarms after one decision, so one closure gives one event. If the handler rejects the decision and the Confirm round stays open (for example `RejectedLiveConfirmDisarmed`), it keeps listening in that round.
 - **Live EEG:** labelled `live-eeg`. The handler still returns `RejectedLiveConfirmDisarmed` until #23 sets `live_eeg_confirm_armed`. The decoder works, and the contract holds it back.
-- **Sharing the headset with #46:** a Unicorn opens only once. Pass `AlphaConfirm(handler, pipeline=p, upstream=bandpass_node, input_source=LIVE_EEG)` to hang the alpha branch off the P300 pipeline instead of opening a second source.
+- **Sharing the headset with #46:** a Unicorn opens only once. Pass `AlphaConfirm(handler, pipeline=p, upstream=bandpass_node, input_source=LIVE_EEG)` to hang the alpha branch off the P300 pipeline instead of opening a second source. If that stream isn't 250 Hz, pass `sampling_rate=`: the FFT window stays 1 s and the dwell stays in seconds. A mismatch raises at pipeline start.
+- **Lifecycle:** `close()` unhooks from the handler. The band-power buffer keeps the last 2 minutes, and edges and log entries keep the last 256, so a long demo can't grow memory.
 - **Tests:** `tests/test_alpha_confirm.py` covers the calibration math, every gating rule, the live-disarmed contract, and one Generator burst through the real pipeline giving exactly one confirm and no rest triggers.
 
 **Simulated results (Generator with 10 µV noise, 2026-11-14)**
