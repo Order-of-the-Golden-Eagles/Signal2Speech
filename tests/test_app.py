@@ -1,5 +1,6 @@
 """Integration checks for #4 / #25: one confirm -> one map action + one utterance; preview,
 cancel, disconnect, stale, and duplicate input -> nothing. Offscreen, no headset, no g.Pype."""
+import re
 import os
 import time
 
@@ -104,8 +105,9 @@ def test_simulated_flow_uses_capture_path_and_outputs_once(qapp):
     pump(qapp, lambda: view.calls)
     assert view.calls == [ActionIds.COMPARE_AIR_QUALITY]
     assert speaker.said == [COMPARE_LINE]
-    assert any("Previewed: simulated s1 r1->target-2" in l for l in app.log.lines)
-    assert any("Confirmed: simulated s2 r2->target-1" in l for l in app.log.lines)
+    # Event IDs come from one process-wide counter, so match the shape, not the number.
+    assert any(re.search(r"Previewed: simulated s\d+ r1->target-2", l) for l in app.log.lines)
+    assert any(re.search(r"Confirmed: simulated s\d+ r2->target-1", l) for l in app.log.lines)
 
 
 def test_simulated_cancel_outputs_nothing(qapp):
@@ -141,3 +143,51 @@ def test_main_keyboard_screenshot(qapp, tmp_path):
     out = tmp_path / "app.png"
     assert main(["--keys", "2,1", "--mute", "--screenshot", str(out)]) == 0
     assert out.stat().st_size > 0
+
+
+class WidgetView(FakeView):
+    """A QWidget map view, so App puts it in the layout like the real OpenOrbitView."""
+
+    def __new__(cls):
+        from PySide6.QtWidgets import QWidget
+
+        class _W(QWidget):
+            def __init__(self):
+                super().__init__()
+                self.calls = []
+
+            def show_satellite(self):
+                self.calls.append(ActionIds.SHOW_SATELLITE)
+
+            def compare_air_quality(self):
+                self.calls.append(ActionIds.COMPARE_AIR_QUALITY)
+        return _W()
+
+
+def test_map_confirm_enlarges_reveal_until_next_question(qapp):
+    view, speaker = WidgetView(), FakeSpeaker()
+    app = App(view=view, speaker=speaker, echo=False, reveal_ms=60000)
+    app.ask()
+    app.window.press_target(T2)
+    assert not app.revealing                                   # preview: tiles stay
+    app.window.press_target(T1)
+    assert app.revealing and app._reopen.interval() == 60000
+    assert not any(t.isVisibleTo(app.window) for t in app.window.tiles.values())
+    assert app.window.input_label.isVisibleTo(app.window)      # input label always visible
+    app.ask()                                                  # next question
+    assert not app.revealing
+    assert all(t.isVisibleTo(app.window) for t in app.window.tiles.values())
+
+
+def test_cancel_and_speak_reply_do_not_reveal(qapp):
+    app = App(view=WidgetView(), speaker=FakeSpeaker(), echo=False, reopen_ms=1234)
+    app.ask()
+    app.window.press_target(T2)
+    app.window.press_target(T2)                                # cancel
+    assert not app.revealing and app._reopen.interval() == 1234
+    from signal2speech.ai import to_choices
+    app.choices = list(to_choices(["Yes, please.", "No, thanks."]))
+    app.ask()
+    app.window.press_target(T1)
+    app.window.press_target(T1)                                # confirm a spoken reply
+    assert not app.revealing and app._reopen.interval() == 1234
