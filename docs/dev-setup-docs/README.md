@@ -23,6 +23,8 @@ From the [g.Pype docs](https://gpype.gtec.at). **Each step is unverified until s
 
 **Verified on 2026-11-14 (Windows 11):** Python 3.12.10, g.Pype 4.2.0, PySide6 6.11.3, `gtec_oscar` 1.3.2, `gtec_unicorn` 2.0.0. `pytest` passes 21 of 21. Built `Generator` → `Bandpass` → `TimeSeriesScope` with `HybridBlack` available. The install fails partway through on a flaky network unless you use `--resume-retries`.
 
+**Linux dev machine (not the demo laptop):** steps 1–5 work with `uv venv --python 3.12 .venv && source .venv/bin/activate && uv pip install -e ".[dev]"`. That installs g.Pype 4.2.0 and PySide6 6.11.3. `QT_QPA_PLATFORM=offscreen pytest` passes, and `python -m signal2speech.eeg.simulated --picks 2,1` runs the g.Pype `Generator` path. Verified 2026-11-14 during #21.
+
 **Offline demo:** g.Pype, the OpenOrbit data, and speech (`pyttsx3`) all work without Wi-Fi. Only AI Answering (#27) needs a network, and it falls back to saved phrases.
 
 ## Platform notes
