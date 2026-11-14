@@ -5,6 +5,7 @@ classifier output arrives.
 """
 from __future__ import annotations
 
+import itertools
 from typing import Dict, Optional
 
 from .contract import InputSources, Outcome, SelectionEvent, TargetIds
@@ -13,6 +14,11 @@ from .handler import SelectionHandler
 _PREFIX = {InputSources.KEYBOARD: "k", InputSources.SIMULATED: "s",
            InputSources.RECORDED: "rec", InputSources.LIVE_EEG: "e"}
 
+# One counter for the whole process, shared by every adapter. Event IDs must be unique per run,
+# not per adapter: the P300 chooser and the alpha switch each own a live-eeg adapter, and
+# per-instance counters made both emit "e1", so the handler rejected the confirm as a duplicate.
+_EVENT_NUMBERS = itertools.count(1)
+
 
 class InputAdapter:
     def __init__(self, handler: SelectionHandler, source: str):
@@ -20,7 +26,6 @@ class InputAdapter:
             raise ValueError(f"Unknown source: {source}")
         self._handler = handler
         self.source = source
-        self._counter = 0
         self._armed_round_id: Optional[str] = None
 
     def select_now(self, target_id: str) -> Outcome:
@@ -45,8 +50,7 @@ class InputAdapter:
         return self._handler.handle(self.create(round_id, target_id))
 
     def create(self, round_id: str, target_id: str) -> SelectionEvent:
-        self._counter += 1
-        return SelectionEvent(self.source, round_id, f"{_PREFIX[self.source]}{self._counter}",
+        return SelectionEvent(self.source, round_id, f"{_PREFIX[self.source]}{next(_EVENT_NUMBERS)}",
                               target_id)
 
 

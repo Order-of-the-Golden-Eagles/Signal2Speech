@@ -1,5 +1,6 @@
 """Integration checks for #4 / #25: one confirm -> one map action + one utterance; preview,
 cancel, disconnect, stale, and duplicate input -> nothing. Offscreen, no headset, no g.Pype."""
+import re
 import os
 import time
 
@@ -104,8 +105,9 @@ def test_simulated_flow_uses_capture_path_and_outputs_once(qapp):
     pump(qapp, lambda: view.calls)
     assert view.calls == [ActionIds.COMPARE_AIR_QUALITY]
     assert speaker.said == [COMPARE_LINE]
-    assert any("Previewed: simulated s1 r1->target-2" in l for l in app.log.lines)
-    assert any("Confirmed: simulated s2 r2->target-1" in l for l in app.log.lines)
+    # Event IDs come from one process-wide counter, so match the shape, not the number.
+    assert any(re.search(r"Previewed: simulated s\d+ r1->target-2", l) for l in app.log.lines)
+    assert any(re.search(r"Confirmed: simulated s\d+ r2->target-1", l) for l in app.log.lines)
 
 
 def test_simulated_cancel_outputs_nothing(qapp):
