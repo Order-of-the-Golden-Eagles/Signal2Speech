@@ -34,3 +34,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The headless runner handles longer scripts, and a run that times out now reports failure instead of success
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
+
+## 11/14/26 - 5:38 PM - Vasanth Anbukumar (with Claude) - #48 Evidence view driven by the P300 chooser (PR pending)
+- New flag: `python -m signal2speech.evidence --source generator --p300` (or `--source hybridblack --p300`) builds the judge window around the real P300 chooser instead of the stand-in flasher
+- The chooser's filter, scorers and calibration collectors now live in the same g.Pype pipeline as the scopes, and its flash markers go on the evidence view's marker
+- The target vs non-target average uses the calibration flashes, from the very Trigger nodes whose epochs train the classifier, so judges see what the classifier learns from
+- Two test tiles flash in the window header, and each decision (with the round's outcome from the SelectionHandler) shows next to them
+- The old mode without `--p300` works as before
+- Verified on simulated input only: new headless tests pass, and a 22 s offscreen run calibrated, trained, and made 2 of 2 correct simulated selections. Not tried with a headset
