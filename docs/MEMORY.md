@@ -17,6 +17,8 @@
 ## Verification and next checkpoint
 
 - The initial docs record the plan. Live EEG and app behavior are pending verification.
+- **Keyboard UI works (#24):** `python -m signal2speech.ui` covers preview, confirm, cancel, and the judge strip, with offscreen tests in `pytest`. See [Accessibility and UI](accessibility-ui/README.md#running-the-ui-24).
+- **Setup blocker (#19):** `gpype[all]` 4.2 needs PySide6 6.10.1 or newer, and there's no wheel for macOS 12 (Darwin 21). Use macOS 13 or later for g.Pype work. On macOS 12, `pip install PySide6==6.9.3 pytest` runs the core and the UI, but not g.Pype.
 - See the [sprint issue](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/16) for the current checkpoint and priorities.
 
 Replace outdated notes when a decision, blocker, or verified result changes. Link to the issue or commit for details.

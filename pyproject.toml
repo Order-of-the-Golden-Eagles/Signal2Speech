@@ -15,5 +15,5 @@ dev = ["pytest>=8"]
 include = ["signal2speech*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "signal2speech/ui/tests"]
 pythonpath = ["."]
