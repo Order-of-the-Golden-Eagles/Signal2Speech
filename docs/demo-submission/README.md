@@ -12,4 +12,4 @@ Own the two-minute walkthrough, live recording, and submission checklist.
 | [Judge Q&A](judge-qa.md) | Short answers mapped to g.tec's must-have and bonus criteria |
 | [Pre-flight](preflight.md) | What to do before and during the 8:15 PM headset slot |
 
-**Honest status (2026-11-14, `4fb717a`):** keyboard and simulated runs work. Live EEG in the app is blocked on #23. The alpha confirm (#47) and the OpenOrbit map (#30) are in open PRs. A real-wearer P300 average needs the P300 chooser's tiles to drive the evidence view's markers (the #46 ↔ #48 seam). Nothing here has been run with a real headset yet.
+**Honest status (2026-11-14):** keyboard and simulated runs work. Live EEG in the app is blocked on #23. The alpha confirm (#47) is merged and runs standalone (`python -m signal2speech.eeg.alpha_confirm --source hybrid-black`), but live confirm inside the app still waits on #23. The OpenOrbit map (#30) is in an open PR. A real-wearer P300 average needs the P300 chooser's tiles to drive the evidence view's markers (the #46 ↔ #48 seam). Nothing here has been run with a real headset yet.

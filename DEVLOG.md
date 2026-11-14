@@ -71,12 +71,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
 
-## 11/14/26 - 5:33 PM - Vasanth Anbukumar (with Claude) - #13 Run of show and submission prep ([PR #74](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/74))
-- Added the demo playbook in `docs/demo-submission/`: a second-by-second two-minute run of show with four roles, a shot list for a video under three minutes, a rehearsal checklist, judge Q&A, and an 8:15 PM headset pre-flight
-- Each beat has two tracks. The live track is the goal. The keyboard track is what `main` can do today, and the label you say out loud must match the one on screen
-- Found that the evidence view can't show a real P300 average yet. On the headset its flash markers have no visible flash, so the backup recording is for OSCAR and the eyes-closed alpha peak, and the P300 average stays labelled Simulated until the P300 chooser drives those markers
-- Checked the commands on Windows: keyboard and simulated runs work, and `--input live` refuses as expected. `pytest` passes 89 with 2 skipped
-- Nothing here has been run with a real headset yet
 ## 11/14/26 - 5:20 PM - Vasanth Anbukumar (with Claude) - #37 Git hooks: secret scan and pre-push tests ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66))
 - Every clone can now turn on two shared git hooks with one command, the same on Windows, macOS, and Linux: `git config core.hooksPath .githooks`
     - `pre-commit` blocks API keys and tokens (Anthropic, OpenAI, GitHub, AWS, Google, private keys), raw EEG files (`.edf`, `.bdf`, recordings folders), and `.env`
@@ -91,3 +85,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Merging two PRs back to back no longer cancels the first one's test run on `main`
 - The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
 - Code review follow-up: the summary is now written even when tests or the smoke check fail, and an app that can't start fails CI instead of looking like a skipped smoke check. The check is renamed `ci (...)` because it runs more than pytest
+
+## 11/14/26 - 5:33 PM - Vasanth Anbukumar (with Claude) - #13 Run of show and submission prep ([PR #74](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/74))
+- Added the demo playbook in `docs/demo-submission/`: a second-by-second two-minute run of show with four roles, a shot list for a video under three minutes, a rehearsal checklist, judge Q&A, and an 8:15 PM headset pre-flight
+- Each beat has two tracks. The live track is the goal. The keyboard track is what `main` can do today, and the label you say out loud must match the one on screen
+- Found that the evidence view can't show a real P300 average yet. On the headset its flash markers have no visible flash, so the backup recording is for OSCAR and the eyes-closed alpha peak, and the P300 average stays labelled Simulated until the P300 chooser drives those markers
+- Checked the commands on Windows: keyboard and simulated runs work, and `--input live` refuses as expected. `pytest` passes 89 with 2 skipped
+- Nothing here has been run with a real headset yet

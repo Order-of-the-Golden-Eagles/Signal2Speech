@@ -26,7 +26,7 @@ Use `--mute` only for silent dry runs. Rehearse at least once with audio on.
 | --- | --- | --- | --- | --- | --- |
 | Whole run of show | 1:50 | 2:00 | | | |
 | Question read → tiles start flashing | 10 s | 15 s | | | |
-| Flashes start → preview shown (P300, about 3.5 s per sequence) | 8 s | 15 s | | | |
+| Flashes start → preview shown (P300: about 2.5 s per chooser sequence; 3.5 s at the unvalidated app timing) | 8 s | 15 s | | | |
 | Preview → confirm lands (alpha, about 2 s eyes closed) | 6 s | 12 s | | | |
 | Confirm → speech starts | 1 s | 2 s | | | |
 | Switch to evidence view | 3 s | 5 s | | | |
@@ -48,7 +48,7 @@ Run each row with keyboard first, then with simulated input, then live when #23 
 | 6 | Disconnect during preview | `2`, then `D` | No output. Connection label changes. Question reopens. | ☐ | ☐ | ☐ |
 | 7 | Live confirm disarmed | Live EEG confirm before #23 arms it | `RejectedLiveConfirmDisarmed`. Keyboard can still confirm. | — | — | ☐ |
 
-Cases 4 and 5 are also covered by `pytest` (`tests/test_app.py` and the contract scenarios). Run `pytest` on the judging laptop before rehearsing. It passed 89, with 2 skipped, at `4fb717a` on Windows.
+Cases 4 and 5 are also covered by `pytest` (`tests/test_app.py` and the contract scenarios). Run `pytest` on the judging laptop before rehearsing. Expect all tests to pass with 2 skipped (111 passed, 2 skipped on Windows on 2026-11-14).
 
 ## Live rehearsal log
 

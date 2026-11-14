@@ -7,7 +7,7 @@ Answer in one or two sentences, then stop. If something isn't verified, say so.
 ## Must-haves
 
 **Where's the stimulus presentation?** *(stimulus presentation)*
-Our own PySide6 tiles flash for 100 ms with 75 ms between flashes, 10 times per tile. Every flash sends a g.Pype `Marker`, so each epoch is locked to the flash. We didn't use Paradigm Presenter because it's separately licensed and Windows-only.
+Our own PySide6 tiles flash for 100 ms with 75 ms between flashes, 10 times per tile, in the app. The standalone P300 chooser that we calibrate with uses 100 ms flashes at a 250 ms SOA, 5 times per tile; the app timing hasn't been validated with the classifier yet. Every flash sends a g.Pype `Marker`, so each epoch is locked to the flash. We didn't use Paradigm Presenter because it's separately licensed and Windows-only.
 
 **What amplifier?** *(biosignal amplifier)*
 The g.tec Unicorn Hybrid Black: 8 EEG channels at 250 Hz, read through g.Pype's `HybridBlack` source with OSCAR on.
@@ -25,7 +25,7 @@ It's g.tec's artifact removal for blinks and movement. The evidence view shows t
 Yes. One Python process, with g.Pype on worker threads and Qt on the main thread. A decision reaches the UI through a Qt signal, and one confirm gives exactly one map action and one spoken line, with no network needed.
 
 **How accurate is it?**
-On synthetic data: 6 out of 6 online picks, and 95–100% offline. That shows the plumbing works, not that a person can use it. *Live accuracy is unmeasured until the headset calibration. We'll report it in #23.*
+On synthetic data, with the chooser's settings (250 ms SOA, 5 flashes per tile): 6 out of 6 online picks, and 95–100% offline. That shows the plumbing works, not that a person can use it. *Live accuracy is unmeasured until the headset calibration. We'll report it in #23.*
 
 **What stops a wrong answer from being spoken?**
 Every pick is only a preview. Speech needs a second, different brain signal (alpha, not P300). Cancel, a timeout, a disconnect or a late decision from an old round all produce no output. Tests check this.
@@ -39,7 +39,7 @@ A platform. Every input source emits the same small selection event: source, rou
 Yes. Python, g.Pype and Qt only. GitHub Actions runs the full `pytest` suite on Windows, macOS and Linux for every PR (#37). The live headset path has only been planned on Windows so far.
 
 **How production-ready is it?** *(production-ready prototype)*
-A versioned event contract, a pinned lock file, 89 tests on three operating systems, honest input labels on screen, an offline demo, and raw EEG kept out of git. Not production: there's no clinical validation, live accuracy is unmeasured, and calibration is per wearer.
+A versioned event contract, a pinned lock file, a full `pytest` suite (111 passing at the time of writing) on three operating systems, honest input labels on screen, an offline demo, and raw EEG kept out of git. Not production: there's no clinical validation, live accuracy is unmeasured, and calibration is per wearer.
 
 **How hard is it to get started?** *(low entry barrier)*
 Clone, install the lock file, and run `python -m signal2speech.app --input simulated`. There's no headset, licence or internet needed to try the full flow. g.Pype's `Generator` stands in for the brain.
