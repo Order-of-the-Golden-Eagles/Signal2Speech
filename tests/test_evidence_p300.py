@@ -108,9 +108,9 @@ def test_realtime_flashes_reach_handler_through_evidence_graph(model):
                 chooser.on_flash(tile)
                 time.sleep(0.2)
             deadline = time.monotonic() + p300.TIME_POST + 1.0
-            while chooser.aggregator._open and time.monotonic() < deadline:
+            while chooser.aggregator.is_open and time.monotonic() < deadline:
                 time.sleep(0.05)
-            if chooser.aggregator._open:
+            if chooser.aggregator.is_open:
                 chooser.end_sequence()
             handler.cancel("next")
     finally:

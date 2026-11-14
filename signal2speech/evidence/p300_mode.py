@@ -25,7 +25,7 @@ only what the cue asked for.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, List, Optional
 
 import gpype as gp
@@ -58,7 +58,6 @@ class P300Evidence:
     adapter: InputAdapter
     flashes_per_tile: int = p300.FLASHES_PER_TILE
     chooser: Optional[p300.P300Chooser] = None
-    confirmed: list = field(default_factory=list)
 
     def attach_chooser(self, use_qt: bool = True) -> p300.P300Chooser:
         """Create the chooser. With ``use_qt``, call after the QApplication exists."""
@@ -93,8 +92,9 @@ def build_p300_evidence(kind: SourceKind | str = SourceKind.GENERATOR, *,
             unfitted scorers, so by default a small synthetic placeholder is
             fitted; calibration in the run replaces it.
         flashes_per_tile: Flashes per tile in a sequence.
-        handler: SelectionHandler the decisions go to; a printing one by
-            default.
+        handler: SelectionHandler the decisions go to. The default one is
+            preview-only: the evidence view cancels each round after its
+            preview, so its sink is never asked to confirm anything.
     """
     kind = SourceKind(kind)
     synth = p300.SyntheticP300(name="p300_synth") \
@@ -140,20 +140,21 @@ def build_p300_evidence(kind: SourceKind | str = SourceKind.GENERATOR, *,
     nodes = p300.P300Nodes(p, graph.source, graph.epoch_input, graph.marker,
                            synth, triggers, scorers, cal_triggers,
                            cal_collectors, sinks)
-    confirmed: list = []
-    handler = handler or SelectionHandler(_Sink(confirmed))
+    handler = handler or SelectionHandler(_PreviewOnlySink())
     adapter = InputAdapter(handler, input_source(graph.label))
-    return P300Evidence(graph, nodes, handler, adapter, flashes_per_tile,
-                        confirmed=confirmed)
+    return P300Evidence(graph, nodes, handler, adapter, flashes_per_tile)
 
 
-class _Sink:
-    def __init__(self, store: list):
-        self.store = store
+class _PreviewOnlySink:
+    """Default action sink for the evidence view.
+
+    The evidence view stops at the preview: ``P300Session`` cancels every
+    round right after the chooser's decision is previewed, so nothing is ever
+    confirmed and this sink is never called. Confirmation belongs to the app.
+    """
 
     def execute(self, action) -> None:
-        self.store.append(action)
-        print(f"[evidence p300] confirmed: {action}")
+        print(f"[evidence p300] unexpected confirm: {action}")
 
 
 class P300Session:
@@ -231,7 +232,7 @@ class P300Session:
         self.ev.chooser.on_flash(tile)
 
     def _after(self, i: int, calibrating: bool) -> None:
-        if not calibrating and self.ev.chooser.aggregator._open:
+        if not calibrating and self.ev.chooser.aggregator.is_open:
             self.ev.chooser.end_sequence()  # dropped epochs: decide anyway
         self._sequence(i + 1)
 
