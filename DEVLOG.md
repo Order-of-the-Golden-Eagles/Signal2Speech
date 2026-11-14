@@ -34,3 +34,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The headless runner handles longer scripts, and a run that times out now reports failure instead of success
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
+
+## 11/14/26 - 5:30 PM - Vasanth Anbukumar (with Claude) - #16 Standup snapshot (PR pending)
+- Added a two-minute written standup in `docs/sprint-operations/standup.md`, built from GitHub PRs, issues, CI runs, this devlog, and MEMORY.md
+- It lists what works on main and how each piece was checked. So far everything is simulated, recorded, or keyboard-driven; nothing is live EEG yet
+- Each owner's open PRs and next task are listed, plus the next checkpoints: #40 before the headset, then the 8:15 PM live test (#23)
+- Top risks: live P300 accuracy and flash timing, seven PRs waiting on review (two with failing CI), and the macOS 12 g.Pype blocker
+- No code changes
