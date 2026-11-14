@@ -25,3 +25,17 @@ Keep choices stable during a round. Show the preview, confirm and cancel control
 - A preview produces no audio and no map change. Cancel, disconnect, and reset return to a clean screen.
 - Always show the input label so simulated input is never mistaken for live EEG.
 - Use high contrast and large type (at least 48 px on tiles) so text is readable from the judge table.
+
+## Running the UI (#24)
+
+```
+python -m signal2speech.ui            # keys 1/2 select, Esc cancels
+python -m signal2speech.ui --flash    # flash tiles in Choose rounds, print each flash
+python -m signal2speech.ui --keys 2 --screenshot out.png
+```
+
+The standalone sink only prints the `ConfirmedAction`. It plays no audio and changes no map. `pytest` includes the offscreen UI tests in `signal2speech/ui/tests/`.
+
+- **Listeners:** `SelectionWindow` is driven only by `on_round_opened`, `on_preview`, `on_cleared`, and `on_handled`. The handler sends no `on_cleared` after a confirm, so the window clears itself on `Confirmed`. Key auto-repeat is off, so a held 2 can't preview and then cancel.
+- **Input label:** call `window.set_input_source(InputSources.SIMULATED)`, or another source, to label the decoder feeding the handler. Call `set_connection(...)` for the headset state.
+- **Flashes for #46:** pass `on_flash(target_id)`, `on_sequence_started` (call `eeg.arm_capture()` here), and `on_sequence_finished` to `SelectionWindow(..., flash=True)`. Each flash lights the tile, repaints it synchronously, and then calls `on_flash` in the same tick. Tune the timing with `window.flasher.flash_ms`, `isi_ms`, and `repetitions`. Only Choose rounds flash. Frame-accurate timing still needs checking on hardware.
