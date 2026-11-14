@@ -1,5 +1,6 @@
 """#25 checks: offline speech choice, simulated-input selection, one confirm -> one reveal and one
 utterance. Offscreen, no headset, no network."""
+from pathlib import Path
 import os
 import sys
 import types
@@ -74,7 +75,8 @@ def test_offline_speaker_plays_bundled_clip_instead_of_voice(qapp, tmp_path, mon
     monkeypatch.setattr(qm, "QSoundEffect", FakeEffect)
     sp = OfflineSpeaker(log.append, audio_dir=tmp_path, use_qt_tts=False)
     sp.say("Washtenaw's AQI rose 186 points.", "compare_air_quality")
-    assert played == [str(tmp_path / "compare_air_quality.wav")]
+    # QUrl.toLocalFile() uses forward slashes on Windows, so compare paths, not strings.
+    assert [Path(p) for p in played] == [tmp_path / "compare_air_quality.wav"]
     assert any("speech: bundled" in l for l in log)
 
 
