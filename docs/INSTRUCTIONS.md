@@ -7,3 +7,4 @@
 - Use platform APIs and hardware-required packages. Keep the OpenOrbit demo usable offline. Label keyboard, simulated, recorded, and live EEG input accurately. Keep secrets and raw EEG out of git and public logs.
 - When an issue is done, append a plain-language entry to [DEVLOG.md](../DEVLOG.md) in the same PR. The format is in [CLAUDE.md](../CLAUDE.md#devlog-after-every-issue).
 - After a verified change, update the category when it helps the next developer. Update memory when a shared decision, setup step, blocker, or demo checkpoint changes. Replace stale notes and link to the issue or commit for detail.
+- After a PR merges, update the project board: link the PR, set the status by the issue's "Done when", and keep sub-issue progress current. The steps are in [CLAUDE.md](../CLAUDE.md#project-board-after-every-merge).
