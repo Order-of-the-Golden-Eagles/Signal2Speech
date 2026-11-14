@@ -29,9 +29,13 @@ flowchart TD
 
 ## First demo host
 
-**Use the sponsor’s Unity ERP scene and C# for the first live build.** Keep the sponsor’s stimulus layout while verifying target IDs. Run keyboard and simulated input through the same app handler, so the rest of the team can work while the headset is unavailable. The first hardware rehearsal starts by opening the sponsor scene in Unity and pressing **Play**. Unity **2022.3.11f1** is required by the SDK. See the [launch path](../dev-setup-docs/README.md#unity-launch-path-19), which #19 will verify.
+**Python 3.12 + [g.Pype](https://gpype.gtec.at) + PySide6, in one process.** g.Pype reads the Unicorn Hybrid Black, cleans the signal with OSCAR, decodes choices, and draws the evidence scopes. A PySide6 window shows the tiles, preview, and OpenOrbit panel. g.Pype runs on Windows, macOS, and Linux, and needs no Unicorn Suite or licence for the Hybrid Black.
 
-**Decided:** the judging build runs entirely inside Unity: uGUI overlays plus the vendor's 3D flash tags, with no browser UI and no localhost bridge. See [UI stack](../accessibility-ui/README.md#ui-stack-and-layout). [g.tec Unity ERP starter](https://github.com/unicorn-bi/Unicorn-Hybrid-Black-Unity-Interface/blob/main/tutorial/build-your-first-erp-application.md)
+- **Choose:** our tiles flash, and a P300 classifier (g.Pype `Epochs` → `Sklearn` LDA) picks the attended tile ([#46](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/46)).
+- **Confirm:** a deliberate alpha switch, eyes closed for about 2 s (`BandPower` → `Threshold`) ([#47](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/47)).
+- **Evidence:** raw and filtered EEG, FFT, and averaged target vs. non-target responses for the judges ([#48](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/48)).
+
+Keyboard and g.Pype `Generator` input run through the same handler, so the team can work without the headset. Setup is in the [launch path](../dev-setup-docs/README.md#python-and-gpype-launch-path-19). *We switched from Unity on 2026-11-14 because the sponsor's judging criteria centre on g.Pype: visible pipelines, cross-platform support, and evidence.*
 
 ## Developer handoff
 
@@ -47,10 +51,10 @@ The input adapter maps keys, simulated choices, and decoded headset classes to t
 | Simulator or test input | `{"source":"simulated","roundId":"r1","eventId":"s1","targetId":"target-2"}` |
 | Live headset | `{"source":"live-eeg","roundId":"r1","eventId":"e1","targetId":"target-2"}` |
 
-- The app owns the visible options and their mapping. Example choice round `r1` maps `target-1` to `show_satellite` and `target-2` to `compare_air_quality`. Example confirmation round `r2` maps `target-1` to Confirm and `target-2` to Cancel. Verify the vendor’s numeric class mapping in the installed scene.
+- The app owns the visible options and their mapping. Example choice round `r1` maps `target-1` to `show_satellite` and `target-2` to `compare_air_quality`. Example confirmation round `r2` maps `target-1` to Confirm and `target-2` to Cancel. Our training labels define the classifier classes (`EegClassMap.default()`).
 - Freeze options for the round. Accept one valid target from the active input source and consume the round before updating the UI or running an effect. Drop unknown targets, duplicate events, and events for any other round.
 - On a preview, keep the exact text and action ID together. On a fresh Confirm, consume that pending choice before sending it to speech or the map, so a repeated callback cannot run it twice. Cancel, reset, or disconnect closes the round and clears the preview.
-- g.tec documents an `On Class Selection` callback with a decoded class. The published callback example supplies no app round ID. The adapter must establish the round at capture time or verify a starter transition that isolates callbacks from the previous round. Assigning the current round at callback arrival could mistake an old choice for a confirmation. Keep live confirmation disarmed until the boundary is verified. [g.tec callback example](https://github.com/unicorn-bi/Unicorn-Hybrid-Black-Unity-Interface/blob/main/tutorial/build-your-first-erp-application.md#advance-unity-event-callbacks)
+- g.Pype decisions arrive after the flash sequence ends. The adapter stamps the round when flashing **starts** (`arm_capture()`), so a late decision from the Choose round can't count as a confirmation. Keep live confirmation disarmed until [#23](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/23) verifies it.
 
 | Confirmed action | What happens |
 | --- | --- |

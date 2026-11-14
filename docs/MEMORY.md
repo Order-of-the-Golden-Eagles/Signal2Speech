@@ -7,12 +7,11 @@
 
 ## Decisions and open questions
 
-- Start with g.tec Unicorn Hybrid Black and the Unity ERP starter. Use keyboard or simulated input before live headset access.
+- **Stack (pivoted 2026-11-14):** Python 3.12, g.Pype 4.2, and PySide6 in one process. We use the Unicorn Hybrid Black through the `HybridBlack` source with OSCAR on. No Unity, no Unicorn Suite, and no licence needed. Use keyboard or `Generator` input before live headset access.
 - Use platform APIs and hardware-required packages. Bundle OpenOrbit data and demo audio locally.
-- Selection contract is final in [#22](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/22). It covers the event shape, IDs, round rules, folder ownership, and dependency order. See [selection-contract.md](architecture/selection-contract.md). `core/` holds the plain C# handler, and `dotnet test core/DotNetTests~` must stay green. Live EEG confirm stays disarmed until #23.
-- **The SDK needs Unity 2022.3 (2022.3.11f1), not Unity 6.** The judging build is Unity-only: vendor `ERPFlashTag3D` tags plus uGUI overlays, with no browser UI or bridge. [Launch path](dev-setup-docs/README.md#unity-launch-path-19).
-- **Blocker (#19):** Vasanth's laptop has no Unity Hub, no Unity 2022.3, and no Unicorn Suite. The leftover 6000.0.40f1 folder is unused. Install them, then create and commit `unity/Signal2Speech`.
-- Vendor simulator `UN-0000.00.00` drives the real ERP pipeline without a headset, so use it for #21.
+- Selection contract is final in [#22](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/22). It covers the event shape, IDs, round rules, folder ownership, and dependency order. See [selection-contract.md](architecture/selection-contract.md). `signal2speech/core/` holds the pure-Python handler, and `pytest` must stay green. Live EEG confirm stays disarmed until #23.
+- **Decoding:** choose with P300 (our flashing tiles → `Epochs` → `Sklearn` LDA, #46). Confirm with an alpha switch, eyes closed for about 2 s (#47). Fallback: step through options one at a time and confirm each with the alpha switch. Judges see evidence scopes (#48).
+- **Ask the g.tec mentor:** Paradigm Presenter licence, MCP visualizer access, and whether one headset can stream to two apps at once.
 - The AI provider is TBD. See the [architecture walkthrough and input contract](architecture/README.md) and [AI Answering](ai-answering/README.md).
 
 ## Verification and next checkpoint

@@ -37,11 +37,12 @@ The wearer chooses **Compare counties** and confirms. OpenOrbit switches from th
 | Layer | Current plan |
 | --- | --- |
 | EEG hardware | **g.tec Unicorn Hybrid Black** |
-| EEG acquisition and selection | **g.tec Unicorn Suite** and the **Unity ERP starter with C#** |
-| Interface | **Unity 2022.3 LTS and C#**: vendor `ERPFlashTag3D` targets plus uGUI and TextMeshPro overlays. No browser UI. |
-| Local integration | In-process in Unity through the shared [selection contract](docs/architecture/selection-contract.md). No bridge. |
+| EEG acquisition and processing | **[g.Pype](https://gpype.gtec.at)** (Python): the `HybridBlack` source, **OSCAR** artifact removal, filters, and scopes. Cross-platform. |
+| Selection | **P300** chooser (our flashing tiles → `Epochs` → LDA) plus a deliberate **alpha switch** to confirm |
+| Interface | **PySide6** (Qt), the same toolkit g.Pype's GUI uses: tiles, preview, judge strip, evidence scopes |
+| Local integration | One Python process through the shared [selection contract](docs/architecture/selection-contract.md). UDP and LSL out are available for other apps. |
 | AI Answering | Short reply suggestions with explicit wearer confirmation. **Model, provider, and integration TBD.** |
-| Speech | Bundled audio for the OpenOrbit demo. **Speech synthesis for generated replies TBD.** |
+| Speech | Bundled audio for the OpenOrbit demo. Offline speech synthesis with **pyttsx3** for generated replies. |
 | OpenOrbit data | Locally bundled **NASA MODIS imagery** and **EPA AirData daily county AQI**. **NASA FIRMS fire detections** are a planned extension. |
 | Testing | Keyboard rehearsal, simulated input, then live EEG validation |
 
@@ -49,12 +50,12 @@ Use platform APIs and hardware-required packages. Keep the OpenOrbit demo assets
 
 ## Implementation status
 
-**Planning and prototyping.** The first demo targets Unity. The app layout, any separate browser host, AI provider, and setup instructions are **TBD**. The first milestone is a keyboard-driven selection that produces one confirmed map-and-speech reveal. The live milestone is the same flow driven by two deliberate EEG selections, one to preview and one to confirm.
+**Prototyping.** The selection contract and tests are on `main` (`pytest`). Setup is in the [launch path](docs/dev-setup-docs/README.md#python-and-gpype-launch-path-19). The AI provider is **TBD**. The first milestone is a keyboard-driven selection that produces one confirmed map-and-speech reveal. The live milestone is the same flow driven by two deliberate EEG selections, one to preview and one to confirm.
 
 ## Resources
 
 - [g.tec Hackathon resources](https://github.com/unicorn-bi/Hackathon)
-- [g.tec Unity ERP starter](https://github.com/unicorn-bi/Unicorn-Hybrid-Black-Unity-Interface/blob/main/tutorial/build-your-first-erp-application.md)
+- [g.Pype documentation](https://gpype.gtec.at) and [GitHub](https://github.com/gtec-medical-engineering/gpype)
 - [NASA GIBS imagery documentation](https://nasa-gibs.github.io/gibs-api-docs/access-basics/)
 - [EPA AirData 2023 daily county AQI download](https://aqs.epa.gov/aqsweb/airdata/daily_aqi_by_county_2023.zip)
 - [NASA FIRMS historical fire detections](https://firms.modaps.eosdis.nasa.gov/download/)
