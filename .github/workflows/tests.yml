@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  pytest:
-    name: pytest (${{ matrix.os }}, py${{ matrix.python }})
+  ci:
+    name: ci (${{ matrix.os }}, py${{ matrix.python }})   # pytest + smoke
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -75,28 +75,43 @@ jobs:
           EOF
 
       - name: pytest
+        id: pytest
         run: |
-          set -o pipefail
+          set +e                        # write the summary even when tests fail
           pytest -q -rs 2>&1 | tee pytest.txt
+          rc=${PIPESTATUS[0]}
           {
-            echo "### pytest (${{ matrix.os }}, py${{ matrix.python }})"
+            echo "### pytest (${{ matrix.os }}, py${{ matrix.python }}): exit $rc"
             echo '```'
             tail -n 1 pytest.txt
             grep '^SKIPPED' pytest.txt || echo "no skips"
+            grep -E '^(FAILED|ERROR)' pytest.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: Smoke (#41)
-        if: always() && steps.install.outcome != 'failure'
+        if: always() && steps.install.outcome == 'success'
         run: |
-          set -o pipefail
-          if python -m signal2speech.app --help | grep -q -- '--smoke'; then
+          set +e
+          # --help must work: a broken app import fails here instead of looking like a skip.
+          help=$(python -m signal2speech.app --help 2>&1)
+          hrc=$?
+          if [ $hrc -ne 0 ]; then
+            echo "$help"
+            { echo "### smoke: app failed to start (exit $hrc)"; echo '```'; echo "$help" | tail -n 20; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            exit $hrc
+          fi
+          if [[ "$help" == *"--smoke"* ]]; then
             python -m signal2speech.app --smoke 2>&1 | tee smoke.txt
+            rc=${PIPESTATUS[0]}
           else
             echo "::notice title=Smoke skipped::python -m signal2speech.app --smoke isn't on this branch yet (#41)"
             echo "SMOKE SKIPPED: --smoke not on this branch yet (#41)" > smoke.txt
+            rc=0
           fi
-          { echo "### smoke"; echo '```'; cat smoke.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "### smoke: exit $rc"; echo '```'; cat smoke.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
 
       - name: Manual checks (not run in CI)
         if: always()
