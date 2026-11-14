@@ -1,0 +1,28 @@
+# .NET (core/DotNetTests)
+bin/
+obj/
+*.user
+
+# Unity (unity/Signal2Speech, created in #19)
+unity/**/[Ll]ibrary/
+unity/**/[Tt]emp/
+unity/**/[Oo]bj/
+unity/**/[Bb]uild/
+unity/**/[Bb]uilds/
+unity/**/[Ll]ogs/
+unity/**/[Uu]ser[Ss]ettings/
+unity/**/MemoryCaptures/
+*.csproj.user
+*.sln.DotSettings.user
+unity/**/*.csproj
+unity/**/*.sln
+
+# Never commit raw EEG or secrets
+*.edf
+*.bdf
+*.gdf
+*.xdf
+eeg-recordings/
+.env
+.env.*
+secrets.*

@@ -1,0 +1,10 @@
+{
+  "name": "Signal2Speech.Core.Tests",
+  "rootNamespace": "Signal2Speech.Core.Tests",
+  "references": ["Signal2Speech.Core", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "includePlatforms": ["Editor"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll", "Newtonsoft.Json.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

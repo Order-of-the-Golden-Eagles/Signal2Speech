@@ -35,6 +35,8 @@ A separate browser UI and localhost bridge are **TBD**. The in-process contract 
 
 ## Developer handoff
 
+**The finalized contract, code, and tests are in [selection-contract.md](selection-contract.md).** It also covers folder ownership and issue dependencies. This section is the short version.
+
 **Input adapter → selection handler → confirmed action → speech or OpenOrbit.**
 
 The input adapter maps keys, simulated choices, and decoded headset classes to the same event. The following are three alternative inputs for the same visible option in the same example round. The app issues the round ID. The adapter issues the event ID and maps the source-specific input to an app target.

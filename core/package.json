@@ -1,0 +1,11 @@
+{
+  "name": "com.goldeneagles.signal2speech.core",
+  "version": "0.1.0",
+  "displayName": "Signal2Speech Core",
+  "description": "Selection contract and handler shared by keyboard, simulated, and live EEG input (issue #22). No UnityEngine dependency.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.test-framework": "1.4.5"
+  }
+}
