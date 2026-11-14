@@ -17,7 +17,7 @@ From the [g.Pype docs](https://gpype.gtec.at). **Each step is unverified until s
 | 3 | `pip install -e ".[dev]"` (exact versions: `pip install -r requirements-lock.txt`; on a flaky network add `--resume-retries 30 --timeout 120`) | Installs `gpype[all]`, PySide6, pyttsx3, and pytest | ✅ 2026-11-14 |
 | 4 | `pytest` | All contract tests pass | ✅ 2026-11-14 |
 | 5 | `python -c "import gpype; print(gpype.__version__)"` | 4.2 or later | ✅ 2026-11-14 |
-| 6 | Run a g.Pype example with `Generator` (for example `s1e4_time_series_scope.py` from the g.Pype repo) | The scope window shows a moving signal | ◐ pipeline builds offscreen; window not yet opened by a person |
+| 6 | Run a g.Pype example with `Generator` (for example `s1e4_time_series_scope.py` from the g.Pype repo) | The scope window shows a moving signal | ✅ 2026-11-14 (scope window ran 15 s with no errors) |
 | 7 | Pair the Unicorn Hybrid Black in OS Bluetooth settings, then run `s3e2_hybrid_black.py` | 8 EEG traces at 250 Hz | ☐ (#23) |
 | 8 | `python -m signal2speech.app` once #25 lands | The demo window opens on the first choice round | ☐ |
 
