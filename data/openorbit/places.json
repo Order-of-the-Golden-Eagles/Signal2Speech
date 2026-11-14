@@ -1,0 +1,36 @@
+{
+  "places": [
+    {
+      "id": "emu",
+      "label": "Eastern Michigan University",
+      "county": "Washtenaw",
+      "lat": 42.2502,
+      "lon": -83.6245,
+      "source": "https://en.wikipedia.org/wiki/Eastern_Michigan_University"
+    },
+    {
+      "id": "detroit",
+      "label": "Detroit",
+      "county": "Wayne",
+      "lat": 42.3317,
+      "lon": -83.0458,
+      "source": "https://en.wikipedia.org/wiki/Detroit"
+    }
+  ],
+  "crs": "EPSG:4326",
+  "bbox": {
+    "west": -84.4,
+    "south": 41.8,
+    "east": -82.6,
+    "north": 42.8
+  },
+  "image": {
+    "width": 1440,
+    "height": 800
+  },
+  "layer": "MODIS_Terra_CorrectedReflectance_TrueColor",
+  "images": {
+    "2023-06-26": "modis_2023-06-26.jpg",
+    "2023-06-28": "modis_2023-06-28.jpg"
+  }
+}
