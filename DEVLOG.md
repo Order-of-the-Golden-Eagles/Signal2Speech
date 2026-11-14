@@ -34,3 +34,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The headless runner handles longer scripts, and a run that times out now reports failure instead of success
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
+
+## 11/14/26 - 5:32 PM - Long Le (with Claude) - #34 Submission plan and checklist (PR pending)
+- The team has a plan for the demo and the submission in `docs/demo-submission/`
+    - `run-of-show.md`: the two-minute table demo, with a fallback for every step
+    - `video-shot-list.md`: nine shots under 2:45 for the video
+    - `submission-checklist.md`: the Devpost fields, a draft AI disclosure, and logs for submission status and rehearsals
+- Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
+- Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
