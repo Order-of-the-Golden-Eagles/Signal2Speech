@@ -23,13 +23,13 @@ import re
 import sys
 import time
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Callable, List, Optional, TextIO
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_DIR = ROOT / "logs"                    # gitignored
 DATA_DIR = ROOT / "data" / "openorbit"     # #29
-DEMO_ROUND = ROOT / "contracts" / "demo-round.json"
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".webp"}
 # The demo's ground truth (README, MEMORY.md): EPA daily county AQI, June 26 -> June 28, 2023.
 AQI = {"Washtenaw": (32, 218), "Wayne": (58, 226)}
@@ -46,21 +46,46 @@ _SCALARS = (str, int, float, bool, type(None))
 
 
 # ── Diagnostics log ──────────────────────────────────────────
-def _safe(value, depth: int = 0):
-    """JSON-safe metadata only. Arrays and long numeric lists (raw EEG) are refused."""
+_NO_RAW = "diagnostics record short metadata only; raw EEG stays out of logs (#10)"
+MAX_LIST = 32
+
+
+def _scalar(value):
     if isinstance(value, _SCALARS):
+        if isinstance(value, str) and len(value) > 500:
+            raise TypeError(_NO_RAW + ": string too long")
         return value
-    if type(value).__module__.startswith("numpy"):
-        if getattr(value, "ndim", 1) == 0:
-            return value.item()
-        raise TypeError("diagnostics never record arrays (raw EEG stays out of logs, #10)")
-    if isinstance(value, dict) and depth < 3:
+    if type(value).__module__.startswith("numpy") and getattr(value, "ndim", None) == 0:
+        return value.item()
+    if isinstance(value, (Path, Enum)):
+        return str(value.value if isinstance(value, Enum) else value)
+    return _NOT_SCALAR
+
+
+_NOT_SCALAR = object()
+
+
+def _safe(value, depth: int = 0):
+    """Allow-list: scalars, dicts up to 3 levels, and lists of up to 32 scalars. Else TypeError.
+
+    Nothing is ever stringified as a fallback, so arrays, deques, tensors, bytes, and nested
+    sample lists can't reach a log by accident.
+    """
+    s = _scalar(value)
+    if s is not _NOT_SCALAR:
+        return s
+    if isinstance(value, dict):
+        if depth >= 3:
+            raise TypeError(_NO_RAW + ": nested too deep")
         return {str(k): _safe(v, depth + 1) for k, v in value.items()}
-    if isinstance(value, (list, tuple)) and depth < 3:
-        if len(value) > 32:
-            raise TypeError("diagnostics record short metadata lists only (no sample data)")
-        return [_safe(v, depth + 1) for v in value]
-    return str(value)
+    if isinstance(value, (list, tuple)):
+        if len(value) > MAX_LIST:
+            raise TypeError(_NO_RAW + f": list longer than {MAX_LIST}")
+        out = [_scalar(v) for v in value]
+        if any(v is _NOT_SCALAR for v in out):
+            raise TypeError(_NO_RAW + ": lists may hold scalars only")
+        return out
+    raise TypeError(_NO_RAW + f": {type(value).__name__} is not allowed")
 
 
 class Diagnostics:
@@ -80,7 +105,16 @@ class Diagnostics:
     @classmethod
     def to_file(cls, prefix: str = "diagnostics", **kw) -> "Diagnostics":
         LOG_DIR.mkdir(exist_ok=True)
-        return cls(LOG_DIR / f"{prefix}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl", **kw)
+        stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{int(time.time() * 1000) % 1000:03d}"
+        n = 1
+        while True:                               # claim the name, so same-ms runs can't share it
+            suffix = "" if n == 1 else f"-{n}"
+            path = LOG_DIR / f"{prefix}-{stamp}-{os.getpid()}{suffix}.jsonl"
+            try:
+                open(path, "x", encoding="utf-8").close()
+                return cls(path, **kw)
+            except FileExistsError:
+                n += 1
 
     # Context shown on every row
     def set_input(self, source: str) -> None:
@@ -119,10 +153,12 @@ class Diagnostics:
     def attach(self, handler, *, input_source: Optional[str] = None,
                gpype_source: Optional[str] = None, connection: Optional[str] = None,
                sink=None) -> "Diagnostics":
-        """Log rounds, previews, outcomes, and clears, plus output timing if ``sink`` is given.
+        """Log rounds, previews, outcomes, and clears, plus an output row if ``sink`` is given.
 
-        ``sink`` is the object the handler calls (``AppSink``). Its ``execute`` is wrapped so
-        every output row carries the milliseconds from the decision to the end of output.
+        ``sink`` is the object the handler calls (``AppSink``). Its ``execute`` is wrapped once,
+        however many Diagnostics attach. Each output row carries ``sink_call_ms``, the time
+        spent inside ``execute``: the map update plus *starting* speech. Qt speech and sound
+        play asynchronously, so audible duration is not included.
         """
         if input_source:
             self.set_input(input_source)
@@ -136,16 +172,27 @@ class Diagnostics:
         handler.on_handled.append(self._on_handled)
         handler.on_cleared.append(lambda reason: self.record("cleared", reason=reason))
         if sink is not None:
-            original = sink.execute
+            observers = getattr(sink, "_diagnostics_observers", None)
+            if observers is None:                 # wrap once; later Diagnostics just listen
+                observers = []
+                original = sink.execute
 
-            def timed(action):
-                t = time.monotonic()
-                original(action)
-                self.record("output", action=action.action_id, source=action.source,
-                            preview=action.preview_event_id, confirm=action.confirm_event_id,
-                            output_ms=round((time.monotonic() - t) * 1000, 1))
-            sink.execute = timed
+                def timed(action):
+                    t = time.monotonic()
+                    original(action)
+                    ms = round((time.monotonic() - t) * 1000, 1)
+                    for diag in list(observers):
+                        diag._on_output(action, ms)
+                sink.execute = timed
+                sink._diagnostics_observers = observers
+            if self not in observers:
+                observers.append(self)
         return self
+
+    def _on_output(self, action, sink_call_ms: float) -> None:
+        self.record("output", action=action.action_id, source=action.source,
+                    preview=action.preview_event_id, confirm=action.confirm_event_id,
+                    sink_call_ms=sink_call_ms)
 
     def _on_round(self, rnd) -> None:
         self._round_opened[rnd.id] = time.monotonic()
@@ -169,7 +216,7 @@ class Diagnostics:
 @dataclass
 class Check:
     name: str
-    status: str      # PASS, FAIL, SKIP
+    status: str      # PASS, WARN, SKIP, FAIL (judging mode turns WARN and SKIP into FAIL)
     detail: str
 
 
@@ -199,26 +246,30 @@ def check_environment() -> Check:
     except ImportError as err:
         return Check("environment", "FAIL", f"import failed: {err}. Run pip install -e \".[dev]\"")
     py = platform.python_version()
-    detail = f"Python {py}, g.Pype {gpype.__version__}, PySide6 {PySide6.__version__}"
-    major_minor = tuple(int(x) for x in gpype.__version__.split(".")[:2])
-    if major_minor < (4, 2):
+    gv = str(getattr(gpype, "__version__", "unknown"))
+    detail = f"Python {py}, g.Pype {gv}, PySide6 {getattr(PySide6, '__version__', 'unknown')}"
+    m = re.match(r"(\d+)\.(\d+)", gv)
+    if not m:
+        return Check("environment", "FAIL", detail + " (can't read the g.Pype version)")
+    if (int(m.group(1)), int(m.group(2))) < (4, 2):
         return Check("environment", "FAIL", detail + " (need g.Pype 4.2 or later)")
     if not py.startswith("3.12."):
-        return Check("environment", "PASS", detail + " (note: the launch path pins 3.12)")
+        return Check("environment", "WARN", detail + " (the verified launch path pins 3.12)")
     return Check("environment", "PASS", detail)
 
 
-def check_demo_numbers() -> Check:
-    """The spoken comparison must match the EPA values it claims (32->218, 58->226)."""
-    choices = json.loads(DEMO_ROUND.read_text(encoding="utf-8"))["choices"]
-    text = next((c.get("spokenText", "") for c in choices
-                 if c["actionId"] == "compare_air_quality"), "")
-    rises = {county: after - before for county, (before, after) in AQI.items()}
-    missing = [f"{c} +{r}" for c, r in rises.items() if c not in text or str(r) not in text]
+def check_demo_numbers(text: Optional[str] = None) -> Check:
+    """Each county in the spoken comparison is followed, in the same sentence, by its EPA rise."""
+    if text is None:
+        from signal2speech.ui.__main__ import load_demo_choices   # the app's own loader
+        text = next((c.spoken_text or "" for c in load_demo_choices()
+                     if c.action_id == "compare_air_quality"), "")
+    missing = [f"{county} +{after - before}" for county, (before, after) in AQI.items()
+               if not re.search(rf"{county}[^.]*?(?<![\d.]){after - before}(?![\d])", text)]
     if missing:
         return Check("demo numbers", "FAIL", f"spoken line {text!r} lacks {', '.join(missing)}")
-    return Check("demo numbers", "PASS",
-                 ", ".join(f"{c} {b}->{a} (+{a - b})" for c, (b, a) in AQI.items()))
+    return Check("demo numbers", "PASS", f"{text!r} matches EPA " + ", ".join(
+        f"{c} {b}->{a}" for c, (b, a) in AQI.items()))
 
 
 def _rel(path: Path) -> str:
@@ -240,14 +291,16 @@ def check_assets(data_dir: Optional[Path] = None) -> Check:
     images = sorted(p.name for p in data_dir.rglob("*") if p.suffix.lower() in IMAGE_SUFFIXES)
     if len(images) < 2:
         problems.append(f"{len(images)} image(s), need June 26 and June 28")
-    text = ""
+    lines: List[str] = []
     for p in [sources, *data_dir.rglob("*.csv"), *data_dir.rglob("*.json")]:
         if p.is_file() and p.stat().st_size < 2_000_000:
-            text += p.read_text(encoding="utf-8", errors="ignore") + "\n"
+            lines += p.read_text(encoding="utf-8", errors="ignore").splitlines()
     for county, (before, after) in AQI.items():
-        if county not in text or not re.search(rf"\b{before}\b", text) \
-                or not re.search(rf"\b{after}\b", text):
-            problems.append(f"{county} {before}->{after} not found in SOURCES.md or data files")
+        # Only lines (table rows, CSV rows) that name this county count for its values.
+        own = " ".join(line for line in lines if county in line)
+        found = {v for v in (before, after) if re.search(rf"(?<![\d.]){v}(?!\d|\.\d)", own)}
+        if found != {before, after}:
+            problems.append(f"{county} {before}->{after} not found on {county}'s own rows")
     audio = sorted(p.name for p in (data_dir / "audio").glob("*.wav")) if (data_dir / "audio").is_dir() else []
     if problems:
         return Check("openorbit assets", "FAIL", "; ".join(problems))
@@ -257,12 +310,14 @@ def check_assets(data_dir: Optional[Path] = None) -> Check:
 
 
 def check_view() -> Check:
-    try:
-        from signal2speech.openorbit import OpenOrbitView  # noqa: F401  (#30)
-    except ImportError:
+    from signal2speech.app import PendingMapView, load_view   # the app's own probe
+    view = load_view()
+    stand_in = isinstance(view, PendingMapView)
+    view.deleteLater()
+    if stand_in:
         return Check("openorbit view", "SKIP", "signal2speech.openorbit.OpenOrbitView not built yet "
                                                "(#30); the app shows a labelled stand-in")
-    return Check("openorbit view", "PASS", "OpenOrbitView imports")
+    return Check("openorbit view", "PASS", f"{type(view).__name__} loads")
 
 
 def check_confirm_flow(diag: Diagnostics) -> List[Check]:
@@ -338,24 +393,23 @@ def run_smoke(mode: str = "dev", out: Callable[[str], None] = print) -> int:
     diag = Diagnostics.to_file("smoke")
     diag.record("smoke_start", mode=mode, python=platform.python_version(),
                 platform=platform.platform())
-    checks: List[Check] = [check_environment()]
+    def guarded(name: str, fn) -> List[Check]:
+        try:                                    # a crashing check is a failing check
+            result = fn()
+            return result if isinstance(result, list) else [result]
+        except Exception as err:
+            return [Check(name, "FAIL", repr(err))]
+
+    checks = guarded("environment", check_environment)
     if checks[0].status != "FAIL":
-        for fn in (check_demo_numbers, check_assets, check_view):
-            try:
-                checks.append(fn())
-            except Exception as err:            # a crashing check is a failing check
-                checks.append(Check(fn.__name__.replace("check_", ""), "FAIL", repr(err)))
-        try:
-            checks.extend(check_confirm_flow(diag))
-        except Exception as err:
-            checks.append(Check("confirm flow", "FAIL", repr(err)))
-        try:
-            checks.append(check_gpype_stream())
-        except Exception as err:
-            checks.append(Check("g.Pype stream", "FAIL", repr(err)))
-    if mode == "judging":
-        checks = [Check(c.name, "FAIL", c.detail + " [SKIP is a FAIL in judging mode]")
-                  if c.status == "SKIP" else c for c in checks]
+        checks += guarded("demo numbers", check_demo_numbers)
+        checks += guarded("openorbit assets", check_assets)
+        checks += guarded("openorbit view", check_view)
+        checks += guarded("confirm flow", lambda: check_confirm_flow(diag))
+        checks += guarded("g.Pype stream", check_gpype_stream)
+    if mode == "judging":                       # the judging build must be fully green
+        checks = [Check(c.name, "FAIL", c.detail + f" [{c.status} is a FAIL in judging mode]")
+                  if c.status in ("SKIP", "WARN") else c for c in checks]
 
     out(f"Signal2Speech smoke ({mode}) · input labels: keyboard checks use keyboard, "
         f"the stream check uses Generator (simulated); no live EEG")
@@ -364,12 +418,13 @@ def run_smoke(mode: str = "dev", out: Callable[[str], None] = print) -> int:
         out(f"  {c.status:<5} {c.name:<17} {c.detail}")
     for m in MANUAL_CHECKS:
         out(f"  {'MANUAL':<5} {m}")
-    counts = {s: sum(c.status == s for c in checks) for s in ("PASS", "SKIP", "FAIL")}
+    counts = {s: sum(c.status == s for c in checks) for s in ("PASS", "WARN", "SKIP", "FAIL")}
     verdict = "FAIL" if counts["FAIL"] else "PASS"
     diag.record("smoke_end", verdict=verdict, **counts)
     diag.close()
     log = _rel(diag.path) if diag.path else "-"
-    out(f"SMOKE {verdict}: {counts['PASS']} pass, {counts['SKIP']} skip, {counts['FAIL']} fail "
-        f"· log {log}")
+    warn = f"{counts['WARN']} warn, " if counts["WARN"] else ""
+    out(f"SMOKE {verdict}: {counts['PASS']} pass, {warn}{counts['SKIP']} skip, "
+        f"{counts['FAIL']} fail · log {log}")
     qapp.processEvents()
     return 1 if counts["FAIL"] else 0

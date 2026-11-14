@@ -26,3 +26,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - It lists the checks that need a person: headset, live calibration, audio, Wi-Fi off
 - Every run writes a timing log to `logs/` (not committed) with the input mode and connection state. The log refuses raw EEG data on purpose
 - Breaking the app on purpose so it spoke twice made the smoke check fail, which shows it catches real problems
+
+## 11/14/26 - 5:20 PM - MagicJester2764 (with Claude) - #41 Code review fixes ([PR #61](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/61))
+- A code review found the asset check was too easy to fool: it would pass if the right numbers appeared anywhere in the data. Now Washtenaw's and Wayne's AQI values have to be on their own rows
+- The spoken-line check now needs the exact rise next to each county, so a typo like "1860" can't pass
+- The raw-EEG guard on the log can no longer be sidestepped by nesting data or using another container type
+- The judging check now fails on the wrong Python version. A weird g.Pype version string gives a clear failure instead of a crash
+- Two smoke runs at the same moment get separate log files, and the log no longer claims to time how long speech plays (it only times starting it)
+- Verified: 89 tests pass, and `python -m signal2speech.app --smoke` reports 5 pass, 2 skip (#29, #30)
