@@ -149,13 +149,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
 - Code review follow-up: the summary is now written even when tests or the smoke check fail, and an app that can't start fails CI instead of looking like a skipped smoke check. The check is renamed `ci (...)` because it runs more than pytest
 
-## 11/14/26 - 5:38 PM - Vasanth Anbukumar (with Claude) - #48 Evidence view driven by the P300 chooser ([PR #76](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/76))
-- New flag: `python -m signal2speech.evidence --source generator --p300` (or `--source hybridblack --p300`) builds the judge window around the real P300 chooser instead of the stand-in flasher
-- The chooser's filter, scorers and calibration collectors now live in the same g.Pype pipeline as the scopes, and its flash markers go on the evidence view's marker
-- The target vs non-target average uses the calibration flashes, from the very Trigger nodes whose epochs train the classifier, so judges see what the classifier learns from
-- Two test tiles flash in the window header, and each decision (with the round's outcome from the SelectionHandler) shows next to them
-- The old mode without `--p300` works as before
-- Verified on simulated input only: new headless tests pass, and a 22 s offscreen run calibrated, trained, and made 2 of 2 correct simulated selections. Not tried with a headset
 ## 11/14/26 - 5:32 PM - Long Le (with Claude) - #34 Submission plan and checklist ([PR #73](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/73))
 - The team has a plan for the demo and the submission in `docs/demo-submission/`
     - `run-of-show.md`: the two-minute table demo, with a fallback for every step
@@ -163,3 +156,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - `submission-checklist.md`: the Devpost fields, a draft AI disclosure, and logs for submission status and rehearsals
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
+
+## 11/14/26 - 5:38 PM - Vasanth Anbukumar (with Claude) - #48 Evidence view driven by the P300 chooser ([PR #76](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/76))
+- New flag: `python -m signal2speech.evidence --source generator --p300` (or `--source hybridblack --p300`) builds the judge window around the real P300 chooser instead of the stand-in flasher
+- The chooser's filter, scorers and calibration collectors now live in the same g.Pype pipeline as the scopes, and its flash markers go on the evidence view's marker
+- The target vs non-target average uses the calibration flashes, from the very Trigger nodes whose epochs train the classifier, so judges see what the classifier learns from
+- Two test tiles flash in the window header, and each decision (with the round's outcome from the SelectionHandler) shows next to them
+- The old mode without `--p300` works as before
+- Verified on simulated input only: new headless tests pass, and a 22 s offscreen run calibrated, trained, and made 2 of 2 correct simulated selections. Not tried with a headset
