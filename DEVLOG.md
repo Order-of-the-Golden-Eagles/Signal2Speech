@@ -98,5 +98,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Added the demo playbook in `docs/demo-submission/`: a second-by-second two-minute run of show with four roles, a shot list for a video under three minutes, a rehearsal checklist, judge Q&A, and an 8:15 PM headset pre-flight
 - Each beat has two tracks. The live track is the goal. The keyboard track is what `main` can do today, and the label you say out loud must match the one on screen
 - Found that the evidence view can't show a real P300 average yet. On the headset its flash markers have no visible flash, so the backup recording is for OSCAR and the eyes-closed alpha peak, and the P300 average stays labelled Simulated until the P300 chooser drives those markers
-- Checked the commands on Windows: keyboard and simulated runs work, and `--input live` refuses as expected. `pytest` passes 89 with 2 skipped
+- Checked the commands on Windows: keyboard and simulated runs work, and `--input live` refuses as expected. `pytest` passes 124 with 2 skipped after merging the latest `main`
+- Review fixes: marked the alpha confirm (#47) as merged with its real command (`--source hybrid-black`, plus `--demo`), and noted that the app's 175 ms, 10-flash tile timing has not been checked with the classifier, which was tested at 250 ms and 5 flashes
 - Nothing here has been run with a real headset yet

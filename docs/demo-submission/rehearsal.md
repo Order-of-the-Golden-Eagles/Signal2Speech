@@ -48,7 +48,7 @@ Run each row with keyboard first, then with simulated input, then live when #23 
 | 6 | Disconnect during preview | `2`, then `D` | No output. Connection label changes. Question reopens. | ☐ | ☐ | ☐ |
 | 7 | Live confirm disarmed | Live EEG confirm before #23 arms it | `RejectedLiveConfirmDisarmed`. Keyboard can still confirm. | — | — | ☐ |
 
-Cases 4 and 5 are also covered by `pytest` (`tests/test_app.py` and the contract scenarios). Run `pytest` on the judging laptop before rehearsing. Expect all tests to pass with 2 skipped (111 passed, 2 skipped on Windows on 2026-11-14).
+Cases 4 and 5 are also covered by `pytest` (`tests/test_app.py` and the contract scenarios). Run `pytest` on the judging laptop before rehearsing. Expect all tests to pass with 2 skipped (124 passed, 2 skipped on Windows on 2026-11-14).
 
 ## Live rehearsal log
 

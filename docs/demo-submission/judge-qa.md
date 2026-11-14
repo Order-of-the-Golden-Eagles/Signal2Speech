@@ -39,7 +39,7 @@ A platform. Every input source emits the same small selection event: source, rou
 Yes. Python, g.Pype and Qt only. GitHub Actions runs the full `pytest` suite on Windows, macOS and Linux for every PR (#37). The live headset path has only been planned on Windows so far.
 
 **How production-ready is it?** *(production-ready prototype)*
-A versioned event contract, a pinned lock file, a full `pytest` suite (111 passing at the time of writing) on three operating systems, honest input labels on screen, an offline demo, and raw EEG kept out of git. Not production: there's no clinical validation, live accuracy is unmeasured, and calibration is per wearer.
+A versioned event contract, a pinned lock file, a full `pytest` suite (124 passing at the time of writing) on three operating systems, honest input labels on screen, an offline demo, and raw EEG kept out of git. Not production: there's no clinical validation, live accuracy is unmeasured, and calibration is per wearer.
 
 **How hard is it to get started?** *(low entry barrier)*
 Clone, install the lock file, and run `python -m signal2speech.app --input simulated`. There's no headset, licence or internet needed to try the full flow. g.Pype's `Generator` stands in for the brain.
