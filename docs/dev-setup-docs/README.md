@@ -27,13 +27,13 @@ From the [g.Pype docs](https://gpype.gtec.at). **Each step is unverified until s
 
 ## Platform notes
 
-CI (`.github/workflows/tests.yml`) runs `pytest` on Windows, Ubuntu, and macOS (Apple silicon) for every PR. The headset, audio, and Wi-Fi-off launch stay manual.
+CI (`.github/workflows/tests.yml`, #37) runs `pytest` and the #41 smoke check for every PR. It covers Windows, Ubuntu, and macOS (Apple silicon) on Python 3.12, plus Ubuntu on 3.13. Versions are constrained to `requirements-lock.txt`. The headset, audio, and Wi-Fi-off launch stay manual. See [DevOps](../devops/README.md#ci-on-every-pr-37).
 
 | | Windows 10/11 x64 | macOS (Apple silicon) | Linux x86_64 |
 | --- | --- | --- | --- |
-| Supported by g.Pype | Yes. Verified on the dev laptop and in CI. | macOS 13 or later (PySide6 6.10+). Intel Macs can't use the Unicorn driver. | Yes. No ARM Linux wheels. |
-| Python | 3.12 (verified), 3.10–3.14 | 3.12 via python.org or Homebrew | 3.12 (CI also tests 3.13) |
-| Extra system setup | None | Grant **Input Monitoring** to your terminal for g.Pype's `Keyboard` source. g.Pype needs the main thread's event loop (`MainApp.run()`). | `sudo apt install espeak-ng libegl1 libxkbcommon0 libbluetooth3` |
+| Supported by g.Pype | Yes. Verified on the dev laptop, and `pytest` passes in CI. | macOS 13 or later (PySide6 6.10+). Intel Macs can't use the Unicorn driver. | Yes. No ARM Linux wheels. |
+| Python | 3.12 (verified). 3.10, 3.11, 3.13, and 3.14 are untested. | 3.12 via python.org or Homebrew (CI) | 3.12 and 3.13 in CI; others untested |
+| Extra system setup | None | Grant **Input Monitoring** to your terminal for g.Pype's `Keyboard` source. g.Pype needs the main thread's event loop (`MainApp.run()`). | `sudo apt install libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0 libpulse0 libpulse-mainloop-glib0 espeak-ng libbluetooth3` (the same list CI installs) |
 | Headset pairing | Settings → Bluetooth | System Settings → Bluetooth | `bluetoothctl` → `pair` / `trust` |
 | Speech (`pyttsx3`) | SAPI5, built in | NSSpeechSynthesizer, built in | espeak-ng |
 | Keyboard input | Works | Needs Input Monitoring | Needs an X11 session (`pynput`). Wayland may block it. |

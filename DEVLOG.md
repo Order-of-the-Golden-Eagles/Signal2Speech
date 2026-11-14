@@ -26,3 +26,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - It lists the checks that need a person: headset, live calibration, audio, Wi-Fi off
 - Every run writes a timing log to `logs/` (not committed) with the input mode and connection state. The log refuses raw EEG data on purpose
 - Breaking the app on purpose so it spoke twice made the smoke check fail, which shows it catches real problems
+
+## 11/14/26 - 5:24 PM - MagicJester2764 (with Claude) - #37 CI follow-up (PR pending)
+- Took over the CI that Vasanth drafted in #64 and fixed what its code review found
+- CI now installs the exact versions in `requirements-lock.txt`, so it tests what the judging laptop runs instead of whatever is newest that day
+- Each run's summary shows the test result, every skipped test and why, the smoke check report, and the list of checks a person still has to do by hand
+- Merging two PRs back to back no longer cancels the first one's test run on `main`
+- The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
