@@ -243,3 +243,87 @@ def test_generator_dry_run_end_to_end(tmp_path):
     summary = next(r for r in records if r["kind"] == "summary")
     assert summary["arming_safe"] is False                  # a dry run never arms
     assert all(r["label"] == "Simulated" for r in records)
+
+
+def _inject_wrong_decodes(h, wrong_attempts):
+    """Make the simulated P300 attend another tile on the given attempts (1-based)."""
+    from signal2speech.eeg import p300
+    build, calls = h.build, []
+
+    def patched_build():
+        result = build()
+        begin = h.chooser.begin_sequence
+
+        def begin_sequence(attended_for_synthetic=None):
+            calls.append(attended_for_synthetic)
+            if len(calls) in wrong_attempts and attended_for_synthetic:
+                attended_for_synthetic = next(t for t in p300.FLASH_CODES
+                                              if t != attended_for_synthetic)
+            begin(attended_for_synthetic=attended_for_synthetic)
+
+        h.chooser.begin_sequence = begin_sequence
+        return result
+
+    h.build = patched_build
+
+
+def test_generator_wrong_preview_is_cancelled_and_false_confirm_counted(tmp_path):
+    """Keyboard path: one wrong preview cancelled, one wrongly confirmed (wearer error)."""
+    pytest.importorskip("gpype")
+    pytest.importorskip("sklearn")
+    pytest.importorskip("h5py")
+    pytest.importorskip("PySide6")
+    opts = live.Options(source="generator", attempts=3, quality_s=2.0, calibration=4,
+                        confirm="keyboard", logs_dir=str(tmp_path), seed=1)
+    h = live.LiveHarness(opts, live.Console(scripted=True, out=_Quiet()))
+    _inject_wrong_decodes(h, {2, 3})
+    keyboard_confirm = h._keyboard_confirm
+
+    def confirm(a, intend):
+        keyboard_confirm(a, intend or a.index == 3)   # attempt 3: confirm a wrong preview
+
+    h._keyboard_confirm = confirm
+    assert h.run() == live.EXIT_OK
+    by_index = {a.index: a for a in h.stats.attempts}
+    assert by_index[1].p300_correct and by_index[1].confirm_outcome == "Confirmed"
+    assert not by_index[2].p300_correct and by_index[2].decoded is not None
+    assert by_index[2].confirm_outcome == "Cancelled" and not by_index[2].false_confirm
+    assert not by_index[3].p300_correct and by_index[3].false_confirm
+    s = h.stats.summary()
+    assert s["false_confirms"] == 1 and s["stale_round_rejections"] == 0
+    assert len(h.sink.executed) == 2                      # attempts 1 and 3 reached the sink
+    records = [json.loads(line) for line in open(h.log.path, encoding="utf-8")]
+    summary = next(r for r in records if r["kind"] == "summary")
+    assert summary["false_confirms"] == 1 and summary["arming_safe"] is False
+
+
+def test_generator_alpha_wrong_preview_times_out(tmp_path):
+    """Alpha path: no eye closure on a wrong preview, so the confirm round times out."""
+    pytest.importorskip("gpype")
+    pytest.importorskip("sklearn")
+    pytest.importorskip("h5py")
+    pytest.importorskip("PySide6")
+    if live.alpha_module() is None:
+        pytest.skip("alpha_confirm.py not on this checkout")
+    opts = live.Options(source="generator", attempts=2, quality_s=2.0, calibration=4,
+                        confirm="alpha", confirm_timeout_s=3.0, alpha_calib_s=4.0,
+                        alpha_rest_s=4.0, logs_dir=str(tmp_path), seed=1)
+    h = live.LiveHarness(opts, live.Console(scripted=True, out=_Quiet()))
+    _inject_wrong_decodes(h, {2})
+    assert h.run() == live.EXIT_OK
+    first, second = h.stats.attempts
+    assert first.p300_correct and first.confirm_outcome == "Confirmed"
+    assert first.confirm_source == InputSources.SIMULATED
+    assert not second.p300_correct and second.decoded is not None
+    assert second.confirm_outcome == "Timeout" and not second.false_confirm
+    s = h.stats.summary()
+    assert s["false_confirms"] == 0 and s["stale_round_rejections"] == 0
+
+
+def test_runlogs_in_the_same_second_get_separate_files(tmp_path):
+    a = live.RunLog(str(tmp_path), "Simulated")
+    b = live.RunLog(str(tmp_path), "Simulated")
+    assert a.path != b.path
+    a.write("step", n=1)
+    b.write("step", n=1)
+    assert len(open(a.path, encoding="utf-8").read().splitlines()) == 1

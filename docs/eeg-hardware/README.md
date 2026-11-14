@@ -139,6 +139,59 @@ The synthetic P300 is a 5 µV Gaussian at 300 ms over 10 µV white noise plus 10
 3. Offline, find each light onset in the photodiode channel and subtract the matching marker sample. The mean is the latency and the standard deviation is the jitter.
 4. If the standard deviation is above about 10 ms, pass the flip time to `on_flash(target_id, observed_at=...)`, for example `gp.stamp_clock()` taken in a `QWindow.frameSwapped` handler.
 
+## Alpha-switch confirm (#47): works on simulated input
+
+`signal2speech/eeg/alpha_confirm.py`. Closing the eyes for about 2 s in an armed Confirm round emits exactly one `target-1` (Confirm). **Verified on simulated input only** (g.Pype `Generator` plus injected 10 Hz bursts), on Linux with Python 3.12.13 and g.Pype 4.2.0. Live calibration on a wearer is pending the headset slot (#23).
+
+```
+python -m signal2speech.eeg.alpha_confirm                          # Generator: 10 s + 10 s calibration, 60 s rest, 3 closures, JSON report
+python -m signal2speech.eeg.alpha_confirm --demo                   # Generator: keyboard preview, then alpha confirm through the handler
+python -m signal2speech.eeg.alpha_confirm --source hybrid-black    # live: pair the Unicorn first, then follow the >>> prompts
+```
+
+Flags: `--calib-s`, `--rest-s`, `--closures`, `--dwell-s` (default 1.0), `--settle-s` (default 1.0), `--burst-uv` (Generator alpha amplitude, default 8), `--min-ratio` (default 2).
+
+**Pipeline**
+
+```
+source -> [AlphaBursts, simulated only] -> Bandpass 1-30 Hz -> ChannelSelector(indices 5,6,7 = PO7, Oz, PO8)
+  -> FFT(250, overlap 0.9) -> BandPower(alpha 8-13 Hz) -> ChannelMean -> Threshold(level, release, dwell 10 rows)
+  -> Tap -> AlphaConfirm.rising/.falling (queued Qt signals) -> main thread -> adapter.select_captured("target-1")
+```
+
+- **Calibration:** `Calibration.from_samples(open, closed)` refuses NaN or infinite rows, which come from a flat or railing electrode. Then it sets `level = sqrt(open_p95 × closed_median)` and `release = sqrt(open_p95 × level)`, a geometric midpoint with hysteresis. It refuses when the closed median is under 2× the open p95 (`CalibrationError`). The levels are applied live through `Threshold.set_control()`. Until calibration runs, the level is 1e12, so nothing fires.
+- **Gating, on top of the threshold:**
+  1. It only listens in an armed Confirm round. Arming happens through `handler.on_round_opened`; cancel or clear disarms it.
+  2. The eyes must have been open continuously for `settle_s`. That's measured from arming, or from the last time they opened. A closure that comes too early doesn't count, and the eyes have to open again. Arming reads the worker thread's Threshold state, so a closure still in flight from the previous round can't slip through.
+  3. Only a rising edge counts. It disarms after one decision, so one closure gives one event. If the handler rejects the decision and the Confirm round stays open (for example `RejectedLiveConfirmDisarmed`), it keeps listening in that round.
+- **Live EEG:** labelled `live-eeg`. The handler still returns `RejectedLiveConfirmDisarmed` until #23 sets `live_eeg_confirm_armed`. The decoder works, and the contract holds it back.
+- **Sharing the headset with #46:** a Unicorn opens only once. Pass `AlphaConfirm(handler, pipeline=p, upstream=bandpass_node, input_source=LIVE_EEG)` to hang the alpha branch off the P300 pipeline instead of opening a second source. If that stream isn't 250 Hz, pass `sampling_rate=`: the FFT window stays 1 s and the dwell stays in seconds. A mismatch raises at pipeline start.
+- **Lifecycle:** `close()` unhooks from the handler. The band-power buffer keeps the last 2 minutes, and edges and log entries keep the last 256, so a long demo can't grow memory.
+- **Tests:** `tests/test_alpha_confirm.py` covers the calibration math, every gating rule, the live-disarmed contract, and one Generator burst through the real pipeline giving exactly one confirm and no rest triggers.
+
+**Simulated results (Generator with 10 µV noise, 2026-11-14)**
+
+| Burst | Open p95 | Closed median | Ratio | Level / release | False triggers, 60 s eyes-open | Edges per closure | Latency from closure to edge |
+| --- | ---: | ---: | ---: | --- | ---: | --- | --- |
+| 8 µV | 10.6 | 68.8 | 6.5 | 27.0 / 16.9 | **0** | 1, 1, 1, 1, 1 | 1.21–1.45 s |
+| 4 µV (weak alpha) | 10.1 | 23.2 | 2.3 | 15.3 / 12.4 | **0** | 1, 1, 1, 1, 1 | 1.19–1.49 s |
+
+Latency is about 0.3–0.5 s for the 1 s FFT window to fill with alpha, plus the 1.0 s dwell. With `--dwell-s 0.5` the switch reacts faster but chatters more. Real eyes-closed alpha is typically 2–10× eyes-open, and some people have weak alpha, so the 2× floor is the first thing to check at the headset slot. Even at ratio 2.3 (4 µV), the simulated switch held: no false triggers and one edge per closure. Real EEG adds blinks and drift that the Generator lacks.
+
+**Fallback (if P300 is unreliable): not built yet.** The plan is to step through the options one at a time and confirm each with this switch. `AlphaConfirm` acts only in Confirm rounds today, so stepping needs a small driver:
+
+1. Highlight one tile at a time.
+2. Arm for each highlight.
+3. Send the highlighted target on a rising edge.
+
+Then confirm with `AlphaConfirm` as usual. The `rising` signal and the calibration are reusable as-is.
+
+**g.Pype facts we confirmed:**
+
+- `ChannelMean` and `AlphaBursts` are custom `gp.IONode`s. For a 1-channel output, `setup()` sets `channel_count`, `channel_roles`, and `channel_labels` in the output context.
+- `Threshold.set_control({"level", "release", "dwell"})` works while the pipeline runs.
+- More than one `Pipeline` can run in a process. g.Pype refuses only a faster-than-real-time replay beside another pipeline.
+
 ## Live run
 
 `signal2speech/eeg/live.py` ([#23](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/23)) walks the headset slot step by step, so the live run is one command.
@@ -168,7 +221,7 @@ python -m signal2speech.eeg.live --source generator     # dry run, no hardware, 
 
 The harness uses its own handler with a logging sink, so nothing is spoken and the map doesn't change. On a live alpha run it arms that handler for step 5 only. The app's handler stays disarmed until someone changes it after reading the summary.
 
-**Logs.** Each run writes `logs/live_<timestamp>_<simulated|live-eeg>.jsonl`. The `logs/` folder is gitignored. The log holds steps, the quality table, calibration counts, every handler outcome with its event, every P300 decision (and whether it was late), each attempt, and the summary. `RunLog` refuses arrays and long lists, so raw EEG can't end up in a log.
+**Logs.** Each run writes `logs/live_<YYYYmmdd-HHMMSS-mmm>_<pid>_<simulated|live-eeg>.jsonl`, opened with mode `x` so two runs started at the same moment never share a file. The `logs/` folder is gitignored. The log holds steps, the quality table, calibration counts, every handler outcome with its event, every P300 decision (and whether it was late), each attempt, and the summary. `RunLog` refuses arrays and long lists, so raw EEG can't end up in a log.
 
 **Event IDs.** Two `InputAdapter`s with the same source on one handler both count from 1. So the P300 branch's `s1` and the alpha branch's `s1` collide, and the alpha confirm is rejected as `RejectedDuplicateEvent`. The harness found this. `TaggedAdapter` adds a branch tag (`s1-p300`, `s1-alpha`). The app needs the same fix when it wires up both branches.
 
@@ -176,10 +229,10 @@ The harness uses its own handler with a logging sink, so nothing is spoken and t
 
 | Check | Result |
 | --- | --- |
-| `--source generator` (defaults), Simulated, keyboard confirm | Ran to completion in 83 s. Quality GO on 8 channels. LDA on 50 target and 50 non-target epochs, CV epoch accuracy 0.97. 10/10 correct previews, 10 Confirmed, 0 false confirms, 0 `RejectedStaleRound`, 0 late decisions. Verdict: not safe (keyboard confirm, Simulated). |
-| `--source generator` with PR #58's `alpha_confirm.py` loaded by hand (not on main) | 6/6 confirmed by simulated eye closures, alpha ratio 8.2, 0 false triggers at rest. This run found the event-ID collision above. |
+| `--source generator` (defaults: `--confirm auto`, so the #47 alpha switch now on main), Simulated | Ran to completion in about 160 s. Quality GO on 8 channels. LDA on 50 target and 50 non-target epochs, CV epoch accuracy 0.89. Alpha ratio 7.0, 0 false triggers in the 20 s rest, 1 edge per closure. 10/10 correct previews, 10/10 confirmed by simulated eye closures, 0 false confirms, 0 `RejectedStaleRound`, 0 late decisions, 5.65 s per selection. Verdict: not safe (Simulated). |
+| `--source generator --confirm keyboard`, Simulated | Earlier run, before #47 merged: 83 s, 10/10 correct and Confirmed, 0 false confirms. An earlier alpha run with PR #58 loaded by hand found the event-ID collision above. |
 | `--source hybridblack` with no headset | `ConnectionError: No Unicorn device available`. Prints the pairing checklist and exits with code 3 in about 8 s. |
-| `pytest tests/test_live.py` (16 tests) | Pass. Covers quality rules, arming rules, scoring, the log refusing samples, tagged adapters, step order and exit codes, plus one end-to-end Generator dry run. |
+| `pytest tests/test_live.py` (19 tests) | Pass. Covers quality rules, arming rules, scoring, the log refusing samples, separate log files for runs in the same second, tagged adapters, step order and exit codes, and three end-to-end Generator dry runs. Two of them inject wrong decodes: on keyboard, a wrong preview is cancelled and a wrongly confirmed one counts as 1 false confirm (verdict not safe); on alpha, a wrong preview with no eye closure times out. |
 
 **Not verified yet:** anything with the real headset. That includes the quality thresholds (`FLAT_RMS_UV` 0.5, `NOISY_RMS_UV` 50, `LINE_RMS_UV` 10 µV are starting guesses), whether the HybridBlack signal-role channels are the 8 EEG channels in Unicorn order, OSCAR's effect, real P300 and alpha accuracy, and whether a late decision ever crosses rounds. Fill in the table below after the run.
 

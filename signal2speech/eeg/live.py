@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import itertools
 import json
 import os
 import random
@@ -258,9 +259,19 @@ class RunLog:
 
     def __init__(self, directory: str, label: str):
         os.makedirs(directory, exist_ok=True)
-        stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        # Milliseconds and the PID keep two runs started in the same second apart.
+        # Mode "x" never shares a file: on a collision, add a counter and try again.
+        now = _dt.datetime.now()
+        stamp = now.strftime("%Y%m%d-%H%M%S") + f"-{now.microsecond // 1000:03d}"
         tag = label.lower().replace(" ", "-")
-        self.path = os.path.join(directory, f"live_{stamp}_{tag}.jsonl")
+        base = os.path.join(directory, f"live_{stamp}_{os.getpid()}")
+        for n in itertools.count():
+            self.path = f"{base}{'' if n == 0 else f'-{n}'}_{tag}.jsonl"
+            try:
+                with open(self.path, "x", encoding="utf-8"):
+                    break
+            except FileExistsError:
+                continue
         self.label = label
         self._lock = threading.Lock()
 
