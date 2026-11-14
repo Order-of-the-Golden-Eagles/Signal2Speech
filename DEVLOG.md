@@ -298,3 +298,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - `python -m signal2speech.app --fullscreen`. F11 toggles fullscreen, and F1 shows the keys for whoever runs the demo
 - The input label in the bottom strip always shows in full, so simulated input can't look live on a small screen. Longer connection and outcome text clips instead, and the transcript keeps it
 - Checked with screenshots at 1280×720, 1366×768, and 1536×864 (preview, reveal, and help overlay), and tests assert the size limit in every state. Not yet seen on the judging laptop itself
+
+## 11/14/26 - 7:33 PM - MagicJester2764 - #26 Review fixes that missed the merge (PR pending)
+- My code-review fixes for #26 were pushed a few minutes after its PR merged, so they never reached main. This puts them back
+- If a preview times out or is cancelled, the simulator repeats the whole choose-then-confirm step instead of getting out of order
+- The app's timers stop when it closes, the screenshot timer can't fire into a later run, and `--confirm-timeout` refuses values that would quietly turn it off
