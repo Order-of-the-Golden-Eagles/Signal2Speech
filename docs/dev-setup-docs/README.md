@@ -12,9 +12,9 @@ From the [g.Pype docs](https://gpype.gtec.at). **Each step is unverified until s
 
 | # | Step | Expected result | Verified |
 | --- | --- | --- | --- |
-| 1 | Install **Python 3.12** (64-bit). On Windows with 3.13 or 3.14, g.Pype's EDF support doesn't install. | `py -3.12 --version` | ✅ 2026-11-14 |
+| 1 | Install **Python 3.12** (64-bit, the verified version). Python 3.10 to 3.14 should also work, because we don't use g.Pype's EDF support, which has no Windows wheel on 3.13 and 3.14. | `py -3.12 --version` | ✅ 2026-11-14 |
 | 2 | `py -3.12 -m venv .venv` then `.venv\Scripts\activate` (macOS/Linux: `source .venv/bin/activate`) | Prompt shows `(.venv)` | ✅ 2026-11-14 |
-| 3 | `pip install -e ".[dev]"` (exact versions: `pip install -r requirements-lock.txt`; on a flaky network add `--resume-retries 30 --timeout 120`) | Installs `gpype[all]`, PySide6, pyttsx3, and pytest | ✅ 2026-11-14 |
+| 3 | `pip install -e ".[dev]"` (exact versions: `pip install -r requirements-lock.txt`; on a flaky network add `--resume-retries 30 --timeout 120`) | Installs `gpype[gui,devices]` (core includes OSCAR), h5py, scikit-learn, pyttsx3, and pytest. We skip LSL and EDF. | ✅ 2026-11-14 |
 | 4 | `pytest` | All contract tests pass | ✅ 2026-11-14 |
 | 5 | `python -c "import gpype; print(gpype.__version__)"` | 4.2 or later | ✅ 2026-11-14 |
 | 6 | Run a g.Pype example with `Generator` (for example `s1e4_time_series_scope.py` from the g.Pype repo) | The scope window shows a moving signal | ✅ 2026-11-14 (scope window ran 15 s with no errors) |

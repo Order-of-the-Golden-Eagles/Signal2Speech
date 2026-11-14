@@ -8,7 +8,7 @@ This is the shared contract from [#22](https://github.com/Order-of-the-Golden-Ea
 
 | | What we know | Status |
 | --- | --- | --- |
-| **Vendor fact** | g.Pype 4.2 `HybridBlack` source: Bluetooth, 8 EEG channels at 250 Hz. It needs no licence and no Unicorn Suite. Install with `pip install "gpype[all]"` and pair the headset in the OS first. | Documented, not yet run by us |
+| **Vendor fact** | g.Pype 4.2 `HybridBlack` source: Bluetooth, 8 EEG channels at 250 Hz. It needs no licence and no Unicorn Suite. Our `pyproject.toml` installs `gpype[gui,devices]`, h5py, and scikit-learn. Pair the headset in the OS first. | Documented, not yet run by us |
 | **Vendor fact** | `HybridBlack(enable_oscar=True)` turns on OSCAR artifact removal. It adds processing delay. | Documented |
 | **Vendor fact** | g.Pype has **no ready-made P300 or SSVEP classifier**. The `Sklearn` node offers LDA or logistic regression, trained offline on `Epochs`, and outputs a class index online. | Documented |
 | **Vendor fact** | `Marker` emits stimulus codes into a pipeline, and `Keyboard` emits key events. `Generator` simulates signals with no hardware. `UDPSender` and `LSLSender` stream out. | Documented |
