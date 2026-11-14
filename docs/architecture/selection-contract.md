@@ -15,7 +15,7 @@ What is on `main` as of 2026-11-14. "Simulated" means g.Pype `Generator` or scri
 | Integrated app (#4, #25) | `signal2speech/app.py`, `signal2speech/speech/` | Merged. `--input keyboard` and `--input simulated` give one map action and one spoken line per confirm, and nothing on preview or cancel. The map is a labelled stand-in until #30 lands. |
 | Simulated input (#21) | `signal2speech/eeg/simulated.py` | Merged. Real g.Pype `Generator` pipeline, labelled `simulated`. |
 | P300 chooser (#46) | `signal2speech/eeg/p300.py` | Merged. Verified on synthetic data only. Not yet wired into `app.py`. **Needs the live headset** for accuracy and trial counts. |
-| Alpha-switch confirm (#47) | `signal2speech/eeg/alpha_confirm.py` | Not on `main` yet ([PR #58](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/58)). **Needs the live headset** for the threshold and false triggers. |
+| Alpha-switch confirm (#47) | `signal2speech/eeg/alpha_confirm.py` | Merged. Verified on g.Pype `Generator` only. **Needs the live headset** for the threshold and false triggers. |
 | Evidence view (#48) | `signal2speech/evidence/` | Merged. Runs on `Generator` and replay. **Needs the live headset** for real EEG. |
 | AI reply choices (#5, #27, #28) | `signal2speech/ai/` | Merged. Stub flow checked by hand. A live Claude call is unverified (no key yet). |
 | OpenOrbit data and view (#29, #30) | `data/openorbit/`, `signal2speech/openorbit/` | Not on `main` yet ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65)). |
@@ -153,9 +153,9 @@ pytest
 For the exact pinned versions, use `pip install -r requirements-lock.txt`. On a headless machine, set `QT_QPA_PLATFORM=offscreen`.
 
 - `tests/test_contract.py` runs the scenario file, the sample events, and the adapter checks in under a second.
-- The full suite (`tests/` plus `signal2speech/ui/tests/`) was 89 passed and 2 skipped in about 60 s on Windows on 2026-11-14. It needs no headset: EEG tests use g.Pype `Generator` or synthetic recordings.
+- The full suite (`tests/` plus `signal2speech/ui/tests/`) runs in about a minute; on 2026-11-14 it was 111 passed and 2 skipped on Windows. The count grows as PRs land, so trust the latest CI run over this number. It needs no headset: EEG tests use g.Pype `Generator` or synthetic recordings.
 - CI runs the same `pytest` on every PR on Windows, macOS, and Ubuntu ([`tests.yml`](../../.github/workflows/tests.yml), #37).
-- Git hooks (secret and raw-EEG scan before commit, `pytest` before push) are not on `main` yet ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66)).
+- Git hooks (secret and raw-EEG scan before commit, `pytest` before push) are in [`.githooks/`](../../.githooks/) (#37). Turn them on once per clone with `git config core.hooksPath .githooks`.
 
 ## Repo layout and ownership
 
@@ -165,7 +165,7 @@ Each track owns one folder, so parallel PRs don't conflict. Don't edit another t
 | --- | --- | --- |
 | `contracts/`, `signal2speech/core/`, `tests/test_contract.py` | #22 | Shared. Changes need a scenario update and a heads-up to every track. |
 | `pyproject.toml`, `docs/dev-setup-docs/` | #19 | Environment and launch path |
-| `signal2speech/eeg/` | #21, #46, #47, #23 | One file per issue: `simulated.py` (#21), `p300.py` (#46), `alpha_confirm.py` (#47, in PR #58), live run (#23, not started) |
+| `signal2speech/eeg/` | #21, #46, #47, #23 | One file per issue: `simulated.py` (#21), `p300.py` (#46), `alpha_confirm.py` (#47), live run (#23, not started) |
 | `signal2speech/evidence/` | #48 | Judge evidence window and record/replay |
 | `signal2speech/ui/` | #24 | PySide6 tiles, preview, judge strip, keys 1 and 2, and the P300 flash scheduler (`flash.py`) |
 | `data/openorbit/` | #29 | MODIS images, AQI rows, `SOURCES.md` (in PR #65) |
@@ -182,7 +182,7 @@ flowchart LR
     I22 --> I24["#24 keyboard preview UI ✅"]
     I22 --> I27["#27 AI reply choices ✅"]
     I22 --> I46["#46 P300 chooser (merged)"]
-    I22 --> I47["#47 alpha confirm"]
+    I22 --> I47["#47 alpha confirm ✅"]
     I22 --> I30["#30 offline view"]
     I29["#29 NASA/EPA data"] -.->|swap in real data| I30
     I21 --> I25["#25 confirm → map + speech ✅"]

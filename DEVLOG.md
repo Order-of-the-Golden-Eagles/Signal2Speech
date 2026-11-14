@@ -71,12 +71,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
 
-## 11/14/26 - 5:35 PM - Vasanth Anbukumar (with Claude) - #1 Sync the architecture docs with main ([PR #71](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/71))
-- Added a "Current status" table to the selection contract: what is merged and checked on simulated or synthetic data, what is still in an open PR (#47 alpha confirm, #29/#30 OpenOrbit, git hooks), and what still needs the live headset
-- Fixed stale lines: the P300 pipeline now matches the code (Trigger per tile, LDA score, sequence vote), the folder table names the real files, and the tests section gives today's count (89 passed, 2 skipped) and the 3-OS CI
-- Matched the dependency graph to GitHub's "Blocked by" links: added #22 to #30 and #21 to #23, and marked closed issues
-- `docs/MEMORY.md` no longer says simulated input still needs a one-line swap in `app.py`: it already uses the g.Pype stream
-- Docs only. No code changed, and pytest still passes
 ## 11/14/26 - 5:20 PM - Vasanth Anbukumar (with Claude) - #37 Git hooks: secret scan and pre-push tests ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66))
 - Every clone can now turn on two shared git hooks with one command, the same on Windows, macOS, and Linux: `git config core.hooksPath .githooks`
     - `pre-commit` blocks API keys and tokens (Anthropic, OpenAI, GitHub, AWS, Google, private keys), raw EEG files (`.edf`, `.bdf`, recordings folders), and `.env`
@@ -91,3 +85,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Merging two PRs back to back no longer cancels the first one's test run on `main`
 - The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
 - Code review follow-up: the summary is now written even when tests or the smoke check fail, and an app that can't start fails CI instead of looking like a skipped smoke check. The check is renamed `ci (...)` because it runs more than pytest
+## 11/14/26 - 5:35 PM - Vasanth Anbukumar (with Claude) - #1 Sync the architecture docs with main ([PR #71](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/71))
+- Added a "Current status" table to the selection contract: what is merged and checked on simulated or synthetic data, what is still in an open PR (#29/#30 OpenOrbit), and what still needs the live headset (P300 accuracy, the alpha-switch threshold, live Unicorn input)
+- Fixed stale lines: the P300 pipeline now matches the code (Trigger per tile, LDA score, sequence vote), the folder table names the real files, and the tests section gives today's count (111 passed, 2 skipped after merging main, with a note that the number grows) and the 3-OS CI
+- Matched the dependency graph to GitHub's "Blocked by" links: added #22 to #30 and #21 to #23, and marked closed issues
+- `docs/MEMORY.md` no longer says simulated input still needs a one-line swap in `app.py`: it already uses the g.Pype stream
+- Docs only. No code changed, and pytest still passes
