@@ -33,3 +33,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Each run's summary shows the test result, every skipped test and why, the smoke check report, and the list of checks a person still has to do by hand
 - Merging two PRs back to back no longer cancels the first one's test run on `main`
 - The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
+## 11/14/26 - 5:15 PM - MagicJester2764 (with Claude) - #21 Code review fixes ([PR #53](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/53))
+- The full app now runs on the fake g.Pype brain: `python -m signal2speech.app --input simulated` (wired in by #60)
+- A code review found that pressing Esc during a scripted run threw the script out of order. Now a cancelled step is retried, and a step the keyboard already did is skipped
+- Picking with Ctrl+1/Ctrl+2 now waits until the tiles finish flashing, the same as the real P300 will
+- The headless runner handles longer scripts, and a run that times out now reports failure instead of success
+- Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
+- Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
