@@ -200,6 +200,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Explained in the workflow why Ubuntu runs twice: Python 3.12 is what the judging laptop uses, and 3.13 is an early warning for newer Python. It caught a real bug on its first day
 - Recorded a flaky evidence test on macOS (#48) so nobody chases it as a real failure
 
+## 11/14/26 - 6:08 PM - MagicJester2764 - #38 Review follow-up ([PR #83](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/83))
+- Filled in the green CI run that proves the check passes again, instead of "expected green"
+- The flaky evidence test on macOS is now in living memory, with a firmer rule: re-run once, and if it fails twice it's a real problem
+- The CI matrix explanation lives in one place (the workflow file) and no longer claims Python versions CI doesn't test
 ## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
 - A teammate can now run the whole OpenOrbit reveal with Wi-Fi off and explain it
     - `python -m signal2speech.app --input keyboard`: press 2 then 1 to compare counties, or 1 then 1 for the satellite view
@@ -218,3 +222,17 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Event IDs now come from one counter shared by every adapter, so they're unique for the whole run
 - Verified with a new test where two live-EEG adapters preview and then confirm (`tests/test_contract.py`). `tests/test_app.py` and `tests/test_recovery.py` no longer assume IDs like `k1`. Full suite: 176 passed
 - Still needs the headset: the combined P300 + alpha flow on a real wearer (#23)
+
+## 11/14/26 - 6:45 PM - Long Le (with Claude) - #42 Rollback that works with Wi-Fi off ([PR #86](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/86))
+- If the final build breaks at the table, the team can switch back to the draft build without Wi-Fi, even when the two builds need different packages
+    - Make a ready-to-run fallback copy when freezing: `git worktree add ../Signal2Speech-fallback judging-draft`, then set up its own `.venv` while still online. Steps are in `docs/devops/judging-build.md`
+- Why: the old switch-back step said to run `pip install` when the lock file changed, and that fails with Wi-Fi off
+- Switch-back rehearsal on a Mac: 3 seconds from `main` to the known-good build `eecc31a` and one map reveal (keyboard input; the lock file was the same)
+- Also updated the runbook for the smoke check (#41) and the 8-second map reveal (#81). Still needed: tag `judging-draft` and `judging-final` and rehearse the switch on the judging laptop
+
+## 11/14/26 - 6:20 PM - Long Le (with Claude) - #33 First security pass ([PR #85](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/85))
+- Did a first privacy and security check of the current code, ahead of making the repo and video public
+    - `python tools/release_check.py --quick --all-branches`, plus manual checks for trained models, network use, and image metadata
+- No keys, raw EEG, recordings, or trained models are in git on any branch. Nothing sends EEG over the network. The only outbound call is the optional AI request, which sends the typed question only
+- One warning: two teammates' personal email addresses appear in commit history. They'll be public if the repo goes public. Results and fix steps are in `docs/security-privacy/README.md`
+- Not final: the check has to be repeated on the frozen judging commit (#42) and the actual video and screenshots (#34). The checklist for that is in the same doc
