@@ -1,0 +1,320 @@
+"""OpenOrbit comparison view (#30): NASA imagery and EPA county AQI, fully offline.
+
+Only #25's sink calls this, on the Qt main thread, after a confirmed choice:
+
+    if not view.perform(action.action_id):   # show_satellite or compare_air_quality
+        ...                                  # not an OpenOrbit action (e.g. speak_reply)
+    view.reset()                             # cancel, disconnect, or the next question
+
+The view never plays audio, never uses the network, and never talks to the selection handler.
+Speech stays in #25.
+"""
+from __future__ import annotations
+
+from typing import List, Optional, Tuple
+
+from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (QGridLayout, QHBoxLayout, QLabel, QSizePolicy, QStackedLayout,
+                               QVBoxLayout, QWidget)
+
+from signal2speech.core import ActionIds
+
+from .dataset import AFTER, BEFORE, Dataset, Place, load_dataset
+
+BACKGROUND = "#101418"
+TEXT = "#FFFFFF"
+MUTED = "#C9D1D9"
+MARKER = QColor("#FFD400")
+LABEL_BOX = QColor(0, 0, 0, 185)
+MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
+          "September", "October", "November", "December")
+
+# EPA AQI category colors, with readable text on each. The category name is always shown too,
+# so color is never the only cue.
+AQI_COLORS = {
+    "Good": ("#00E400", "#000000"),
+    "Moderate": ("#FFFF00", "#000000"),
+    "Unhealthy for Sensitive Groups": ("#FF7E00", "#000000"),
+    "Unhealthy": ("#FF0000", "#FFFFFF"),
+    "Very Unhealthy": ("#8F3F97", "#FFFFFF"),
+    "Hazardous": ("#7E0023", "#FFFFFF"),
+}
+
+
+def _parts(iso: str) -> Tuple[int, int, int]:
+    year, month, day = (int(p) for p in iso.split("-"))
+    return year, month, day
+
+
+def _month_day(iso: str) -> str:
+    _, month, day = _parts(iso)
+    return f"{MONTHS[month - 1]} {day}"
+
+
+def _long_date(iso: str) -> str:
+    return f"{_month_day(iso)}, {_parts(iso)[0]}"
+
+
+def _short_date(iso: str) -> str:
+    _, month, day = _parts(iso)
+    return f"{MONTHS[month - 1][:3]} {day}"
+
+
+def _label(text: str, px: int, color: str = TEXT, bold: bool = False,
+           align=Qt.AlignLeft | Qt.AlignVCenter, wrap: bool = True) -> QLabel:
+    label = QLabel(text)
+    font = label.font()
+    font.setPixelSize(px)
+    font.setBold(bold)
+    label.setFont(font)
+    label.setStyleSheet(f"color: {color};")
+    label.setAlignment(align)
+    label.setWordWrap(wrap)
+    return label
+
+
+def _aqi_cell(aqi: int, category: str) -> QLabel:
+    background, foreground = AQI_COLORS.get(category, ("#444C56", TEXT))
+    label = _label(f"{aqi}  {category}", 24, foreground, bold=True, align=Qt.AlignCenter, wrap=False)
+    label.setStyleSheet(f"background-color: {background}; color: {foreground};"
+                        " border-radius: 6px; padding: 3px 14px;")
+    return label
+
+
+def _clamp(box: QRectF, bounds: QRectF) -> QRectF:
+    x = min(max(box.x(), bounds.left()), bounds.right() - box.width())
+    y = min(max(box.y(), bounds.top()), bounds.bottom() - box.height())
+    return QRectF(x, y, box.width(), box.height())
+
+
+class MapImage(QWidget):
+    """One satellite image, scaled to fit with its aspect ratio kept, with a date caption and
+    labelled place markers drawn on top."""
+
+    def __init__(self, dataset: Dataset, date: str, caption: Optional[str] = None,
+                 parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._ds = dataset
+        self.date = date
+        self.caption = caption
+        self._pixmap = QPixmap(str(dataset.images[date]))
+        self.setMinimumSize(240, 134)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def image_rect(self) -> QRectF:
+        scale = min(self.width() / self._ds.width, self.height() / self._ds.height)
+        w, h = self._ds.width * scale, self._ds.height * scale
+        return QRectF((self.width() - w) / 2, (self.height() - h) / 2, w, h)
+
+    def marker_points(self) -> List[Tuple[Place, QPointF]]:
+        r = self.image_rect()
+        points = []
+        for place in self._ds.places:
+            x, y = self._ds.to_pixel(place.lat, place.lon)
+            points.append((place, QPointF(r.x() + x * r.width() / self._ds.width,
+                                          r.y() + y * r.height() / self._ds.height)))
+        return points
+
+    def _font(self, px: float) -> QFont:
+        font = QFont(self.font())
+        font.setPixelSize(max(13, int(px)))
+        font.setBold(True)
+        return font
+
+    def caption_layout(self) -> Optional[Tuple[QFont, QRectF]]:
+        if not self.caption:
+            return None
+        r = self.image_rect()
+        font = self._font(r.height() / 18)
+        metrics = QFontMetricsF(font)
+        box = QRectF(r.left() + 8, r.top() + 8,
+                     metrics.horizontalAdvance(self.caption) + 16, metrics.height() + 6)
+        return font, box
+
+    def label_layout(self) -> Tuple[QFont, float, List[Tuple[Place, QPointF, QRectF, str]]]:
+        """Marker labels: each sits next to its own marker, inside the image, without covering
+        another label, any marker, or the caption."""
+        r = self.image_rect()
+        font = self._font(r.height() / 22)
+        metrics = QFontMetricsF(font)
+        radius = max(6.0, r.height() / 60)
+        points = self.marker_points()
+        taken = [QRectF(p.x() - radius - 2, p.y() - radius - 2, 2 * radius + 4, 2 * radius + 4)
+                 for _, p in points]
+        caption = self.caption_layout()
+        if caption:
+            taken.append(caption[1])
+        labels = []
+        for place, p in points:
+            text = f"{place.short} ({place.county})"
+            w, h = metrics.horizontalAdvance(text) + 12, metrics.height() + 4
+            gap = radius + 4
+            candidates = [QRectF(p.x() - w / 2, p.y() - gap - h, w, h),   # above
+                          QRectF(p.x() - w / 2, p.y() + gap, w, h),       # below
+                          QRectF(p.x() + gap, p.y() - h / 2, w, h),       # right
+                          QRectF(p.x() - gap - w, p.y() - h / 2, w, h)]   # left
+            boxes = [_clamp(c, r) for c in candidates]
+            box = next((b for b in boxes if not any(b.intersects(t) for t in taken)), boxes[0])
+            taken.append(box)
+            labels.append((place, p, box, text))
+        return font, radius, labels
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        r = self.image_rect()
+        if self._pixmap.isNull():
+            painter.setPen(QColor(TEXT))
+            painter.drawText(r, Qt.AlignCenter, f"Image missing: {self.date}")
+            painter.end()
+            return
+        painter.drawPixmap(r, self._pixmap, QRectF(self._pixmap.rect()))
+
+        caption = self.caption_layout()
+        if caption:
+            font, box = caption
+            painter.setFont(font)
+            self._draw_box_text(painter, box, self.caption)
+
+        font, radius, labels = self.label_layout()
+        painter.setFont(font)
+        for _, point, box, text in labels:
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(QPen(QColor("black"), 5))
+            painter.drawEllipse(point, radius, radius)
+            painter.setPen(QPen(MARKER, 3))
+            painter.drawEllipse(point, radius, radius)
+            self._draw_box_text(painter, box, text)
+        painter.end()
+
+    @staticmethod
+    def _draw_box_text(painter: QPainter, box: QRectF, text: str) -> None:
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(LABEL_BOX)
+        painter.drawRoundedRect(box, 4, 4)
+        painter.setPen(QColor(TEXT))
+        painter.drawText(box, Qt.AlignCenter, text)
+
+
+class OpenOrbitView(QWidget):
+    """Blank until a confirmed OpenOrbit action. Exposes both action IDs from the contract."""
+
+    ACTION_IDS = (ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY)
+    MODES = ("blank", "satellite", "compare")
+
+    def __init__(self, dataset: Optional[Dataset] = None, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.dataset = dataset or load_dataset()
+        self.setObjectName("OpenOrbitView")
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setStyleSheet(f"#OpenOrbitView {{ background-color: {BACKGROUND}; }}")
+        self._pages = {"blank": QWidget(), "satellite": self._build_satellite(),
+                       "compare": self._build_compare()}
+        self._stack = QStackedLayout(self)
+        for mode in self.MODES:
+            self._stack.addWidget(self._pages[mode])
+        self._mode = "blank"
+        self.reset()
+
+    @property
+    def mode(self) -> str:
+        return self._mode
+
+    def perform(self, action_id: str) -> bool:
+        """Run an OpenOrbit action. Returns False for any other action ID."""
+        run = {ActionIds.SHOW_SATELLITE: self.show_satellite,
+               ActionIds.COMPARE_AIR_QUALITY: self.compare_air_quality}.get(action_id)
+        if run is None:
+            return False
+        run()
+        return True
+
+    def show_satellite(self) -> None:
+        """June 28 NASA MODIS view with the EMU and Detroit markers."""
+        self._show("satellite")
+
+    def compare_air_quality(self) -> None:
+        """June 26 and June 28 imagery plus the county AQI comparison."""
+        self._show("compare")
+
+    def reset(self) -> None:
+        """Blank panel for cancel, disconnect, or the next question."""
+        self._show("blank")
+
+    def _show(self, mode: str) -> None:
+        self._mode = mode
+        self._stack.setCurrentWidget(self._pages[mode])
+
+    @staticmethod
+    def _page() -> Tuple[QWidget, QVBoxLayout]:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(28, 16, 28, 12)
+        layout.setSpacing(8)
+        return page, layout
+
+    def _build_satellite(self) -> QWidget:
+        ds = self.dataset
+        page, layout = self._page()
+        layout.addWidget(_label("Southeast Michigan under wildfire smoke", 36, bold=True))
+        layout.addWidget(MapImage(ds, AFTER, caption=_long_date(AFTER)), 1)
+        layout.addWidget(_label(ds.nasa_credit, 18, MUTED))
+        return page
+
+    def _build_compare(self) -> QWidget:
+        ds = self.dataset
+        page, layout = self._page()
+        title = f"Wildfire smoke: {_month_day(BEFORE)} vs {_month_day(AFTER)}, {_parts(AFTER)[0]}"
+        layout.addWidget(_label(title, 36, bold=True))
+
+        images = QHBoxLayout()
+        images.setSpacing(16)
+        for date in (BEFORE, AFTER):
+            images.addWidget(MapImage(ds, date, caption=_long_date(date)), 1)
+        layout.addLayout(images, 1)
+        layout.addWidget(_label(ds.nasa_credit, 18, MUTED))
+
+        layout.addWidget(self._aqi_table())
+        for line in self._summary_lines():
+            layout.addWidget(_label(line, 24))
+        layout.addWidget(_label(ds.epa_credit, 18, MUTED))
+        return page
+
+    def _aqi_table(self) -> QWidget:
+        ds = self.dataset
+        table = QWidget()
+        grid = QGridLayout(table)
+        grid.setContentsMargins(0, 4, 0, 0)
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(6)
+        headers = ("County", f"{_short_date(BEFORE)} AQI", f"{_short_date(AFTER)} AQI", "Change")
+        for col, text in enumerate(headers):
+            align = Qt.AlignLeft | Qt.AlignVCenter if col == 0 else Qt.AlignCenter
+            grid.addWidget(_label(text, 20, MUTED, bold=True, align=align, wrap=False), 0, col)
+        for row, c in enumerate(ds.changes, start=1):
+            grid.addWidget(_label(c.county, 28, bold=True, wrap=False), row, 0)
+            grid.addWidget(_aqi_cell(c.before, c.before_category), row, 1)
+            grid.addWidget(_aqi_cell(c.after, c.after_category), row, 2)
+            grid.addWidget(_label(f"{c.change:+d}", 32, bold=True, align=Qt.AlignCenter, wrap=False), row, 3)
+        grid.setColumnStretch(4, 1)
+        return table
+
+    def _summary_lines(self) -> List[str]:
+        """Largest increase vs highest final AQI, computed (#7 asks a teammate to explain both)."""
+        ds = self.dataset
+        if len(ds.changes) < 2:
+            return []
+        by_change = sorted(ds.changes, key=lambda c: c.change, reverse=True)
+        by_after = sorted(ds.changes, key=lambda c: c.after, reverse=True)
+        top, runner = by_change[0], by_change[1]
+        first = (f"Biggest jump: {top.county}, {top.change:+d} "
+                 f"({top.change - runner.change} more than {runner.county}).")
+        top, runner = by_after[0], by_after[1]
+        second = (f"Highest {_short_date(AFTER)} AQI: {top.county}, {top.after} "
+                  f"({top.after - runner.after} more than {runner.county}).")
+        return [first, second]
+
+
+__all__ = ["MapImage", "OpenOrbitView"]
