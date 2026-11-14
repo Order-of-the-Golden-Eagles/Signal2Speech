@@ -38,8 +38,8 @@ The wearer chooses **Compare counties** and confirms. OpenOrbit switches from th
 | --- | --- |
 | EEG hardware | **g.tec Unicorn Hybrid Black** |
 | EEG acquisition and selection | **g.tec Unicorn Suite** and the **Unity ERP starter with C#** |
-| Interface | **Unity and C#** for the first live demo. A separate local browser UI is TBD. |
-| Local integration | In-process for the first Unity build. A localhost bridge is TBD. |
+| Interface | **Unity 2022.3 LTS and C#**: vendor `ERPFlashTag3D` targets plus uGUI and TextMeshPro overlays. No browser UI. |
+| Local integration | In-process in Unity through the shared [selection contract](docs/architecture/selection-contract.md). No bridge. |
 | AI Answering | Short reply suggestions with explicit wearer confirmation. **Model, provider, and integration TBD.** |
 | Speech | Bundled audio for the OpenOrbit demo. **Speech synthesis for generated replies TBD.** |
 | OpenOrbit data | Locally bundled **NASA MODIS imagery** and **EPA AirData daily county AQI**. **NASA FIRMS fire detections** are a planned extension. |
