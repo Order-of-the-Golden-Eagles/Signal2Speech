@@ -316,6 +316,7 @@ def main(argv=None) -> int:
                                confirm_s=args.confirm_s,
                                flasher=win.flasher if win is not None and args.flash else None)
 
+    guards: List[QTimer] = []
     if win is not None:
         win.set_connection("simulated stream (g.Pype Generator)")
         for seq, cls in (("Ctrl+1", 1), ("Ctrl+2", 2)):
@@ -342,7 +343,10 @@ def main(argv=None) -> int:
             timed_out.append(True)
             print(f"timeout after {args.timeout:g} s with picks left; exit 1", file=sys.stderr)
             app.exit(1)
-        QTimer.singleShot(int(args.timeout * 1000), give_up)
+        guard = QTimer(singleShot=True, interval=int(args.timeout * 1000))
+        guard.timeout.connect(give_up)
+        guard.start()
+        guards.append(guard)
     timed_out: List[bool] = []
 
     decoder.start()
@@ -351,6 +355,8 @@ def main(argv=None) -> int:
         code = app.exec()
         return 1 if timed_out else code
     finally:
+        for g in guards:                 # a pending timeout must not fire in a later event loop
+            g.stop()
         decoder.close()
 
 

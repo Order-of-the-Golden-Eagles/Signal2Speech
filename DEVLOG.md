@@ -172,6 +172,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
 
+## 11/14/26 - 5:58 PM - MagicJester2764 - #26 Recovery checks ([PR #80](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/80))
+- Proved that nothing goes wrong when things go wrong: cancelling, a headset drop, repeated keys, and late or replayed brain decisions never cause an extra map change or spoken line
+    - Covers keyboard, the g.Pype simulator, and replayed recordings: `pytest tests/test_recovery.py`
+- Added the confirm timeout the rules always promised: if nobody confirms within 15 seconds, the preview cancels quietly (`--confirm-timeout`, 0 turns it off)
+- Found and fixed a hidden test problem: a leftover 30-second timer from one test could end a later test early. It only showed up once the test suite got long enough
+- Still open for the headset slot (#23): if the headset goes silent without disconnecting, nothing notices yet
 ## 11/14/26 - 5:45 PM - MagicJester2764 - #38 Proved the PR check passes and fails ([PR #75](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/75))
 - Pushed a test that fails on purpose. CI went red on all four systems and pointed straight at the failing test. Then I removed it to get green again
 - That closes out #14: every PR now shows a clear pass or fail without needing the headset
