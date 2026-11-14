@@ -18,7 +18,7 @@
 
 - The initial docs record the plan. Live EEG and app behavior are pending verification.
 - **Keyboard UI works (#24):** `python -m signal2speech.ui` covers preview, confirm, cancel, and the judge strip, with offscreen tests in `pytest`. See [Accessibility and UI](accessibility-ui/README.md#running-the-ui-24).
-- **Integrated flow works (#4):** `python -m signal2speech.app --input keyboard|simulated` gives one map action and one spoken line per confirm, and no output on preview or cancel (`tests/test_app.py`). The map is still a labelled stand-in until #30, and simulated input is scripted until #21 (g.Pype). See [Integration](integration/README.md#running-the-integrated-app-4-25).
+- **Integrated flow works (#4):** `python -m signal2speech.app --input keyboard|simulated` gives one map action and one spoken line per confirm, and no output on preview or cancel (`tests/test_app.py`). Verified with Wi-Fi off on 2026-11-14: one map action and one audible OS-voice line, run on a dev Mac on macOS 12, not yet the judging laptop. The map is still a labelled stand-in until #30, and simulated input is scripted until #21 (g.Pype). See [Integration](integration/README.md#running-the-integrated-app-4-25).
 - **Setup blocker (#19):** `gpype[all]` 4.2 needs PySide6 6.10.1 or newer, and there's no wheel for macOS 12 (Darwin 21). Use macOS 13 or later for g.Pype work. On macOS 12, `pip install PySide6==6.9.3 pytest` runs the core and the UI, but not g.Pype.
 - See the [sprint issue](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/16) for the current checkpoint and priorities.
 
