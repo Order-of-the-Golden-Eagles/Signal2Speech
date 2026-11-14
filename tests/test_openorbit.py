@@ -12,6 +12,12 @@ from signal2speech.openorbit.dataset import AFTER, BEFORE
 
 CONTRACTS = Path(__file__).resolve().parents[1] / "contracts"
 
+# Offscreen Qt on Windows finds no fonts unless pointed at the system font folder. Set it at
+# import (collection) time, before any test module creates the QApplication, so text widths are
+# real in every test session. Only the offscreen platform reads this variable.
+if sys.platform == "win32":
+    os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts"))
+
 
 def test_changes_are_computed_from_the_epa_rows():
     ds = load_dataset()
@@ -50,8 +56,6 @@ def test_missing_data_names_the_rebuild_command(tmp_path):
 def qapp():
     pytest.importorskip("PySide6")
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    if sys.platform == "win32":  # the offscreen platform finds no fonts on Windows otherwise
-        os.environ.setdefault("QT_QPA_FONTDIR", os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts"))
     from PySide6.QtWidgets import QApplication
     return QApplication.instance() or QApplication([])
 
@@ -63,14 +67,42 @@ def visible_texts(view):
 
 def test_view_starts_blank_and_switches_modes(qapp):
     from signal2speech.openorbit import OpenOrbitView
+    from signal2speech.openorbit.view import BLANK_HINT
     view = OpenOrbitView()
-    assert view.mode == "blank" and visible_texts(view) == []
+    assert view.data_error is None
+    assert view.mode == "blank" and visible_texts(view) == [BLANK_HINT]
     view.show_satellite()
     assert view.mode == "satellite"
     view.compare_air_quality()
     assert view.mode == "compare"
     view.reset()
-    assert view.mode == "blank" and visible_texts(view) == []
+    assert view.mode == "blank" and visible_texts(view) == [BLANK_HINT]
+
+
+def test_missing_data_shows_a_labelled_panel_instead_of_crashing(qapp, tmp_path):
+    """The app's load_view() only catches ImportError, so the view itself must not raise."""
+    from signal2speech.openorbit import OpenOrbitView
+    view = OpenOrbitView(data_root=tmp_path)
+    assert view.data_error and "build_dataset.py" in view.data_error
+    for action in (ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY):
+        assert view.perform(action)
+        texts = visible_texts(view)
+        assert any("OpenOrbit data missing (#29)" in t for t in texts)
+        assert not any("NASA" in t or "EPA" in t for t in texts)
+    view.reset()
+    assert view.mode == "blank"
+
+
+def test_view_fits_the_app_output_panel(qapp):
+    """The app (#4) puts the view next to the selection tiles (about 936 px wide). To fit a
+    1536x864 screen (1920x1080 at 125%), the view must stay narrow and short enough."""
+    from PySide6.QtGui import QFont, QFontMetricsF
+    from signal2speech.openorbit import OpenOrbitView
+    metrics = QFontMetricsF(QFont())
+    if metrics.horizontalAdvance("iiii") == metrics.horizontalAdvance("WWWW"):
+        pytest.skip("Qt started without real fonts in this session, so text widths are placeholders")
+    hint = OpenOrbitView().minimumSizeHint()
+    assert hint.width() <= 560 and hint.height() <= 520, hint.toTuple()
 
 
 def test_perform_exposes_both_action_ids_only(qapp):
@@ -85,11 +117,13 @@ def test_perform_exposes_both_action_ids_only(qapp):
 
 def test_compare_shows_computed_values_and_separate_credits(qapp):
     from signal2speech.openorbit import OpenOrbitView
+    from PySide6.QtWidgets import QLabel
     view = OpenOrbitView()
     view.compare_air_quality()
     texts = visible_texts(view)
     assert "+186" in texts and "+168" in texts
-    assert "32  Good" in texts and "226  Very Unhealthy" in texts
+    cells = {l.accessibleName() for l in view.findChildren(QLabel) if l.isVisibleTo(view)}
+    assert {"32 Good", "218 Very Unhealthy", "58 Moderate", "226 Very Unhealthy"} <= cells
     nasa = [t for t in texts if "NASA" in t]
     epa = [t for t in texts if "EPA" in t]
     assert nasa and epa and not any("NASA" in t and "EPA" in t for t in texts)

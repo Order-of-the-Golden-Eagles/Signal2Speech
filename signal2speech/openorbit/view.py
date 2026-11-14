@@ -11,6 +11,8 @@ Speech stays in #25.
 """
 from __future__ import annotations
 
+import html
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from PySide6.QtCore import QPointF, QRectF, Qt
@@ -40,6 +42,11 @@ AQI_COLORS = {
     "Very Unhealthy": ("#8F3F97", "#FFFFFF"),
     "Hazardous": ("#7E0023", "#FFFFFF"),
 }
+
+BLANK_HINT = "The map appears after a confirmed choice."
+# Text sizes in px. They keep the view inside the app's output panel (#4) next to the selection
+# tiles on a 1536x864 screen (1920x1080 at 125%). The images take the remaining space.
+TITLE_PX, BODY_PX, SMALL_PX = 26, 17, 13
 
 
 def _parts(iso: str) -> Tuple[int, int, int]:
@@ -75,10 +82,16 @@ def _label(text: str, px: int, color: str = TEXT, bold: bool = False,
 
 
 def _aqi_cell(aqi: int, category: str) -> QLabel:
+    """AQI number on top, category below, in the EPA category color."""
     background, foreground = AQI_COLORS.get(category, ("#444C56", TEXT))
-    label = _label(f"{aqi}  {category}", 24, foreground, bold=True, align=Qt.AlignCenter, wrap=False)
+    label = QLabel(f"<div style='font-size:22px; font-weight:700;'>{aqi}</div>"
+                   f"<div style='font-size:{SMALL_PX}px; font-weight:600;'>{html.escape(category)}</div>")
+    label.setTextFormat(Qt.RichText)
+    label.setAlignment(Qt.AlignCenter)
+    label.setWordWrap(True)
+    label.setAccessibleName(f"{aqi} {category}")
     label.setStyleSheet(f"background-color: {background}; color: {foreground};"
-                        " border-radius: 6px; padding: 3px 14px;")
+                        " border-radius: 6px; padding: 2px 10px;")
     return label
 
 
@@ -99,7 +112,7 @@ class MapImage(QWidget):
         self.date = date
         self.caption = caption
         self._pixmap = QPixmap(str(dataset.images[date]))
-        self.setMinimumSize(240, 134)
+        self.setMinimumSize(200, 111)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def image_rect(self) -> QRectF:
@@ -224,22 +237,36 @@ class MapImage(QWidget):
 
 
 class OpenOrbitView(QWidget):
-    """Blank until a confirmed OpenOrbit action. Exposes both action IDs from the contract."""
+    """Blank until a confirmed OpenOrbit action. Exposes both action IDs from the contract.
+
+    If the #29 data is missing or unreadable, the view still builds (so the app never crashes)
+    and both actions show a clearly labelled "data missing" panel instead of a map.
+    """
 
     ACTION_IDS = (ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY)
     MODES = ("blank", "satellite", "compare")
 
-    def __init__(self, dataset: Optional[Dataset] = None, parent: Optional[QWidget] = None):
+    def __init__(self, dataset: Optional[Dataset] = None, parent: Optional[QWidget] = None, *,
+                 data_root: Optional[Path] = None):
         super().__init__(parent)
-        self.dataset = dataset or load_dataset()
+        self.data_error: Optional[str] = None
+        if dataset is None:
+            try:
+                dataset = load_dataset(data_root)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                self.data_error = str(exc) or type(exc).__name__
+        self.dataset = dataset
         self.setObjectName("OpenOrbitView")
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setStyleSheet(f"#OpenOrbitView {{ background-color: {BACKGROUND}; }}")
-        self._pages = {"blank": QWidget(), "satellite": self._build_satellite(),
-                       "compare": self._build_compare()}
+        if self.data_error is None:
+            satellite, compare = self._build_satellite(), self._build_compare()
+        else:
+            satellite = compare = self._build_missing(self.data_error)
+        self._pages = {"blank": self._build_blank(), "satellite": satellite, "compare": compare}
         self._stack = QStackedLayout(self)
-        for mode in self.MODES:
-            self._stack.addWidget(self._pages[mode])
+        for page in dict.fromkeys(self._pages.values()):
+            self._stack.addWidget(page)
         self._mode = "blank"
         self.reset()
 
@@ -276,53 +303,70 @@ class OpenOrbitView(QWidget):
     def _page() -> Tuple[QWidget, QVBoxLayout]:
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(28, 16, 28, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(16, 12, 16, 10)
+        layout.setSpacing(6)
         return page, layout
+
+    def _build_blank(self) -> QWidget:
+        page, layout = self._page()
+        layout.addStretch(1)
+        layout.addWidget(_label(BLANK_HINT, SMALL_PX + 2, MUTED, align=Qt.AlignCenter))
+        layout.addStretch(1)
+        return page
+
+    def _build_missing(self, error: str) -> QWidget:
+        page, layout = self._page()
+        box = QLabel(f"<b>OpenOrbit data missing (#29)</b><br><br>{html.escape(error)}")
+        box.setTextFormat(Qt.RichText)
+        box.setWordWrap(True)
+        box.setStyleSheet(f"color: {TEXT}; font-size: {BODY_PX}px; border: 3px dashed #F59E0B;"
+                          " border-radius: 14px; padding: 16px;")
+        layout.addWidget(box)
+        layout.addStretch(1)
+        return page
 
     def _build_satellite(self) -> QWidget:
         ds = self.dataset
         page, layout = self._page()
-        layout.addWidget(_label("Southeast Michigan under wildfire smoke", 36, bold=True))
+        layout.addWidget(_label("Southeast Michigan under wildfire smoke", TITLE_PX, bold=True))
         layout.addWidget(MapImage(ds, AFTER, caption=_long_date(AFTER)), 1)
-        layout.addWidget(_label(ds.nasa_credit, 18, MUTED))
+        layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
         return page
 
     def _build_compare(self) -> QWidget:
         ds = self.dataset
         page, layout = self._page()
-        title = f"Wildfire smoke: {_month_day(BEFORE)} vs {_month_day(AFTER)}, {_parts(AFTER)[0]}"
-        layout.addWidget(_label(title, 36, bold=True))
+        layout.addWidget(_label("Wildfire smoke: before and after", TITLE_PX, bold=True))
 
         images = QHBoxLayout()
-        images.setSpacing(16)
+        images.setSpacing(10)
         for date in (BEFORE, AFTER):
             images.addWidget(MapImage(ds, date, caption=_long_date(date)), 1)
         layout.addLayout(images, 1)
-        layout.addWidget(_label(ds.nasa_credit, 18, MUTED))
+        layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
 
         layout.addWidget(self._aqi_table())
         for line in self._summary_lines():
-            layout.addWidget(_label(line, 24))
-        layout.addWidget(_label(ds.epa_credit, 18, MUTED))
+            layout.addWidget(_label(line, BODY_PX))
+        layout.addWidget(_label(ds.epa_credit, SMALL_PX, MUTED))
         return page
 
     def _aqi_table(self) -> QWidget:
         ds = self.dataset
         table = QWidget()
         grid = QGridLayout(table)
-        grid.setContentsMargins(0, 4, 0, 0)
-        grid.setHorizontalSpacing(14)
+        grid.setContentsMargins(0, 2, 0, 0)
+        grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(6)
         headers = ("County", f"{_short_date(BEFORE)} AQI", f"{_short_date(AFTER)} AQI", "Change")
         for col, text in enumerate(headers):
             align = Qt.AlignLeft | Qt.AlignVCenter if col == 0 else Qt.AlignCenter
-            grid.addWidget(_label(text, 20, MUTED, bold=True, align=align, wrap=False), 0, col)
+            grid.addWidget(_label(text, 14, MUTED, bold=True, align=align, wrap=False), 0, col)
         for row, c in enumerate(ds.changes, start=1):
-            grid.addWidget(_label(c.county, 28, bold=True, wrap=False), row, 0)
+            grid.addWidget(_label(c.county, 20, bold=True, wrap=False), row, 0)
             grid.addWidget(_aqi_cell(c.before, c.before_category), row, 1)
             grid.addWidget(_aqi_cell(c.after, c.after_category), row, 2)
-            grid.addWidget(_label(f"{c.change:+d}", 32, bold=True, align=Qt.AlignCenter, wrap=False), row, 3)
+            grid.addWidget(_label(f"{c.change:+d}", 24, bold=True, align=Qt.AlignCenter, wrap=False), row, 3)
         grid.setColumnStretch(4, 1)
         return table
 
