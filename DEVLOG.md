@@ -50,6 +50,20 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every run writes a timing log to `logs/` (not committed) with the input mode and connection state. The log refuses raw EEG data on purpose
 - Breaking the app on purpose so it spoke twice made the smoke check fail, which shows it catches real problems
 
+## 11/14/26 - 5:02 PM - Long Le (with Claude) - #25 Speech and the confirmed action ([PR #60](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/60))
+- Speech moved to `signal2speech/speech/`. It plays a recorded clip for the two fixed OpenOrbit lines if one exists, otherwise uses the computer's built-in offline voice
+- Fixed a bug where a recorded clip could have played instead of an AI reply. AI replies always speak the exact approved words
+- `--input simulated` uses the g.Pype simulator from #21 when it's installed, and the screen says why when it falls back to the scripted version
+- Verified on a Mac with scripted simulated input: one map action and one spoken line, nothing during the preview. This Mac can't run g.Pype (macOS 12), so the g.Pype path was checked with a test stand-in. Still needs the real map (#30) and recorded clips (#29)
+
+## 11/14/26 - 5:15 PM - MagicJester2764 - #21 Code review fixes ([PR #53](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/53))
+- The full app now runs on the fake g.Pype brain: `python -m signal2speech.app --input simulated` (wired in by #60)
+- A code review found that pressing Esc during a scripted run threw the script out of order. Now a cancelled step is retried, and a step the keyboard already did is skipped
+- Picking with Ctrl+1/Ctrl+2 now waits until the tiles finish flashing, the same as the real P300 will
+- The headless runner handles longer scripts, and a run that times out now reports failure instead of success
+- Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
+- Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
+
 ## 11/14/26 - 5:15 PM - In Young Song (with Claude) - #29 NASA and EPA dataset ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
 - The OpenOrbit demo now has its real data, bundled in the repo so it works with Wi-Fi off
     - `data/openorbit/`: two NASA satellite images of southeast Michigan (June 26 and 28, 2023), the EPA air-quality rows, map marker places, and `SOURCES.md` with every link
@@ -64,20 +78,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Sized to fit next to the selection tiles on a 1920x1080 laptop at 125% scaling. Before this, the window ran off the screen
 - If the data folder is missing, the panel says so clearly instead of crashing the app
 - Verified on Windows with keyboard input and every network call blocked: one map change and one spoken line per confirm. Still needs a real Wi-Fi-off run on the judging laptop (#39)
-## 11/14/26 - 5:15 PM - MagicJester2764 (with Claude) - #21 Code review fixes ([PR #53](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/53))
-## 11/14/26 - 5:02 PM - Long Le (with Claude) - #25 Speech and the confirmed action ([PR #60](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/60))
-- Speech moved to `signal2speech/speech/`. It plays a recorded clip for the two fixed OpenOrbit lines if one exists, otherwise uses the computer's built-in offline voice
-- Fixed a bug where a recorded clip could have played instead of an AI reply. AI replies always speak the exact approved words
-- `--input simulated` uses the g.Pype simulator from #21 when it's installed, and the screen says why when it falls back to the scripted version
-- Verified on a Mac with scripted simulated input: one map action and one spoken line, nothing during the preview. This Mac can't run g.Pype (macOS 12), so the g.Pype path was checked with a test stand-in. Still needs the real map (#30) and recorded clips (#29)
-
-## 11/14/26 - 5:15 PM - MagicJester2764 - #21 Code review fixes ([PR #53](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/53))
-- The full app now runs on the fake g.Pype brain: `python -m signal2speech.app --input simulated` (wired in by #60)
-- A code review found that pressing Esc during a scripted run threw the script out of order. Now a cancelled step is retried, and a step the keyboard already did is skipped
-- Picking with Ctrl+1/Ctrl+2 now waits until the tiles finish flashing, the same as the real P300 will
-- The headless runner handles longer scripts, and a run that times out now reports failure instead of success
-- Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
-- Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
 
 ## 11/14/26 - 5:24 PM - MagicJester2764 - #37 CI follow-up ([PR #68](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/68))
 - Took over the CI that Vasanth drafted in #64 and fixed what its code review found
