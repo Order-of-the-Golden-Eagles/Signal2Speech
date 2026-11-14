@@ -164,7 +164,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
 - Code review follow-up: the summary is now written even when tests or the smoke check fail, and an app that can't start fails CI instead of looking like a skipped smoke check. The check is renamed `ci (...)` because it runs more than pytest
 
-## 11/14/26 - 5:32 PM - Long Le (with Claude) - #34 Submission plan and checklist ([PR #73](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/73))
+## 11/14/26 - 5:32 PM - Long Le - #34 Submission plan and checklist ([PR #73](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/73))
 - The team has a plan for the demo and the submission in `docs/demo-submission/`
     - `run-of-show.md`: the two-minute table demo, with a fallback for every step
     - `video-shot-list.md`: nine shots under 2:45 for the video
@@ -178,3 +178,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Event IDs now come from one counter shared by every adapter, so they're unique for the whole run
 - Verified with a new test where two live-EEG adapters preview and then confirm (`tests/test_contract.py`). `tests/test_app.py` now matches event IDs by shape instead of exact numbers. Full suite: 158 passed
 - Still needs the headset: the combined P300 + alpha flow on a real wearer (#23)
+## 11/14/26 - 5:58 PM - MagicJester2764 - #26 Recovery checks ([PR #80](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/80))
+- Proved that nothing goes wrong when things go wrong: cancelling, a headset drop, repeated keys, and late or replayed brain decisions never cause an extra map change or spoken line
+    - Covers keyboard, the g.Pype simulator, and replayed recordings: `pytest tests/test_recovery.py`
+- Added the confirm timeout the rules always promised: if nobody confirms within 15 seconds, the preview cancels quietly (`--confirm-timeout`, 0 turns it off)
+- Found and fixed a hidden test problem: a leftover 30-second timer from one test could end a later test early. It only showed up once the test suite got long enough
+- Still open for the headset slot (#23): if the headset goes silent without disconnecting, nothing notices yet
+## 11/14/26 - 5:45 PM - MagicJester2764 - #38 Proved the PR check passes and fails ([PR #75](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/75))
+- Pushed a test that fails on purpose. CI went red on all four systems and pointed straight at the failing test. Then I removed it to get green again
+- That closes out #14: every PR now shows a clear pass or fail without needing the headset
+- Explained in the workflow why Ubuntu runs twice: Python 3.12 is what the judging laptop uses, and 3.13 is an early warning for newer Python. It caught a real bug on its first day
+- Recorded a flaky evidence test on macOS (#48) so nobody chases it as a real failure
