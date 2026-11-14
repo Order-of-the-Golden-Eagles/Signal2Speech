@@ -9,9 +9,10 @@ produces output, and the handler calls it exactly once per confirmation.
 Dependencies still missing on main are labelled, never faked:
 - #30 OpenOrbit view: until signal2speech.openorbit.OpenOrbitView exists, a stand-in panel
   says which action would run.
-- #21 g.Pype simulated pipeline: until signal2speech/eeg/simulated.py exists, --input simulated
-  injects scripted decisions through the same arm_capture()/select_captured() path live EEG
-  uses, and is labelled "Simulated".
+- #21 g.Pype simulated pipeline: --input simulated uses signal2speech.eeg.simulated's
+  SimulatedDecoder (a real g.Pype Generator stream) when it imports. Otherwise it injects
+  scripted decisions through the same arm_capture()/select_captured() path and says why.
+- Speech lives in signal2speech/speech/ (bundled OpenOrbit clip, else the offline OS voice).
 - #23 live EEG and #48 recorded replay: refused with a clear message.
 """
 from __future__ import annotations
@@ -22,7 +23,7 @@ import time
 from pathlib import Path
 from typing import Callable, List, Optional, Protocol
 
-from PySide6.QtCore import QObject, QTimer, QUrl
+from PySide6.QtCore import QObject, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QPlainTextEdit, QVBoxLayout,
                                QWidget)
@@ -30,11 +31,11 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QPlainTextEdit
 from signal2speech.core import (ActionIds, Choice, ConfirmedAction, EegClassMap, InputAdapter,
                                 InputSources, Outcome, Round, RoundKind, SelectionEvent,
                                 SelectionHandler, TargetIds)
+from signal2speech.speech import MutedSpeaker, OfflineSpeaker, Speaker
 from signal2speech.ui import INPUT_LABELS, SelectionWindow
 from signal2speech.ui.__main__ import load_demo_choices
 
 ROOT = Path(__file__).resolve().parents[1]
-AUDIO_DIR = ROOT / "data" / "openorbit" / "audio"   # optional bundled <action_id>.wav (#29)
 
 BLOCKED_INPUTS = {
     InputSources.LIVE_EEG: "Live EEG is blocked: needs the P300 chooser (#46), alpha confirm "
@@ -48,10 +49,6 @@ class MapView(Protocol):
     """What #30 exposes. Only AppSink calls these."""
     def show_satellite(self) -> None: ...
     def compare_air_quality(self) -> None: ...
-
-
-class Speaker(Protocol):
-    def say(self, text: str, clip: Optional[str] = None) -> None: ...
 
 
 class Transcript:
@@ -131,39 +128,6 @@ def load_view() -> QWidget:
     return OpenOrbitView()
 
 
-class QtSpeaker(QObject):
-    """Offline speech: bundled <action_id>.wav if present, else the OS voice via QtTextToSpeech."""
-
-    def __init__(self, log: Callable[[str], None], audio_dir: Path = AUDIO_DIR):
-        super().__init__()
-        from PySide6.QtTextToSpeech import QTextToSpeech
-        self.log = log
-        self.audio_dir = audio_dir
-        self.tts = QTextToSpeech(self)
-        self.tts.stateChanged.connect(lambda s: self.log(f"speech engine: {s.name}"))
-        self._sound = None
-
-    def say(self, text: str, clip: Optional[str] = None) -> None:
-        wav = self.audio_dir / f"{clip}.wav" if clip else None
-        if wav is not None and wav.is_file():
-            from PySide6.QtMultimedia import QSoundEffect
-            self._sound = QSoundEffect(self)
-            self._sound.setSource(QUrl.fromLocalFile(str(wav)))
-            self._sound.play()
-            self.log(f"speech: bundled {wav.name}")
-            return
-        self.log(f"speech: OS voice ({self.tts.engine()})")
-        self.tts.say(text)
-
-
-class MutedSpeaker:
-    def __init__(self, log: Callable[[str], None]):
-        self.log = log
-
-    def say(self, text: str, clip: Optional[str] = None) -> None:
-        self.log("speech: muted (--mute), nothing audible")
-
-
 # ── Input side ───────────────────────────────────────────────
 class InjectedSimulatedInput(QObject):
     """Scripted simulated decisions, no g.Pype yet (#21 pending).
@@ -201,6 +165,24 @@ class InjectedSimulatedInput(QObject):
         self.adapter.select_captured(self.classes.target_for(cls))
 
 
+def make_simulated_input(handler: SelectionHandler, window: SelectionWindow, script: List[int],
+                         log: Callable[[str], None], confirm_delay_ms: int = 2000):
+    """Return (input object, label). Prefer #21's g.Pype stream; say why when falling back."""
+    try:
+        from signal2speech.eeg.simulated import SimulatedDecoder
+    except ImportError as e:
+        missing = getattr(e, "name", "") or ""
+        why = ("g.Pype not installed" if missing.startswith("gpype")
+               else "#21 SimulatedDecoder not merged" if missing.startswith("signal2speech")
+               else f"import failed: {missing or e}")
+        return (InjectedSimulatedInput(handler, window, script, log, confirm_delay_ms),
+                f"scripted, no g.Pype ({why})")
+    decoder = SimulatedDecoder(handler, script, flasher=window.flasher,
+                               confirm_s=confirm_delay_ms / 1000, parent=window)
+    decoder.start()
+    return decoder, "g.Pype Generator stream"
+
+
 # ── Wiring ───────────────────────────────────────────────────
 class App:
     def __init__(self, input_source: str = InputSources.KEYBOARD, *,
@@ -219,7 +201,7 @@ class App:
         self.log = Transcript(self.transcript_view, echo=echo)
         self.view = view if view is not None else load_view()
         if speaker is None:
-            speaker = MutedSpeaker(self.log) if mute else QtSpeaker(self.log)
+            speaker = MutedSpeaker(self.log) if mute else OfflineSpeaker(self.log)
         self.speaker = speaker
         self.sink = AppSink(self.view, speaker, self.log)
         self.handler = SelectionHandler(self.sink)
@@ -234,11 +216,12 @@ class App:
         h.on_cleared.append(lambda r: self.log(f"cleared ({r}): no output"))
         h.on_handled.append(self._log_outcome)
 
-        self.sim: Optional[InjectedSimulatedInput] = None
+        self.sim = None
+        sim_label = ""
         if input_source == InputSources.SIMULATED:
-            self.sim = InjectedSimulatedInput(h, self.window, sim_script or [2, 1], self.log,
-                                              confirm_delay_ms)
-            self.window.set_connection("n/a (scripted)")
+            self.sim, sim_label = make_simulated_input(h, self.window, sim_script or [2, 1],
+                                                       self.log, confirm_delay_ms)
+            self.window.set_connection(sim_label)
 
         # Rule 4: the app opens the next question after a cancel, disconnect, or confirm.
         self._reopen = QTimer(singleShot=True, interval=reopen_ms)
@@ -265,8 +248,18 @@ class App:
         sc = QShortcut(QKeySequence("D"), self.root)   # rehearse a headset drop (#26)
         sc.setAutoRepeat(False)
         sc.activated.connect(lambda: h.disconnect())
-        self.log(f"input: {INPUT_LABELS[input_source]}"
-                 + (" (scripted, no g.Pype: #21 pending)" if self.sim else ""))
+        if hasattr(self.sim, "set_next"):              # #21: pick for a waiting sequence
+            for seq, cls in (("Ctrl+1", 1), ("Ctrl+2", 2)):
+                s2 = QShortcut(QKeySequence(seq), self.root)
+                s2.setAutoRepeat(False)
+                s2.activated.connect(lambda c=cls: self.sim.set_next(c))
+        self.log(f"input: {INPUT_LABELS[input_source]}" + (f" ({sim_label})" if sim_label else ""))
+        self.log(f"speech: {getattr(self.speaker, 'backend', type(self.speaker).__name__)}")
+
+    def close(self) -> None:
+        """Stop the g.Pype stream if one is running (#21)."""
+        if hasattr(self.sim, "close"):
+            self.sim.close()
 
     def ask(self) -> None:
         self.handler.begin_choice_round(self.choices)
@@ -303,6 +296,7 @@ def main(argv=None) -> int:
     qapp = QApplication.instance() or QApplication(sys.argv[:1])
     script = [int(s) for s in args.sim.split(",") if s.strip()]
     app = App(source, sim_script=script, mute=args.mute)
+    qapp.aboutToQuit.connect(app.close)
     if args.screenshot:
         def shoot(code: int) -> None:
             app.root.grab().save(str(args.screenshot))
