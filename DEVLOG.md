@@ -35,7 +35,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
 
-## 11/14/26 - 5:38 PM - Vasanth Anbukumar (with Claude) - #48 Evidence view driven by the P300 chooser (PR pending)
+## 11/14/26 - 5:38 PM - Vasanth Anbukumar (with Claude) - #48 Evidence view driven by the P300 chooser ([PR #76](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/76))
 - New flag: `python -m signal2speech.evidence --source generator --p300` (or `--source hybridblack --p300`) builds the judge window around the real P300 chooser instead of the stand-in flasher
 - The chooser's filter, scorers and calibration collectors now live in the same g.Pype pipeline as the scopes, and its flash markers go on the evidence view's marker
 - The target vs non-target average uses the calibration flashes, from the very Trigger nodes whose epochs train the classifier, so judges see what the classifier learns from
