@@ -192,6 +192,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Explained in the workflow why Ubuntu runs twice: Python 3.12 is what the judging laptop uses, and 3.13 is an early warning for newer Python. It caught a real bug on its first day
 - Recorded a flaky evidence test on macOS (#48) so nobody chases it as a real failure
 
+## 11/14/26 - 6:08 PM - MagicJester2764 - #38 Review follow-up ([PR #83](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/83))
+- Filled in the green CI run that proves the check passes again, instead of "expected green"
+- The flaky evidence test on macOS is now in living memory, with a firmer rule: re-run once, and if it fails twice it's a real problem
+- The CI matrix explanation lives in one place (the workflow file) and no longer claims Python versions CI doesn't test
 ## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
 - A teammate can now run the whole OpenOrbit reveal with Wi-Fi off and explain it
     - `python -m signal2speech.app --input keyboard`: press 2 then 1 to compare counties, or 1 then 1 for the satellite view
