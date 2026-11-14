@@ -11,11 +11,14 @@
 - Use platform APIs and hardware-required packages. Bundle OpenOrbit data and demo audio locally.
 - Selection contract is final in [#22](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/22). It covers the event shape, IDs, round rules, folder ownership, and dependency order. See [selection-contract.md](architecture/selection-contract.md). `signal2speech/core/` holds the pure-Python handler, and `pytest` must stay green. Live EEG confirm stays disarmed until #23.
 - **Decoding:** choose with P300 (our flashing tiles → `Epochs` → `Sklearn` LDA, #46). Confirm with an alpha switch, eyes closed for about 2 s (#47). Fallback: step through options one at a time and confirm each with the alpha switch. Judges see evidence scopes (#48).
+- **Simulated input works (#21):** `python -m signal2speech.eeg.simulated --picks 2,1` runs a real g.Pype `Generator` pipeline into the handler, labelled `simulated`. #24 and #25 can rehearse against it. `SimulatedDecoder(h, picks, flasher=window.flasher, confirm_s=2.0)` replaces `InjectedSimulatedInput` in `app.py` in one line, if the #25 owner agrees. Verified on Linux with Python 3.12 and g.Pype 4.2.0. [Details](eeg-hardware/README.md#simulated-input-21--works)
+- **Qt app rule:** create the app with `QApplication`, never `QCoreApplication`. The first one created wins, and the #24 widgets crash pytest otherwise.
 - **Ask the g.tec mentor:** Paradigm Presenter licence, MCP visualizer access, and whether one headset can stream to two apps at once.
 - **AI provider (#5):** the code defaults to Claude (`claude-opus-5-5`) when `ANTHROPIC_API_KEY` is in `.env`. Otherwise it uses a labelled Stub, and it falls back to saved phrases on a timeout or error. The Stub flow was tested by hand on 2026-11-14. A live call is still unverified because there's no key yet. The team can still swap the provider. See the [architecture walkthrough and input contract](architecture/README.md) and [AI Answering](ai-answering/README.md).
 
 ## Verification and next checkpoint
 
+- **CI gates every PR (#37):** `pytest` and the smoke check run on Windows, macOS, and Ubuntu (3.12, plus 3.13 on Ubuntu), with versions constrained to `requirements-lock.txt`. Skips and the manual checks show in each job summary. Tests must pass on all three systems: compare `Path` objects, not path strings. [Details](devops/README.md#ci-on-every-pr-37)
 - **Environment verified (#19, 2026-11-14):** Python 3.12.10, g.Pype 4.2.0, and PySide6 6.11.3 plus scikit-learn 1.9.1 and h5py 3.16.0, are pinned in `requirements-lock.txt`. `pytest` passes 21 of 21, including the #24 UI tests. Step 6 is verified: the g.Pype scope window runs. Still open: the questions for the g.tec mentor.
 
 - The initial docs record the plan. Live EEG and app behavior are pending verification.
