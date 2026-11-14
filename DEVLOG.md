@@ -89,14 +89,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Breaking the app on purpose so it spoke twice made the smoke check fail, which shows it catches real problems
 
 ## 11/14/26 - 5:02 PM - Long Le - #25 Speech and the confirmed action ([PR #60](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/60))
-## 11/14/26 - 5:15 PM - MagicJester2764 - #47 Code review fixes ([PR #58](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/58))
-- A code review found a way to confirm too early. A closure that came too soon could still count after the eyes had been open for less than the required second. Now every early closure restarts the clock
-- A closure still "in the pipes" from the previous screen can no longer sneak through when the Confirm screen appears
-- Calibration now refuses broken readings (for example a flat or noisy electrode) instead of silently making a switch that never fires
-- If the app turns down a live confirm, the switch keeps listening on that same screen, so #23 can enable live confirm without a restart
-- Long demos no longer grow memory, and the switch works with headset streams other than 250 Hz
-- Verified on simulated input: 84 tests pass, and a 10 s rest gave 0 false triggers and 1 confirm per closure
-## 11/14/26 - 5:02 PM - Long Le (with Claude) - #25 Speech and the confirmed action ([PR #60](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/60))
 - Speech moved to `signal2speech/speech/`. It plays a recorded clip for the two fixed OpenOrbit lines if one exists, otherwise uses the computer's built-in offline voice
 - Fixed a bug where a recorded clip could have played instead of an AI reply. AI replies always speak the exact approved words
 - `--input simulated` uses the g.Pype simulator from #21 when it's installed, and the screen says why when it falls back to the scripted version
@@ -116,6 +108,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - It already caught a Windows-only bug: Qt returns forward-slash paths there, so tests should compare `Path` objects, not strings
 - Headset pairing, audio, the g.Pype window, and the Wi-Fi-off launch stay manual checks
 
+## 11/14/26 - 5:15 PM - MagicJester2764 - #47 Code review fixes ([PR #58](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/58))
+- A code review found a way to confirm too early. A closure that came too soon could still count after the eyes had been open for less than the required second. Now every early closure restarts the clock
+- A closure still "in the pipes" from the previous screen can no longer sneak through when the Confirm screen appears
+- Calibration now refuses broken readings (for example a flat or noisy electrode) instead of silently making a switch that never fires
+- If the app turns down a live confirm, the switch keeps listening on that same screen, so #23 can enable live confirm without a restart
+- Long demos no longer grow memory, and the switch works with headset streams other than 250 Hz
+- Verified on simulated input: 84 tests pass, and a 10 s rest gave 0 false triggers and 1 confirm per closure
+
 ## 11/14/26 - 5:15 PM - MagicJester2764 - #21 Code review fixes ([PR #53](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/53))
 - The full app now runs on the fake g.Pype brain: `python -m signal2speech.app --input simulated` (wired in by #60)
 - A code review found that pressing Esc during a scripted run threw the script out of order. Now a cancelled step is retried, and a step the keyboard already did is skipped
@@ -124,13 +124,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
 
-## 11/14/26 - 5:20 PM - Vasanth Anbukumar (with Claude) - #37 Git hooks: secret scan and pre-push tests ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66))
+## 11/14/26 - 5:20 PM - Vasanth Anbukumar - #37 Git hooks: secret scan and pre-push tests ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66))
 - Every clone can now turn on two shared git hooks with one command, the same on Windows, macOS, and Linux: `git config core.hooksPath .githooks`
     - `pre-commit` blocks API keys and tokens (Anthropic, OpenAI, GitHub, AWS, Google, private keys), raw EEG files (`.edf`, `.bdf`, recordings folders), and `.env`
     - `pre-push` runs `pytest` (about 30 seconds) before anything leaves your laptop. Branch deletions skip it automatically. Skip once with `SKIP_TESTS=1 git push`
 - Why: the secret scan used to exist only on one laptop, and the rule about keeping keys and raw EEG out of git had nothing enforcing it
 - The hooks are plain `sh` with LF line endings forced in `.gitattributes`, so Git for Windows, macOS, and Linux all run them
 - Verified: `tests/test_githooks.py` builds a throwaway repo and confirms a fake key and an `.edf` file get blocked while a clean commit and `.env.example` pass. CI runs it on all three OSes
+
 ## 11/14/26 - 5:24 PM - MagicJester2764 - #37 CI follow-up ([PR #68](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/68))
 - Took over the CI that Vasanth drafted in #64 and fixed what its code review found
 - CI now installs the versions pinned in `requirements-lock.txt` (g.Pype, Qt, numpy, scikit-learn, and the rest), so it tests what the judging laptop runs instead of whatever is newest that day
