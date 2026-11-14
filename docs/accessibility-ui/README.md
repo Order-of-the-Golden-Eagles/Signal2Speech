@@ -8,11 +8,11 @@ Keep choices stable during a round. Show the preview, confirm and cancel control
 
 ## UI stack and layout
 
-**Use Unity uGUI (Canvas) with TextMeshPro, not UI Toolkit.** The g.tec ERP starter draws its flashing stimuli as scene objects. uGUI lives in the same scene, so each choice tile can be a sponsor stimulus. TextMeshPro keeps text sharp on a projector. The code lives in `unity/Signal2Speech/Assets/Signal2Speech/UI/` ([#24](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/24)). Build and test in `Scenes/Dev/UI.unity`; only #25 edits `Demo.unity`.
+**Choice tiles are the vendor's `ERPFlashTag3D` 3D objects with TextMeshPro (3D) labels. Use uGUI (Canvas) with TextMeshPro for everything else, not UI Toolkit.** The **BCI Visual ERP 3D** prefab ships 5 flash tags. Use 2 for `target-1` and `target-2`, and disable the other 3 (or leave them unmapped in `EegClassMap` so the handler never sees them). The preview text, judge strip, OpenOrbit panel, and question input are uGUI overlays. The code lives in `unity/Signal2Speech/Assets/Signal2Speech/UI/` ([#24](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/24)). Build and test in `Scenes/Dev/UI.unity`; only #25 edits `Demo.unity`.
 
 | Screen region | Content | Driven by |
 | --- | --- | --- |
-| **Choice tiles** | Two large tiles, `target-1` and `target-2`. Each tile is a sponsor stimulus, and keys 1 and 2 select the same tiles. | `RoundOpened` |
+| **Choice tiles** | Two large `ERPFlashTag3D` tags, `target-1` and `target-2`, relabelled per round. Keys 1 and 2 select the same tags. | `RoundOpened` |
 | **Preview** | The exact reply or action text in large type. The tiles relabel to **Confirm** and **Cancel**. | `PreviewShown` |
 | **Judge strip** | Input label (Keyboard / Simulated / Recorded / Live EEG), connection state, current round ID, last outcome | `Handled`, `Cleared` |
 | **OpenOrbit panel** | June 26 and June 28 imagery with county AQI and separate attribution. Revealed only after a confirm. | `IActionSink` ([#30](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/30), [#25](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/25)) |

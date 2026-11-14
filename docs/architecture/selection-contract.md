@@ -8,6 +8,9 @@ This is the shared contract from [#22](https://github.com/Order-of-the-Golden-Ea
 | --- | --- | --- |
 | **Vendor fact** | The g.tec Unity ERP starter raises an `On Class Selection` callback with a decoded class index. [Tutorial](https://github.com/unicorn-bi/Unicorn-Hybrid-Black-Unity-Interface/blob/main/tutorial/build-your-first-erp-application.md#advance-unity-event-callbacks) | Documented, not yet run by us |
 | **Vendor fact** | The published callback example carries no app round ID. | Documented |
+| **Vendor fact** | The callback signature is `OnClassificationSelection(ERPPipeline erpPipeline, ClassSelection classSelection)`, and it reads `classSelection.Class`. Wire it on the **ERPPipeline** object's **On Class Selection** event. | Documented |
+| **Vendor fact** | **BCI Visual ERP 3D** ships 5 `ERPFlashTag3D` targets. We use 2. | Documented |
+| **Vendor fact** | Serial `UN-0000.00.00` is a built-in **Unicorn simulator**. Training needs at least 30 trials (60 recommended). The SDK targets Unity 2022.3 (2022.3.11f1 recommended). | Documented |
 | **Unknown** | The class index to on-screen target mapping in the installed scene. | Record in [#23](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/23). Code uses `EegClassMap.AssumedDefault()` (1 → `target-1`, 2 → `target-2`) until then. |
 | **Unknown** | Whether a late callback can arrive after the next stimulus sequence starts. | Verify in [#23](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/23). |
 | **App decision** | Everything below. | Implemented in `core/` and covered by tests |
@@ -102,7 +105,7 @@ eeg.ArmCapture();                                    // when flashing starts for
 eeg.SelectCaptured(classMap.TargetFor(classIndex));  // from On Class Selection, on the main thread
 ```
 
-- **Simulated input (#21):** `new InputAdapter(handler, InputSources.Simulated)`. Inject it at the same callback boundary as live EEG (`ArmCapture` then `SelectCaptured`) so it exercises the same path.
+- **Simulated input (#21):** prefer the vendor simulator `UN-0000.00.00` driving the real `On Class Selection` callback, labelled `simulated`. If that's unavailable, inject at the same boundary with `new InputAdapter(handler, InputSources.Simulated)`, then `ArmCapture` and `SelectCaptured`.
 - **Threading:** `SelectionHandler` isn't thread-safe. Marshal vendor callbacks to the Unity main thread first.
 
 ## Tests

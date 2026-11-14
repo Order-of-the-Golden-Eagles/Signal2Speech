@@ -29,9 +29,9 @@ flowchart TD
 
 ## First demo host
 
-**Use the sponsor’s Unity ERP scene and C# for the first live build.** Keep the sponsor’s stimulus layout while verifying target IDs. Run keyboard and simulated input through the same app handler, so the rest of the team can work while the headset is unavailable. The first hardware rehearsal starts by opening the sponsor scene in Unity and pressing **Play**. Signal2Speech’s scene path and launch instructions are pending implementation.
+**Use the sponsor’s Unity ERP scene and C# for the first live build.** Keep the sponsor’s stimulus layout while verifying target IDs. Run keyboard and simulated input through the same app handler, so the rest of the team can work while the headset is unavailable. The first hardware rehearsal starts by opening the sponsor scene in Unity and pressing **Play**. Unity **2022.3.11f1** is required by the SDK. See the [launch path](../dev-setup-docs/README.md#unity-launch-path-19), which #19 will verify.
 
-A separate browser UI and localhost bridge are **TBD**. The in-process contract below applies whether the demo stays in Unity or later gains a bridge. [g.tec Unity ERP starter](https://github.com/unicorn-bi/Unicorn-Hybrid-Black-Unity-Interface/blob/main/tutorial/build-your-first-erp-application.md)
+**Decided:** the judging build runs entirely inside Unity: uGUI overlays plus the vendor's 3D flash tags, with no browser UI and no localhost bridge. See [UI stack](../accessibility-ui/README.md#ui-stack-and-layout). [g.tec Unity ERP starter](https://github.com/unicorn-bi/Unicorn-Hybrid-Black-Unity-Interface/blob/main/tutorial/build-your-first-erp-application.md)
 
 ## Developer handoff
 
