@@ -172,7 +172,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
 
-## 11/14/26 - 5:45 PM - Vasanth Anbukumar (with Claude) - #23 Guided live-run harness ([PR #78](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/78))
+## 11/14/26 - 5:45 PM - Vasanth Anbukumar - #23 Guided live-run harness ([PR #78](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/78))
 - Added one command for the headset slot: `python -m signal2speech.eeg.live --source hybridblack`. It walks through the device check, signal quality, P300 calibration, confirm calibration, 10 live attempts, and a summary
 - If the headset isn't paired, it says how to pair it and exits cleanly. If signal quality is bad, it names the bad channels and stops unless you choose to continue
 - The summary says whether it's safe to arm live EEG confirm. It only says yes on a live run where the alpha switch did the confirming, with no late decisions crossing rounds and no false confirms. A dry run never says yes
@@ -181,6 +181,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Verified on simulated input only: `--source generator` now uses the merged alpha switch and ran start to finish in about 160 s (10/10 confirmed by simulated eye closures, 0 false triggers, 0 false confirms). Tests also inject a wrong decode to check the cancel, timeout, and false-confirm paths, and 194 tests pass. Nothing has run on the real headset yet
 
 ## 11/14/26 - 5:59 PM - Long Le (with Claude) - #4 Real map in the app, bigger reveal ([PR #81](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/81))
+
 ## 11/14/26 - 5:59 PM - Long Le - #4 Real map in the app, bigger reveal ([PR #81](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/81))
 - The app now shows the real NASA/EPA map from #30 after a confirm. No code change was needed for that, and the stand-in panel is gone
     - `python -m signal2speech.app --input keyboard`. Press 2, then 1, to see the county comparison
@@ -207,6 +208,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The CI matrix explanation lives in one place (the workflow file) and no longer claims Python versions CI doesn't test
 
 ## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
+
 ## 11/14/26 - 5:58 PM - In Young Song - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
 - A teammate can now run the whole OpenOrbit reveal with Wi-Fi off and explain it
     - `python -m signal2speech.app --input keyboard`: press 2 then 1 to compare counties, or 1 then 1 for the satellite view
