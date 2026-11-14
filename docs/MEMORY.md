@@ -18,6 +18,8 @@
 
 ## Verification and next checkpoint
 
+- **Alpha confirm works on simulated input (#47):** `python -m signal2speech.eeg.alpha_confirm` calibrates (10 s open, 10 s closed), then reports. On `Generator` with 8 µV and 4 µV bursts (ratio 6.5 and 2.3): 0 false triggers in 60 s eyes-open, exactly 1 edge per closure (5/5 each), 1.2–1.5 s latency. `--source hybrid-black` is the live path, still unverified (#23). Live confirm stays disarmed in the handler until #23. Share one headset with #46 through `AlphaConfirm(pipeline=, upstream=)`. [Details](eeg-hardware/README.md#alpha-switch-confirm-47-works-on-simulated-input)
+- **CI gates every PR (#37):** `pytest` and the smoke check run on Windows, macOS, and Ubuntu (3.12, plus 3.13 on Ubuntu), with versions constrained to `requirements-lock.txt`. Skips and the manual checks show in each job summary. Tests must pass on all three systems: compare `Path` objects, not path strings. [Details](devops/README.md#ci-on-every-pr-37)
 - **Environment verified (#19, 2026-11-14):** Python 3.12.10, g.Pype 4.2.0, and PySide6 6.11.3 plus scikit-learn 1.9.1 and h5py 3.16.0, are pinned in `requirements-lock.txt`. `pytest` passes 21 of 21, including the #24 UI tests. Step 6 is verified: the g.Pype scope window runs. Still open: the questions for the g.tec mentor.
 
 - The initial docs record the plan. Live EEG and app behavior are pending verification.
