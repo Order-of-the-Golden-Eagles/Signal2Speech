@@ -1,0 +1,3 @@
+# Every issue PR appends to DEVLOG.md, so parallel branches collide at the end of the file.
+# union keeps both sides' entries when git merges locally (merge main into your branch first).
+DEVLOG.md merge=union
