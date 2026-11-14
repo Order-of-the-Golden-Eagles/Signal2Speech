@@ -1,0 +1,39 @@
+#!/bin/sh
+# Signal2Speech pre-commit: block secrets, raw EEG, and .env files.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass once (be sure):  GIT_ALLOW_SECRET_COMMIT=1 git commit ...   or   git commit --no-verify
+set -e
+
+[ "${GIT_ALLOW_SECRET_COMMIT:-0}" = "1" ] && { echo "⚠️  Secret scan skipped (GIT_ALLOW_SECRET_COMMIT=1)"; exit 0; }
+
+# 1) Files that must never be committed: raw EEG recordings and local env files.
+blocked="$(git diff --cached --name-only --diff-filter=ACR | grep -aiE \
+  '\.(edf|bdf|gdf|xdf|fif)$|(^|/)\.env(\.[^/]*)?$|(^|/)(eeg-recordings|eeg-raw|recordings)/' \
+  | grep -viE '(^|/)\.env\.example$' || true)"
+if [ -n "$blocked" ]; then
+  echo "❌ Refusing to commit raw EEG, recordings, or .env files:"
+  printf '   %s\n' $blocked
+  exit 1
+fi
+
+# 2) Secret-like content in added lines only (removing a secret is never blocked).
+added="$(git diff --cached -U0 --text | grep -a '^+' | grep -av '^+++' || true)"
+[ -z "$added" ] && { echo "✅ No secret-like patterns found."; exit 0; }
+
+if printf '%s' "$added" | grep -aE -q \
+  -e '-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+  -e 'eyJ[0-9A-Za-z_-]+\.[0-9A-Za-z_-]+\.[0-9A-Za-z_-]{10,}' \
+  -e 'gh[pousr]_[0-9A-Za-z]{36,}' \
+  -e 'github_pat_[0-9A-Za-z_]{40,}' \
+  -e 'sk-ant-[0-9A-Za-z_-]{20,}' \
+  -e 'sk-(proj-)?[0-9A-Za-z_-]{32,}' \
+  -e 'sk_live_[0-9A-Za-z]{24,}' \
+  -e 'AKIA[0-9A-Z]{16}' \
+  -e 'AIza[0-9A-Za-z_-]{35}'
+then
+  echo "❌ Secret-like content detected in staged changes. Put keys in .env (gitignored)."
+  echo "   Bypass once if it's a false positive: GIT_ALLOW_SECRET_COMMIT=1 git commit ..."
+  exit 1
+fi
+
+echo "✅ No secret-like patterns found."
