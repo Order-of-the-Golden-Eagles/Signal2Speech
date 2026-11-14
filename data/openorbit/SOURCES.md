@@ -43,3 +43,18 @@ NASA imagery shows how the region looked from orbit. EPA AQI reports air quality
 Coordinates are Wikipedia's, rounded to 4 decimals (about 10 m, well under one pixel).
 
 Pixel position: `x = (lon - west) / (east - west) * width`, `y = (north - lat) / (north - south) * height`. EMU lands at about (620, 440) and Detroit at about (1083, 375), on the Detroit River's west bank in the image.
+
+## Fire detections (optional, #32)
+
+**Attribution:** "We acknowledge the use of data and/or imagery from NASA's Fire Information for Resource Management System (FIRMS), part of NASA's LANCE and ESDIS." In captions: NASA FIRMS.
+**Source:** NASA FIRMS yearly country files for VIIRS NOAA-20 (375 m), no key needed: `https://firms.modaps.eosdis.nasa.gov/data/country/viirs-jpss1/2023/viirs-jpss1_2023_{Canada,United_States}.csv`. [`firms/build_firms.py`](firms/build_firms.py) downloads only June 26 and 28 with byte ranges, keeps the box from 40°N to 56°N and 95°W to 65°W (Great Lakes to Quebec), and stops if any row has the wrong date or falls outside the box. `--verify-only` checks the committed files offline.
+**Files:** [`firms/viirs_noaa20_2023-06-26_28.csv`](firms/viirs_noaa20_2023-06-26_28.csv) (9,982 detections), [`firms/summary.json`](firms/summary.json) (counts), and `firms/region_2023-06-28.jpg` (NASA GIBS MODIS Terra, same box, 1200 × 640).
+
+| Date | Detections in the box | Vegetation fires (type 0) | Of those, east of 79.5°W (Quebec) | Inside the demo area (southeast Michigan) |
+| --- | ---: | ---: | ---: | --- |
+| June 26, 2023 | 5,873 | 5,606 | 5,164 | 8, all type 2 (industrial or other static source) |
+| June 28, 2023 | 4,109 | 3,851 | 2,938 | 5, all type 2 |
+
+**What a detection means:** a 375 m satellite pixel with at least one hot spot in it at the time of the overpass (UTC). It is not a fire outline or a burned area. The view draws only type 0 ("presumed vegetation fire"). The Canada row count for June 26 (7,959) matches an independent count, which confirms the byte-range download.
+
+**Why a wider map:** southeast Michigan had smoke but no wildfire detections. The fires were in Quebec and Ontario, more than 1,000 km away.
