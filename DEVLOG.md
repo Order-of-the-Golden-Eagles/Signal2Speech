@@ -172,13 +172,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
 
-## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #7 Wildfire comparison works offline ([PR pending])
+## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
 - A teammate can now run the whole OpenOrbit reveal with Wi-Fi off and explain it
     - `python -m signal2speech.app --input keyboard`: press 2 then 1 to compare counties, or 1 then 1 for the satellite view
 - The compare view shows the two numbers judges confuse: Washtenaw had the biggest jump (+186), but Wayne ended highest (226)
 - Verified with Wi-Fi actually disconnected on InYoung-Song's laptop, on `main` after PR #65: one map change and one full spoken line per confirm, and nothing on cancel. Keyboard input only, not live EEG
 
-## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #35 Secret, AI key, and network checks ([PR pending])
+## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #35 Secret, AI key, and network checks ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
 - Checked how the app handles keys and the network. Results are in `docs/security-privacy/README.md`
 - No local bridge exists (the app is one process), so the bridge checks don't apply
 - The AI key is read only from `.env` or the environment and never logged. Only the typed question goes to the AI, never EEG
