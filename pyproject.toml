@@ -1,0 +1,19 @@
+[project]
+name = "signal2speech"
+version = "0.1.0"
+description = "Hands-free selection, preview, and confirmation on g.tec g.Pype"
+requires-python = ">=3.10,<3.15"
+dependencies = [
+    "gpype[all]>=4.2",   # HybridBlack, OSCAR, PySide6 GUI, LSL; Windows: use Python 3.12 for EDF
+    "pyttsx3>=2.90",     # offline speech for generated replies (#28)
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+include = ["signal2speech*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

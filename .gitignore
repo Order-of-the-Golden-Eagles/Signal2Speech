@@ -1,86 +1,59 @@
-# ── Unity (unity/Signal2Speech) ─────────────────────────────
-**/[Ll]ibrary/
-**/[Tt]emp/
-**/[Oo]bj/
-**/[Bb]uild/
-**/[Bb]uilds/
-**/[Ll]ogs/
-**/[Uu]ser[Ss]ettings/
-**/[Mm]emoryCaptures/
-**/[Rr]ecordings/
-**/Assets/Plugins/Editor/JetBrains*
-**/Assets/AssetStoreTools*
-**/Assets/StreamingAssets/aa/
-*.pidb.meta
-*.pdb.meta
-*.mdb.meta
-sysinfo.txt
-crashlytics-build.properties
-mono_crash.*
-*.apk
-*.aab
-*.unitypackage
-*.app
-# Unity regenerates IDE project files
-unity/**/*.csproj
-unity/**/*.sln
-unity/**/*.slnx
-.vsconfig
-
-# ── .NET (core/DotNetTests~) ────────────────────────────────
-bin/
-obj/
-[Dd]ebug/
-[Rr]elease/
-TestResults/
-*.trx
-*.nupkg
-*.snupkg
-
-# ── IDEs and editors ────────────────────────────────────────
-.vs/
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
-.idea/
-*.user
-*.userprefs
-*.suo
-*.swp
-*.sln.DotSettings.user
-.consulo/
-
-# ── OS ──────────────────────────────────────────────────────
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-
-# ── Python / Node helper scripts (data prep, tooling) ───────
+# ── Python ──────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
 .venv/
 venv/
+env/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 .ipynb_checkpoints/
-node_modules/
+
+# ── PySide6 / Qt build output ───────────────────────────────
+*.qmlc
+*.jsc
+rc_*.py
+
+# ── g.Pype runs: raw EEG, recordings, calibration ───────────
+# Never commit raw EEG. Share recordings privately, label them Recorded.
+recordings/
+**/recordings/
+eeg-recordings/
+**/eeg-raw/
+*.edf
+*.bdf
+*.gdf
+*.xdf
+*.fif
+*.mat
+*.h5
+*.hdf5
+*.npy
+*.npz
+# Trained per-wearer classifiers (#46) and g.Pype session logs
+models/
+*.pkl
+*.joblib
+*.log
+logs/
 
 # ── Data: keep curated demo assets, ignore bulk downloads ───
 # Commit only the small verified files under data/openorbit/ (#29).
 data/**/raw/
 data/**/downloads/
 *.zip
+*.rar
 *.tmp
-
-# ── Never commit raw EEG or personal recordings ─────────────
-*.edf
-*.bdf
-*.gdf
-*.xdf
-*.fif
-eeg-recordings/
-**/eeg-raw/
-*.csv.eeg
 
 # ── Secrets and local config ────────────────────────────────
 .env
@@ -90,14 +63,29 @@ secrets.*
 *.pem
 *.key
 *.pfx
-appsettings.Local.json
-**/Assets/StreamingAssets/secrets*
+# AI provider keys (#27) belong in .env, never in code
 
-# ── Demo captures (share via release/drive, not git) ────────
+# ── IDEs and editors ────────────────────────────────────────
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.user
+*.suo
+*.swp
+
+# ── OS ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Demo captures (share via drive, not git) ────────────────
 *.mp4
 *.mov
 *.mkv
-*.wav.bak
 
 # ── Claude Code local settings ──────────────────────────────
 .claude/settings.local.json
