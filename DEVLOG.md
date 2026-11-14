@@ -156,7 +156,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - `submission-checklist.md`: the Devpost fields, a draft AI disclosure, and logs for submission status and rehearsals
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
-## 11/14/26 - 5:41 PM - Vasanth Anbukumar (with Claude) - #46 Flash timing check (PR pending)
+
 ## 11/14/26 - 5:41 PM - Vasanth Anbukumar (with Claude) - #46 Flash timing check ([PR #77](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/77))
 - Added a tool that checks whether the P300 flash markers line up with what the screen actually shows: `python -m signal2speech.eeg.flash_timing --seconds 30`
     - It flashes the same kind of tiles the chooser uses and compares each marker with the moment the frame reaches the display. Then it prints the average and worst gap, the jitter, and the refresh rate, plus PASS or WARN (WARN above 20 ms of jitter)
