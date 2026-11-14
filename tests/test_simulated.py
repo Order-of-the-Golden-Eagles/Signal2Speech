@@ -97,7 +97,7 @@ def test_stale_decision_is_dropped_before_the_adapter(rig):
     h.begin_choice_round(load_demo_choices())
     dec.decided.emit(old, 2)                # late result from the closed round
     spin(app, lambda: dec.dropped)
-    assert dec.dropped == [old]
+    assert list(dec.dropped) == [old]
     assert log == [] and sink.actions == []
 
 
@@ -148,3 +148,76 @@ def test_headless_cli_runs_preview_and_confirm(app, capsys):
     assert '"outcome": "Previewed", "source": "simulated"' in out
     assert '"outcome": "Confirmed", "source": "simulated"' in out
     assert "compare_air_quality" in out
+
+
+# ── Review fixes (PR #53) ────────────────────────────────────
+def test_judge_cancel_gives_the_unused_pick_back(rig):
+    app, h, sink, log, make = rig
+    dec = make([2, 1], decision_s=30.0)     # decision far away: still pending at cancel
+    h.begin_choice_round(load_demo_choices())
+    assert dec._pick == 2
+    h.cancel()                              # Esc: the same step comes again
+    h.begin_choice_round(load_demo_choices())
+    assert dec._pick == 2 and list(dec._picks) == [1]
+
+
+def test_keyboard_using_the_round_drops_that_rounds_pick(rig):
+    app, h, sink, log, make = rig
+    from signal2speech.core import InputAdapter
+    dec = make([2, 1], decision_s=30.0)
+    h.begin_choice_round(load_demo_choices())
+    InputAdapter(h, InputSources.KEYBOARD).select_now(TargetIds.TARGET_2)
+    assert dec._pick == 1                   # Confirm round takes the confirm pick, not the 2
+
+
+def test_set_next_waits_for_the_flash_sequence_to_end(rig):
+    from signal2speech.core import InputAdapter
+    from signal2speech.ui import SelectionWindow
+
+    app, h, sink, log, make = rig
+    flashes = []
+    win = SelectionWindow(h, InputAdapter(h, InputSources.KEYBOARD), flash=True,
+                          on_flash=flashes.append)
+    win.flasher.flash_ms, win.flasher.isi_ms, win.flasher.repetitions = 10, 5, 3
+    at_preview = []
+    h.on_preview.append(lambda _c: at_preview.append(len(flashes)))
+    dec = make(flasher=win.flasher)
+    dec.start()
+    h.begin_choice_round(load_demo_choices())
+    dec.set_next(2)                         # Ctrl+2 during the first flash
+    assert spin(app, lambda: at_preview)
+    assert at_preview == [6]
+    win.close()
+
+
+def test_window_hooks_are_chained_and_restored_on_close(rig):
+    from signal2speech.core import InputAdapter
+    from signal2speech.ui import SelectionWindow
+
+    app, h, sink, log, make = rig
+    started = []
+    win = SelectionWindow(h, InputAdapter(h, InputSources.KEYBOARD), flash=True,
+                          on_sequence_started=lambda: started.append(1))
+    original = win.flasher.on_sequence_started
+    dec = make(flasher=win.flasher)
+    h.begin_choice_round(load_demo_choices())
+    assert started == [1] and dec._pending_seq is not None
+    dec.close()
+    assert win.flasher.on_sequence_started is original
+    assert dec._on_round_opened not in h.on_round_opened
+    seq = dec._seq
+    h.begin_choice_round(load_demo_choices())
+    assert dec._seq == seq                  # a closed decoder no longer arms
+    win.close()
+
+
+def test_headless_runs_several_rounds_then_exits(app, capsys):
+    assert main(["--picks", "2,1,1,1", "--decision-s", "0.1", "--timeout", "10"]) == 0
+    out = capsys.readouterr().out
+    assert out.count('"outcome": "Confirmed"') == 2
+
+
+def test_headless_timeout_exits_1(app, capsys):
+    # One pick: the Confirm round waits for a pick that never comes.
+    assert main(["--picks", "2", "--decision-s", "0.1", "--timeout", "1.5"]) == 1
+    assert main(["--decision-s", "0.1"]) == 2   # headless with no picks is a usage error

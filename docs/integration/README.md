@@ -30,15 +30,12 @@ Add `--mute` for silent runs. Add `--screenshot out.png` to save the window afte
 
 `signal2speech/eeg/simulated.py` (`SimulatedDecoder`) is the g.Pype version of `InjectedSimulatedInput`. A real `gp.Generator` stream runs on g.Pype worker threads. Each decision crosses to the Qt main thread on a queued signal and reaches `InputAdapter(handler, SIMULATED).select_captured()`. Events are labelled `simulated`.
 
-**Drop-in for `app.py` (#25 owner's call):** it has the same timing contract. With `flasher=` it arms on `on_sequence_started` and decides on `on_sequence_finished` in Choose rounds. In Confirm rounds it arms when the round opens and decides after `confirm_s`.
+**Used by `app.py` (#25, PR #60):** `python -m signal2speech.app --input simulated` builds `SimulatedDecoder(h, script, flasher=window.flasher, confirm_s=2.0)` whenever the module imports. Otherwise it falls back to `InjectedSimulatedInput` and labels why. With `flasher=`:
 
-```python
-from signal2speech.eeg.simulated import SimulatedDecoder
-
-# replaces: self.sim = InjectedSimulatedInput(h, self.window, sim_script or [2, 1], self.log)
-self.sim = SimulatedDecoder(h, sim_script or [2, 1], flasher=self.window.flasher, confirm_s=2.0)
-self.sim.start()   # starts the Generator stream; call self.sim.close() on exit
-```
+- **Choose rounds** arm on `on_sequence_started` and decide on `on_sequence_finished`, never during the flashes.
+- **Confirm rounds** arm when the round opens and decide after `confirm_s`.
+- The window's own flash hooks are chained, not replaced. `close()` unhooks everything.
+- Verified 2026-11-14: `--input simulated --sim 2,1 --mute` gives one preview, then one map action and one spoken line, labelled `simulated`.
 
 - A decision from an older sequence is dropped before it reaches the adapter. `select_captured()` alone would stamp a late decision with the newest armed round.
 - With no picks left, a sequence waits for `set_next(cls)`.

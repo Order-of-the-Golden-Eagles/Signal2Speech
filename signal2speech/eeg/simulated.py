@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import threading
 import time
@@ -30,7 +31,7 @@ from collections import deque
 from typing import Callable, Iterable, List, Optional
 
 import gpype as gp
-from PySide6.QtCore import QCoreApplication, QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication
 
@@ -111,11 +112,13 @@ class SimulatedDecoder(QObject):
         self.sampling_rate = sampling_rate
         self._picks = deque(int(p) for p in picks)
         self._seq = 0
-        self._pending_seq: Optional[int] = None
-        self._waiting_for_pick = False
-        self._held: Optional[int] = None         # pick held until the flash sequence ends
-        self.decision_threads: List[str] = []   # thread names that ran _on_decided (tests)
-        self.dropped: List[int] = []            # stale sequence ids dropped before the adapter
+        self._pending_seq: Optional[int] = None  # the sequence whose decision we accept
+        self._pick: Optional[int] = None         # its pick; None = waiting for set_next()
+        self._requested = False                  # the pick has been handed to the stream
+        self._flashing = False                   # between on_sequence_started and _finished
+        self.decision_threads = deque(maxlen=64)  # thread names that ran _on_decided (tests)
+        self.dropped = deque(maxlen=64)           # stale sequence ids dropped before the adapter
+        self._closed = False
 
         self.source = source or gp.Generator(sampling_rate=sampling_rate, channel_count=8,
                                              noise_amplitude=10.0)
@@ -127,12 +130,25 @@ class SimulatedDecoder(QObject):
         self.running = False
 
         self.flasher = flasher
-        if flasher is not None:
-            flasher.on_sequence_started = self._flash_started
-            flasher.on_sequence_finished = self._flash_finished
+        self._prev_hooks = None
+        if flasher is not None:              # chain, don't replace, the window's own hooks
+            started, finished = flasher.on_sequence_started, flasher.on_sequence_finished
+            self._prev_hooks = (started, finished)
+
+            def on_started():
+                self._flash_started()
+                if started:
+                    started()
+
+            def on_finished():
+                self._flash_finished()
+                if finished:
+                    finished()
+            flasher.on_sequence_started, flasher.on_sequence_finished = on_started, on_finished
+        self._auto = auto
         if auto:
             handler.on_round_opened.append(self._on_round_opened)
-            handler.on_cleared.append(lambda _reason: self.cancel_sequence())
+            handler.on_cleared.append(self._on_cleared)
 
     # ── Stream lifecycle ─────────────────────────────────────
     def start(self) -> None:
@@ -142,13 +158,24 @@ class SimulatedDecoder(QObject):
 
     def stop(self) -> None:
         if self.running:
-            self.cancel_sequence()
+            self.cancel_sequence(restore=True)
             self.pipeline.stop()
             self.running = False
 
     def close(self) -> None:
+        """Stop the stream and unhook from the handler and flasher. Safe to call twice."""
+        if self._closed:
+            return
+        self._closed = True
         self.stop()
         self.pipeline.close()
+        if self._auto:
+            for hooks, fn in ((self.handler.on_round_opened, self._on_round_opened),
+                              (self.handler.on_cleared, self._on_cleared)):
+                if fn in hooks:
+                    hooks.remove(fn)
+        if self.flasher is not None and self._prev_hooks is not None:
+            self.flasher.on_sequence_started, self.flasher.on_sequence_finished = self._prev_hooks
 
     def disconnect_stream(self) -> None:
         """Simulate the headset dropping: stop the stream and clear the round (no output)."""
@@ -157,47 +184,55 @@ class SimulatedDecoder(QObject):
 
     # ── Sequences ────────────────────────────────────────────
     @property
+    def idle(self) -> bool:
+        """Nothing scripted is left to deliver: no queued picks and no picked decision pending."""
+        return not self._picks and (self._pending_seq is None or self._pick is None)
+
+    @property
     def busy(self) -> bool:
-        """True while a sequence is waiting for its decision or picks remain."""
-        return self._pending_seq is not None or bool(self._picks)
+        return not self.idle
 
     def start_sequence(self, delay_s: Optional[float] = None, hold: bool = False) -> Optional[int]:
-        """Arm the adapter for the open round and request a decision if a pick is queued.
+        """Arm the adapter for the open round and give this sequence the next pick.
 
-        ``hold=True`` keeps the pick until ``_flash_finished()`` asks for it.
+        ``hold=True`` (flash sequences) delivers the pick only when ``_flash_finished()`` runs.
+        A previous sequence that never got its decision (another input used that round) drops
+        its pick, so picks stay aligned one per round.
         """
         if self.handler.current is None:
             return None
         self.adapter.arm_capture()             # stamp the round now, as live EEG does
         self._seq += 1
         self._pending_seq = self._seq
-        self._held = None
+        self._requested = False
+        self._flashing = hold
         self.sink.cancel()
-        if not self._picks:
-            self._waiting_for_pick = True      # Ctrl+1/Ctrl+2 or set_next() decides
-        elif hold:
-            self._held = self._picks.popleft()
-        else:
-            self._request(self._picks.popleft(), self.decision_s if delay_s is None else delay_s)
+        self._pick = self._picks.popleft() if self._picks else None   # None: set_next() decides
+        if self._pick is not None and not hold:
+            self._request(self.decision_s if delay_s is None else delay_s)
         return self._seq
 
     def set_next(self, cls: int) -> None:
-        """Pick for the waiting sequence, or queue the pick for the next one."""
-        if self._pending_seq is not None and self._waiting_for_pick:
-            self._request(int(cls), 0.0)
+        """Pick for the waiting sequence (after its flashes end), or queue it for the next one."""
+        if self._pending_seq is not None and self._pick is None:
+            self._pick = int(cls)
+            if not self._flashing:
+                self._request(0.0)
         else:
             self._picks.append(int(cls))
 
-    def cancel_sequence(self) -> None:
-        self._pending_seq = None
-        self._waiting_for_pick = False
-        self._held = None
+    def cancel_sequence(self, restore: bool = False) -> None:
+        """Forget the open sequence. ``restore`` puts its unused pick back for the next round."""
+        if restore and self._pending_seq is not None and self._pick is not None:
+            self._picks.appendleft(self._pick)
+        self._pending_seq = self._pick = None
+        self._requested = self._flashing = False
         self.sink.cancel()
 
-    def _request(self, cls: int, delay_s: float) -> None:
-        self._waiting_for_pick = False
-        if self._pending_seq is not None:
-            self.sink.request(self._pending_seq, cls, round(delay_s * self.sampling_rate))
+    def _request(self, delay_s: float) -> None:
+        if self._pending_seq is not None and self._pick is not None and not self._requested:
+            self._requested = True
+            self.sink.request(self._pending_seq, self._pick, round(delay_s * self.sampling_rate))
 
     def _on_round_opened(self, rnd: Round) -> None:
         if rnd.kind is RoundKind.CONFIRM:
@@ -206,13 +241,15 @@ class SimulatedDecoder(QObject):
             self.start_sequence(self.decision_s)
         # With a flasher, the Choose round arms in _flash_started.
 
+    def _on_cleared(self, _reason: str) -> None:
+        self.cancel_sequence(restore=True)     # cancel/disconnect: the same step comes again
+
     def _flash_started(self) -> None:
         self.start_sequence(hold=True)
 
     def _flash_finished(self) -> None:
-        if self._pending_seq is not None and self._held is not None:
-            cls, self._held = self._held, None
-            self._request(cls, 0.0)            # next stream frame carries the decision
+        self._flashing = False
+        self._request(0.0)                     # next stream frame carries the decision
 
     @Slot(int, int)
     def _on_decided(self, seq: int, cls: int) -> None:
@@ -221,7 +258,8 @@ class SimulatedDecoder(QObject):
         if seq != self._pending_seq:
             self.dropped.append(seq)
             return
-        self._pending_seq = None
+        self._pending_seq = self._pick = None
+        self._requested = False
         self.adapter.select_captured(self.classes.target_for(cls))
 
 
@@ -257,10 +295,14 @@ def main(argv=None) -> int:
     from signal2speech.ui import SelectionWindow
     from signal2speech.ui.__main__ import PrintSink, load_demo_choices   # reuse #24's stubs
 
-    if args.ui:
-        app = QApplication.instance() or QApplication(sys.argv[:1])
-    else:
-        app = QCoreApplication.instance() or QCoreApplication(sys.argv[:1])
+    if not args.ui and not args.picks:
+        print("headless needs --picks (e.g. --picks 2,1); use --ui to pick with Ctrl+1/Ctrl+2",
+              file=sys.stderr)
+        return 2
+    if not args.ui and not os.environ.get("QT_QPA_PLATFORM"):
+        os.environ["QT_QPA_PLATFORM"] = "offscreen"     # headless: no display needed
+    # Always a QApplication: the first Qt app in a process wins, and widgets need this one.
+    app = QApplication.instance() or QApplication(sys.argv[:1])
 
     handler = SelectionHandler(PrintSink())
     handler.on_handled.append(lambda e, o: print(log_line(e, o), flush=True))
@@ -286,19 +328,28 @@ def main(argv=None) -> int:
         handler.on_handled.append(lambda _e, o: reopen.start() if o is Outcome.Confirmed else None)
         win.show()
     else:
-        # Headless: stop once the scripted picks are spent and nothing is pending.
-        def maybe_quit(_e, _o):
-            if not decoder.busy:
+        # Headless: reopen the question while picks remain; quit once they are spent.
+        def after(_e, o):
+            if o not in (Outcome.Confirmed, Outcome.Cancelled):
+                return
+            if decoder.idle:
                 QTimer.singleShot(200, app.quit)
-        handler.on_handled.append(maybe_quit)
-        QTimer.singleShot(int(args.timeout * 1000), app.quit)
-        if not args.picks:
-            print("no --picks given; nothing will be decided headless (use --ui for keys)")
+            else:
+                QTimer.singleShot(100, lambda: handler.begin_choice_round(choices))
+        handler.on_handled.append(after)
+
+        def give_up():
+            timed_out.append(True)
+            print(f"timeout after {args.timeout:g} s with picks left; exit 1", file=sys.stderr)
+            app.exit(1)
+        QTimer.singleShot(int(args.timeout * 1000), give_up)
+    timed_out: List[bool] = []
 
     decoder.start()
     handler.begin_choice_round(choices)
     try:
-        return app.exec()
+        code = app.exec()
+        return 1 if timed_out else code
     finally:
         decoder.close()
 

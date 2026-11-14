@@ -38,9 +38,23 @@ gp.Generator (8 ch, 250 Hz) -> DecisionSink (gp.INode, g.Pype worker thread)
 - **Arm at sequence start.** By default, each round calls `arm_capture()` when it opens and decides after `decision_s` (Choose) or `confirm_s` (Confirm) seconds of stream.
 - **`flasher=window.flasher` mode:** a Choose round arms on the #24 `FlashScheduler.on_sequence_started` and decides on `on_sequence_finished`, the same hooks #46 will use. A Confirm round arms when it opens and decides after `confirm_s`, which is where the #47 alpha window goes. This matches `InjectedSimulatedInput` in `app.py`, so it's a one-line swap. See [Integration](../integration/README.md#rehearse-without-a-headset-gpype-simulated-input-21).
 - **Drop stale decisions before the adapter.** Each sequence gets an ID. A decision whose ID isn't the pending sequence is dropped (`decoder.dropped`), so a late result can't be stamped with the next round's ID. `adapter.select_captured()` alone doesn't protect against this, because it uses the most recent arm.
-- **Picks:** `--picks` gives one class per sequence. With no picks queued, a sequence waits for `set_next(cls)` (Ctrl+1 / Ctrl+2 in `--ui`). Class 2 in a Confirm round means Cancel.
+- **Picks:** `--picks` gives one class per round. With no picks queued, a sequence waits for `set_next(cls)` (Ctrl+1 / Ctrl+2 in `--ui`). In flash mode, a keyed pick still waits for the flashes to end. Class 2 in a Confirm round means Cancel.
+- **Pick alignment:**
+  - If the judge cancels or the headset disconnects before a decision, the pick goes back to the front of the queue, because the same step comes again.
+  - If another input (keys 1/2) uses the round, that round's pick is dropped, so the next round still gets its own pick.
+- **Headless runner:**
+  - It reopens the question while picks remain and exits 0 when they are spent.
+  - It exits 1 on `--timeout`, and 2 with no `--picks`.
+  - It always uses `QApplication`, forcing offscreen when there's no display.
+- `close()` removes the decoder's handler listeners and restores the flasher hooks, so a closed decoder never arms again.
 - `disconnect_stream()` stops the stream and calls `handler.disconnect()`, for recovery checks (#26).
-- Tests: `tests/test_simulated.py` covers preview then confirm through the real pipeline, cancel, stale-drop, keyed picks, flasher mode (the decision comes only after every flash), and the CLI.
+- Tests: `tests/test_simulated.py` (13 tests) covers:
+  - preview then confirm through the real pipeline
+  - cancel and stale-drop
+  - keyed picks, which wait for the flashes
+  - pick alignment
+  - hook chaining and unhooking
+  - the CLI: several rounds, the timeout exit code, and the usage error
 
 **g.Pype facts we verified (4.2.0):**
 
