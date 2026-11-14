@@ -156,3 +156,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - `submission-checklist.md`: the Devpost fields, a draft AI disclosure, and logs for submission status and rehearsals
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
+
+## 11/14/26 - 5:58 PM - MagicJester2764 - #26 Recovery checks (PR pending)
+- Proved that nothing goes wrong when things go wrong: cancelling, a headset drop, repeated keys, and late or replayed brain decisions never cause an extra map change or spoken line
+    - Covers keyboard, the g.Pype simulator, and replayed recordings: `pytest tests/test_recovery.py`
+- Added the confirm timeout the rules always promised: if nobody confirms within 15 seconds, the preview cancels quietly (`--confirm-timeout`, 0 turns it off)
+- Found and fixed a hidden test problem: a leftover 30-second timer from one test could end a later test early. It only showed up once the test suite got long enough
+- Still open for the headset slot (#23): if the headset goes silent without disconnecting, nothing notices yet
