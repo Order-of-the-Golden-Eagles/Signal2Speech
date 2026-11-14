@@ -27,13 +27,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every run writes a timing log to `logs/` (not committed) with the input mode and connection state. The log refuses raw EEG data on purpose
 - Breaking the app on purpose so it spoke twice made the smoke check fail, which shows it catches real problems
 
-## 11/14/26 - 5:20 PM - Vasanth Anbukumar (with Claude) - #37 Git hooks: secret scan and pre-push tests ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66))
-- Every clone can now turn on two shared git hooks with one command, the same on Windows, macOS, and Linux: `git config core.hooksPath .githooks`
-    - `pre-commit` blocks API keys and tokens (Anthropic, OpenAI, GitHub, AWS, Google, private keys), raw EEG files (`.edf`, `.bdf`, recordings folders), and `.env`
-    - `pre-push` runs `pytest` (about 30 seconds) before anything leaves your laptop. Skip once with `SKIP_TESTS=1 git push`
-- Why: the secret scan used to exist only on one laptop, and the rule about keeping keys and raw EEG out of git had nothing enforcing it
-- The hooks are plain `sh` with LF line endings forced in `.gitattributes`, so Git for Windows, macOS, and Linux all run them
-- Verified: `tests/test_githooks.py` builds a throwaway repo and confirms a fake key and an `.edf` file get blocked while a clean commit and `.env.example` pass. CI runs it on all three OSes
 ## 11/14/26 - 5:15 PM - MagicJester2764 (with Claude) - #21 Code review fixes ([PR #53](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/53))
 - The full app now runs on the fake g.Pype brain: `python -m signal2speech.app --input simulated` (wired in by #60)
 - A code review found that pressing Esc during a scripted run threw the script out of order. Now a cancelled step is retried, and a step the keyboard already did is skipped
@@ -41,3 +34,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The headless runner handles longer scripts, and a run that times out now reports failure instead of success
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
+
+## 11/14/26 - 5:20 PM - Vasanth Anbukumar (with Claude) - #37 Git hooks: secret scan and pre-push tests ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66))
+- Every clone can now turn on two shared git hooks with one command, the same on Windows, macOS, and Linux: `git config core.hooksPath .githooks`
+    - `pre-commit` blocks API keys and tokens (Anthropic, OpenAI, GitHub, AWS, Google, private keys), raw EEG files (`.edf`, `.bdf`, recordings folders), and `.env`
+    - `pre-push` runs `pytest` (about 30 seconds) before anything leaves your laptop. Skip once with `SKIP_TESTS=1 git push`
+- Why: the secret scan used to exist only on one laptop, and the rule about keeping keys and raw EEG out of git had nothing enforcing it
+- The hooks are plain `sh` with LF line endings forced in `.gitattributes`, so Git for Windows, macOS, and Linux all run them
+- Verified: `tests/test_githooks.py` builds a throwaway repo and confirms a fake key and an `.edf` file get blocked while a clean commit and `.env.example` pass. CI runs it on all three OSes
