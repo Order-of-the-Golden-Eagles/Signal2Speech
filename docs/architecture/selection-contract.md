@@ -4,6 +4,24 @@ This is the shared contract from [#22](https://github.com/Order-of-the-Golden-Ea
 
 **Stack:** Python 3.12, [g.Pype](https://gpype.gtec.at) for acquisition, signal processing, and scopes, and PySide6 for the UI. Everything runs in one process with no bridge. g.Pype runs on Windows, macOS, and Linux.
 
+## Current status
+
+What is on `main` as of 2026-11-14. "Simulated" means g.Pype `Generator` or scripted input, never a person.
+
+| Piece | Where | Status |
+| --- | --- | --- |
+| Selection contract (#22) | `signal2speech/core/`, `contracts/` | Merged. `pytest` runs every scenario and sample event. |
+| Keyboard UI and flash scheduler (#24) | `signal2speech/ui/` | Merged. Offscreen tests in `pytest`. |
+| Integrated app (#4, #25) | `signal2speech/app.py`, `signal2speech/speech/` | Merged. `--input keyboard` and `--input simulated` give one map action and one spoken line per confirm, and nothing on preview or cancel. The map is a labelled stand-in until #30 lands. |
+| Simulated input (#21) | `signal2speech/eeg/simulated.py` | Merged. Real g.Pype `Generator` pipeline, labelled `simulated`. |
+| P300 chooser (#46) | `signal2speech/eeg/p300.py` | Merged. Verified on synthetic data only. Not yet wired into `app.py`. **Needs the live headset** for accuracy and trial counts. |
+| Alpha-switch confirm (#47) | `signal2speech/eeg/alpha_confirm.py` | Not on `main` yet ([PR #58](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/58)). **Needs the live headset** for the threshold and false triggers. |
+| Evidence view (#48) | `signal2speech/evidence/` | Merged. Runs on `Generator` and replay. **Needs the live headset** for real EEG. |
+| AI reply choices (#5, #27, #28) | `signal2speech/ai/` | Merged. Stub flow checked by hand. A live Claude call is unverified (no key yet). |
+| OpenOrbit data and view (#29, #30) | `data/openorbit/`, `signal2speech/openorbit/` | Not on `main` yet ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65)). |
+| Live Unicorn input (#23) | Not started | `app.py` refuses `--input live` and `--input recorded`, and live EEG confirm stays disarmed. **Needs the live headset.** |
+| CI (#37) | `.github/workflows/tests.yml` | Merged. `pytest` on Windows, macOS, and Ubuntu (Python 3.12, plus 3.13 on Ubuntu). |
+
 ## Vendor facts vs. app decisions
 
 | | What we know | Status |
@@ -20,12 +38,12 @@ This is the shared contract from [#22](https://github.com/Order-of-the-Golden-Ea
 
 ```
 HybridBlack(enable_oscar=True) or Generator → Bandpass 1–30 Hz
-  ├→ Epochs (on our tiles' flash Markers) → Sklearn LDA → class 1/2 → Choose round   [#46]
+  ├→ Trigger (per tile's flash Marker) → P300Scorer (Sklearn LDA score) → SequenceAggregator → class 1/2 → Choose round   [#46]
   ├→ FFT → BandPower(alpha) → Threshold → rising edge → Confirm (target-1)          [#47]
   └→ TimeSeriesScope, SpectrumScope, EpochAverage → judge evidence view              [#48]
 ```
 
-- **Choose** uses P300. Our PySide6 tiles flash and send `Marker` codes, and the LDA picks the attended tile.
+- **Choose** uses P300. Our PySide6 tiles flash and send `Marker` codes, and the tile with the highest mean LDA score wins. Calibration cuts epochs with `Epochs` and fits the LDA offline (`gp.Sklearn.fit_offline`).
 - **Confirm** uses a deliberate alpha switch: eyes closed for about 2 seconds. Cancel is the keyboard or judge cancel, or a timeout. P300 and the alpha switch are different brain signals, so a leftover P300 can't count as a confirmation.
 - **Fallback** if P300 isn't reliable by 8:15: step through the options one at a time and confirm each with the alpha switch.
 
@@ -117,11 +135,12 @@ handler.on_handled.append(log.write)                  # #41 diagnostics and judg
 
 handler.begin_choice_round(demo_choices)
 keyboard.select_now(TargetIds.TARGET_2)               # keys 1 and 2
-eeg.arm_capture()                                     # when the tiles start flashing for this round
+eeg.arm_capture()                                     # when the tiles start flashing (window.flasher.on_sequence_started)
 eeg.select_captured(classes.target_for(lda_class))    # from the g.Pype output, on the Qt main thread
 ```
 
 - **Threading:** g.Pype runs nodes on worker threads, and `SelectionHandler` isn't thread-safe. Emit a Qt signal from your g.Pype sink and call the adapter in the slot. The custom-node API is in g.Pype examples `s7e1` and `s7e2`.
+- **Ready-made wiring:** `P300Chooser(build_pipeline(...), adapter).attach(window.flasher)` in `signal2speech/eeg/p300.py` arms capture, sends the flash Markers, and hops to the Qt main thread for you. `SimulatedDecoder` in `signal2speech/eeg/simulated.py` does the same for `Generator` input, and `app.py` uses it for `--input simulated`.
 
 ## Tests
 
@@ -131,7 +150,12 @@ pip install -e ".[dev]"
 pytest
 ```
 
-`pytest` runs the scenario file, the sample events, and the adapter checks in under a second, with no headset or g.Pype hardware needed.
+For the exact pinned versions, use `pip install -r requirements-lock.txt`. On a headless machine, set `QT_QPA_PLATFORM=offscreen`.
+
+- `tests/test_contract.py` runs the scenario file, the sample events, and the adapter checks in under a second.
+- The full suite (`tests/` plus `signal2speech/ui/tests/`) was 89 passed and 2 skipped in about 60 s on Windows on 2026-11-14. It needs no headset: EEG tests use g.Pype `Generator` or synthetic recordings.
+- CI runs the same `pytest` on every PR on Windows, macOS, and Ubuntu ([`tests.yml`](../../.github/workflows/tests.yml), #37).
+- Git hooks (secret and raw-EEG scan before commit, `pytest` before push) are not on `main` yet ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66)).
 
 ## Repo layout and ownership
 
@@ -141,35 +165,38 @@ Each track owns one folder, so parallel PRs don't conflict. Don't edit another t
 | --- | --- | --- |
 | `contracts/`, `signal2speech/core/`, `tests/test_contract.py` | #22 | Shared. Changes need a scenario update and a heads-up to every track. |
 | `pyproject.toml`, `docs/dev-setup-docs/` | #19 | Environment and launch path |
-| `signal2speech/eeg/` | #21, #46, #47, #23 | Pipelines: simulated input (#21), P300 chooser (#46), alpha confirm (#47), live run (#23). Use one file per issue. |
+| `signal2speech/eeg/` | #21, #46, #47, #23 | One file per issue: `simulated.py` (#21), `p300.py` (#46), `alpha_confirm.py` (#47, in PR #58), live run (#23, not started) |
 | `signal2speech/evidence/` | #48 | Judge evidence window and record/replay |
-| `signal2speech/ui/` | #24 | PySide6 tiles, preview, judge strip, keys 1 and 2 |
-| `data/openorbit/` | #29 | MODIS images, AQI rows, `SOURCES.md` |
-| `signal2speech/openorbit/` | #30 | Comparison view. Exposes `show_satellite` and `compare_air_quality`. |
-| `signal2speech/speech/`, `signal2speech/app.py` | #25 | Sink implementation, audio, and the one integration entry point |
-| `signal2speech/ai/` | #27 | Reply suggestions as `speak_reply` choices |
+| `signal2speech/ui/` | #24 | PySide6 tiles, preview, judge strip, keys 1 and 2, and the P300 flash scheduler (`flash.py`) |
+| `data/openorbit/` | #29 | MODIS images, AQI rows, `SOURCES.md` (in PR #65) |
+| `signal2speech/openorbit/` | #30 | Comparison view. Exposes `show_satellite` and `compare_air_quality` (in PR #65). |
+| `signal2speech/speech/`, `signal2speech/app.py` | #4, #25 | Sink implementation, audio, and the one integration entry point (`python -m signal2speech.app`) |
+| `signal2speech/ai/` | #5, #27, #28 | Reply suggestions as `speak_reply` choices (`python -m signal2speech.ai`) |
+| `tests/test_<track>.py` | Each track | One test file per track, for example `test_p300.py` for #46 |
 
 ## Dependency order
 
 ```mermaid
 flowchart LR
-    I22["#22 contract ✅"] --> I21["#21 simulated input"]
-    I22 --> I24["#24 keyboard preview UI"]
-    I22 --> I27["#27 AI reply choices"]
-    I22 --> I46["#46 P300 chooser"]
+    I22["#22 contract ✅"] --> I21["#21 simulated input ✅"]
+    I22 --> I24["#24 keyboard preview UI ✅"]
+    I22 --> I27["#27 AI reply choices ✅"]
+    I22 --> I46["#46 P300 chooser (merged)"]
     I22 --> I47["#47 alpha confirm"]
-    I29["#29 NASA/EPA data"] -.->|swap in real data| I30["#30 offline view"]
-    I21 --> I25["#25 confirm → map + speech"]
+    I22 --> I30["#30 offline view"]
+    I29["#29 NASA/EPA data"] -.->|swap in real data| I30
+    I21 --> I25["#25 confirm → map + speech ✅"]
     I24 --> I25
     I30 --> I25
     I46 --> I48["#48 evidence view"]
     I25 --> I26["#26 recovery checks"]
     I26 --> I40["#40 pre-headset checkpoint"]
+    I21 --> I23
     I46 --> I23["#23 live Unicorn"]
     I47 --> I23
     I40 --> I23
     I23 --> I36["#36 rehearse reveal"]
-    I27 --> I28["#28 speak AI reply"]
+    I27 --> I28["#28 speak AI reply ✅"]
 ```
 
-GitHub tracks the solid edges as **Blocked by** relationships. #19 (environment) blocks nothing: each dev follows the launch path on their own machine. #30 starts with placeholder images, so its link to #29 is soft.
+GitHub tracks the solid edges as **Blocked by** relationships (checked 2026-11-14). ✅ means the issue is closed. #46 is merged but stays open until the live check. #25 merged before #30, using a labelled stand-in map. #19 (environment) blocks nothing: each dev follows the launch path on their own machine. #30 starts with placeholder images, so its link to #29 is soft.
