@@ -93,3 +93,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Merging two PRs back to back no longer cancels the first one's test run on `main`
 - The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
 - Code review follow-up: the summary is now written even when tests or the smoke check fail, and an app that can't start fails CI instead of looking like a skipped smoke check. The check is renamed `ci (...)` because it runs more than pytest
+
+## 11/14/26 - 5:32 PM - Long Le (with Claude) - #34 Submission plan and checklist ([PR #73](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/73))
+- The team has a plan for the demo and the submission in `docs/demo-submission/`
+    - `run-of-show.md`: the two-minute table demo, with a fallback for every step
+    - `video-shot-list.md`: nine shots under 2:45 for the video
+    - `submission-checklist.md`: the Devpost fields, a draft AI disclosure, and logs for submission status and rehearsals
+- Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
+- Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
