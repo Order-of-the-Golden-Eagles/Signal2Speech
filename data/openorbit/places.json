@@ -3,6 +3,7 @@
     {
       "id": "emu",
       "label": "Eastern Michigan University",
+      "short": "EMU",
       "county": "Washtenaw",
       "lat": 42.2502,
       "lon": -83.6245,
@@ -11,6 +12,7 @@
     {
       "id": "detroit",
       "label": "Detroit",
+      "short": "Detroit",
       "county": "Wayne",
       "lat": 42.3317,
       "lon": -83.0458,
