@@ -103,21 +103,26 @@ def test_satellite_shows_only_the_nasa_credit(qapp):
     assert any("NASA" in t for t in texts) and not any("EPA" in t for t in texts)
 
 
-def assert_labels_belong_to_their_markers(map_image, context):
-    """Each label stays on the image, covers no other label, marker, or the caption, and is
-    nearer its own marker than any other (a reader links a label to the nearest marker)."""
+def assert_labels_belong_to_their_markers(map_image, context, require_all=False):
+    """Each drawn label stays on the image, covers no other label, marker, or the caption, and
+    is nearer its own marker than any other (a reader links a label to the nearest marker).
+    Holds for any font, because labels that can't be placed cleanly are left out."""
     from PySide6.QtCore import QRectF
     _, radius, labels = map_image.label_layout()
     image = map_image.image_rect()
     caption = map_image.caption_layout()
+    markers = map_image.marker_points()
+    if require_all:
+        assert len(labels) == len(markers), context
     for i, (place, point, box, _) in enumerate(labels):
         where = (place.id, context)
         assert image.contains(box), where
         assert caption is None or not box.intersects(caption[1]), where
-        for j, (_, other_point, other_box, _) in enumerate(labels):
-            if i == j:
+        for j, (_, _, other_box, _) in enumerate(labels):
+            assert i == j or not box.intersects(other_box), where
+        for other_place, other_point in markers:
+            if other_place.id == place.id:
                 continue
-            assert not box.intersects(other_box), where
             ring = QRectF(other_point.x() - radius, other_point.y() - radius, 2 * radius, 2 * radius)
             assert not box.intersects(ring), where
             own = (box.center() - point).manhattanLength()
@@ -131,7 +136,7 @@ def test_marker_labels_at_any_image_size(qapp, date, width):
     from signal2speech.openorbit.view import MapImage
     m = MapImage(load_dataset(), date, caption="June 28, 2023")
     m.resize(width, round(width * 800 / 1440))
-    assert_labels_belong_to_their_markers(m, width)
+    assert_labels_belong_to_their_markers(m, width, require_all=width >= 640)
 
 
 @pytest.mark.parametrize("size", [(1280, 720), (1024, 600), (800, 480)])

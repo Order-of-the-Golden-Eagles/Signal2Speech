@@ -116,9 +116,9 @@ class MapImage(QWidget):
                                           r.y() + y * r.height() / self._ds.height)))
         return points
 
-    def _font(self, px: float) -> QFont:
+    def _font(self, px: float, minimum: int = 13) -> QFont:
         font = QFont(self.font())
-        font.setPixelSize(max(13, int(px)))
+        font.setPixelSize(max(minimum, int(px)))
         font.setBold(True)
         return font
 
@@ -132,13 +132,28 @@ class MapImage(QWidget):
                      metrics.horizontalAdvance(self.caption) + 16, metrics.height() + 6)
         return font, box
 
+    def marker_radius(self) -> float:
+        return max(6.0, self.image_rect().height() / 60)
+
     def label_layout(self) -> Tuple[QFont, float, List[Tuple[Place, QPointF, QRectF, str]]]:
         """Marker labels: each sits next to its own marker, inside the image, without covering
-        another label, any marker, or the caption."""
+        another label, any marker, or the caption. If they don't all fit, fall back to short
+        labels, then a smaller font, then leave out the labels that still don't fit. Markers
+        are always drawn, so a misleading label is never drawn."""
         r = self.image_rect()
-        font = self._font(r.height() / 22)
+        base = r.height() / 22
+        attempts = ((self._font(base), True), (self._font(base), False),
+                    (self._font(base * 0.8, minimum=11), False))
+        for font, with_county in attempts:
+            labels = self._place_labels(font, with_county)
+            if all(box is not None for _, _, box, _ in labels):
+                break
+        return font, self.marker_radius(), [l for l in labels if l[2] is not None]
+
+    def _place_labels(self, font: QFont, with_county: bool):
+        r = self.image_rect()
         metrics = QFontMetricsF(font)
-        radius = max(6.0, r.height() / 60)
+        radius = self.marker_radius()
         points = self.marker_points()
         taken = [QRectF(p.x() - radius - 2, p.y() - radius - 2, 2 * radius + 4, 2 * radius + 4)
                  for _, p in points]
@@ -147,18 +162,27 @@ class MapImage(QWidget):
             taken.append(caption[1])
         labels = []
         for place, p in points:
-            text = f"{place.short} ({place.county})"
+            text = f"{place.short} ({place.county})" if with_county else place.short
             w, h = metrics.horizontalAdvance(text) + 12, metrics.height() + 4
             gap = radius + 4
-            candidates = [QRectF(p.x() - w / 2, p.y() - gap - h, w, h),   # above
+            candidates = (QRectF(p.x() - w / 2, p.y() - gap - h, w, h),   # above
                           QRectF(p.x() - w / 2, p.y() + gap, w, h),       # below
                           QRectF(p.x() + gap, p.y() - h / 2, w, h),       # right
-                          QRectF(p.x() - gap - w, p.y() - h / 2, w, h)]   # left
-            boxes = [_clamp(c, r) for c in candidates]
-            box = next((b for b in boxes if not any(b.intersects(t) for t in taken)), boxes[0])
-            taken.append(box)
+                          QRectF(p.x() - gap - w, p.y() - h / 2, w, h))   # left
+            box = None
+            if w <= r.width() and h <= r.height():
+                for candidate in candidates:
+                    c = _clamp(candidate, r)
+                    others = [q for _, q in points if q != p]
+                    nearest_is_own = all((c.center() - p).manhattanLength()
+                                         < (c.center() - q).manhattanLength() for q in others)
+                    if nearest_is_own and not any(c.intersects(t) for t in taken):
+                        box = c
+                        break
+            if box is not None:
+                taken.append(box)
             labels.append((place, p, box, text))
-        return font, radius, labels
+        return labels
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -179,13 +203,14 @@ class MapImage(QWidget):
             self._draw_box_text(painter, box, self.caption)
 
         font, radius, labels = self.label_layout()
-        painter.setFont(font)
-        for _, point, box, text in labels:
+        for _, point in self.marker_points():
             painter.setBrush(Qt.NoBrush)
             painter.setPen(QPen(QColor("black"), 5))
             painter.drawEllipse(point, radius, radius)
             painter.setPen(QPen(MARKER, 3))
             painter.drawEllipse(point, radius, radius)
+        painter.setFont(font)
+        for _, _, box, text in labels:
             self._draw_box_text(painter, box, text)
         painter.end()
 
