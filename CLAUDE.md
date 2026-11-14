@@ -13,7 +13,7 @@ Open only the linked category and issue relevant to your task. Use ordinary link
 When you finish an issue, append one entry to the bottom of [DEVLOG.md](DEVLOG.md) in the same PR, after the tests pass and the docs are updated. The devlog is for humans, so write in plain language: what changed, why it matters for the demo, and what is still unverified. Leave out implementation detail that the docs or the code already cover.
 
 ```markdown
-## MM/DD/YY - H:MM AM/PM - <Developer name> (with Claude) - #<issue> <short title> ([PR #<n>](<PR link>))
+## MM/DD/YY - H:MM AM/PM - <Developer name> - #<issue> <short title> ([PR #<n>](<PR link>))
 - What a teammate or judge can now do, in one line
     - Nested bullets for the command to run or one key detail
 - Why a change was made, when that isn't obvious (a bug it prevents, a decision)
