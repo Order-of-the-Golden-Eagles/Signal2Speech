@@ -16,6 +16,7 @@
 
 ## Verification and next checkpoint
 
+- **Alpha confirm works on simulated input (#47):** `python -m signal2speech.eeg.alpha_confirm` calibrates (10 s open, 10 s closed), then reports. On `Generator` with 8 µV bursts: 0 false triggers in 60 s eyes-open, exactly 1 edge per closure (5/5), 1.2–1.45 s latency. `--source hybrid-black` is the live path, still unverified (#23). Live confirm stays disarmed in the handler until #23. Share one headset with #46 through `AlphaConfirm(pipeline=, upstream=)`. [Details](eeg-hardware/README.md#alpha-switch-confirm-47-works-on-simulated-input)
 - **Environment verified (#19, 2026-11-14):** Python 3.12.10, g.Pype 4.2.0, and PySide6 6.11.3 are pinned in `requirements-lock.txt`. `pytest` passes 21 of 21, including the #24 UI tests. Step 6 is verified: the g.Pype scope window runs. Still open: the questions for the g.tec mentor.
 
 - The initial docs record the plan. Live EEG and app behavior are pending verification.
