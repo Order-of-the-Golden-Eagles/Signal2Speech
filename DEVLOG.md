@@ -124,6 +124,21 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
 
+## 11/14/26 - 5:15 PM - In Young Song (with Claude) - #29 NASA and EPA dataset ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
+- The OpenOrbit demo now has its real data, bundled in the repo so it works with Wi-Fi off
+    - `data/openorbit/`: two NASA satellite images of southeast Michigan (June 26 and 28, 2023), the EPA air-quality rows, map marker places, and `SOURCES.md` with every link
+- The EPA numbers were checked against EPA's own file: Washtenaw 32 to 218 (+186), Wayne 58 to 226 (+168). `python data/openorbit/build_dataset.py --verify-only` re-checks the files offline
+- June 26 is mostly cloud on both NASA satellites, so the "before" picture shows little ground. The AQI numbers carry the before and after. The team can decide later whether to change it
+- Verified on Windows with no headset. NASA's coastline map lines up with the image, and the markers sit where EMU and Detroit really are
+
+## 11/14/26 - 5:15 PM - In Young Song (with Claude) - #30 Offline wildfire comparison view ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
+- After a confirm, the app now shows the real map instead of the "not built yet" placeholder
+    - "Show the satellite view" shows June 28 with EMU and Detroit marked. "Compare counties" shows both days side by side with the AQI table and which county rose most versus which ended highest
+- The numbers on screen come from the EPA file, and a test checks that they match the spoken line, so the screen and the voice can't disagree
+- Sized to fit next to the selection tiles on a 1920x1080 laptop at 125% scaling. Before this, the window ran off the screen
+- If the data folder is missing, the panel says so clearly instead of crashing the app
+- Verified on Windows with keyboard input and every network call blocked: one map change and one spoken line per confirm. Still needs a real Wi-Fi-off run on the judging laptop (#39)
+
 ## 11/14/26 - 5:20 PM - MagicJester2764 - #41 Code review fixes ([PR #61](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/61))
 - A code review found the asset check was too easy to fool: it would pass if the right numbers appeared anywhere in the data. Now Washtenaw's and Wayne's AQI values have to be on their own rows
 - The spoken-line check now needs the exact rise next to each county, so a typo like "1860" can't pass
@@ -149,7 +164,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
 - Code review follow-up: the summary is now written even when tests or the smoke check fail, and an app that can't start fails CI instead of looking like a skipped smoke check. The check is renamed `ci (...)` because it runs more than pytest
 
-## 11/14/26 - 5:32 PM - Long Le (with Claude) - #34 Submission plan and checklist ([PR #73](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/73))
+## 11/14/26 - 5:32 PM - Long Le - #34 Submission plan and checklist ([PR #73](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/73))
 - The team has a plan for the demo and the submission in `docs/demo-submission/`
     - `run-of-show.md`: the two-minute table demo, with a fallback for every step
     - `video-shot-list.md`: nine shots under 2:45 for the video
@@ -163,3 +178,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Added the confirm timeout the rules always promised: if nobody confirms within 15 seconds, the preview cancels quietly (`--confirm-timeout`, 0 turns it off)
 - Found and fixed a hidden test problem: a leftover 30-second timer from one test could end a later test early. It only showed up once the test suite got long enough
 - Still open for the headset slot (#23): if the headset goes silent without disconnecting, nothing notices yet
+## 11/14/26 - 5:45 PM - MagicJester2764 - #38 Proved the PR check passes and fails ([PR #75](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/75))
+- Pushed a test that fails on purpose. CI went red on all four systems and pointed straight at the failing test. Then I removed it to get green again
+- That closes out #14: every PR now shows a clear pass or fail without needing the headset
+- Explained in the workflow why Ubuntu runs twice: Python 3.12 is what the judging laptop uses, and 3.13 is an early warning for newer Python. It caught a real bug on its first day
+- Recorded a flaky evidence test on macOS (#48) so nobody chases it as a real failure
