@@ -2,7 +2,30 @@
 
 Plain-language notes on what changed and why, one entry per finished issue. The newest entry goes at the bottom. Times are Eastern. The format is in [CLAUDE.md](CLAUDE.md#devlog-after-every-issue).
 
-## 11/14/26 - 4:28 PM - Long Le (with Claude) - #24 Keyboard preview screen ([PR #51](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/51))
+## 11/14/26 - 2:37 PM - Vasanth Anbukumar (filled in 11/14/26, 5:21 PM, by MagicJester2764, from git history) - Project kickoff
+- Created the repo and wrote the pitch: Signal2Speech lets someone who can't speak or type answer questions with an EEG headset
+- Two features share the same controls: AI Answering suggests replies, and OpenOrbit shows NASA satellite images next to EPA air-quality data
+- Picked the live demo question: which Michigan county's AQI rose more when wildfire smoke arrived on June 26–28, 2023 (Washtenaw 32→218, Wayne 58→226)
+- Wrote down a first tech stack (g.tec Unicorn headset, the g.tec Unity starter, local NASA/EPA data)
+
+## 11/14/26 - 3:12 PM - Vasanth Anbukumar (filled in 11/14/26, 5:21 PM, by MagicJester2764, from git history) - Team docs and issue board
+- Added `CLAUDE.md` and `docs/`, so every teammate's coding agent starts from the same instructions, living memory, and issue categories
+- Merged the issue list into 16 big issues, one per area, each with small tasks and a prompt to paste into a coding agent
+- Wrote the plain-language walkthrough of one answer: choose, preview, then confirm in a separate step, so nothing is ever said by accident
+
+## 11/14/26 - 3:52 PM - Vasanth Anbukumar (filled in 11/14/26, 5:21 PM, by MagicJester2764, from git history) - #22 Selection contract and #1 architecture ([PR #44](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/44)) ([PR #45](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/45))
+- Defined the one shape every input uses (keyboard, simulator, headset), plus the rules that make a stale, duplicate, or leftover choice do nothing
+- Wrote those rules as a test file (`contracts/selection-scenarios.json`) that the code must pass
+- Settled the first plan as Unity 2022.3 with the g.tec starter, the only Unity version the SDK supports
+- Added a `.gitignore` that keeps raw EEG, recordings, and secrets out of git
+
+## 11/14/26 - 4:13 PM - Vasanth Anbukumar (filled in 11/14/26, 5:21 PM, by MagicJester2764, from git history) - Pivot to Python and g.Pype ([PR #49](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/49)) ([PR #50](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/50))
+- Switched the whole project from Unity/C# to Python 3.12, g.Pype 4.2, and PySide6, to match what the g.tec judges look for: visible pipelines, OSCAR artifact removal, and evidence
+- Ported the selection contract to Python. The same scenario file still passes
+- Rewrote the docs and opened new issues for the P300 chooser (#46), alpha confirm (#47), and evidence view (#48)
+- Unblocked the board so no track waits on environment setup or data
+
+## 11/14/26 - 4:28 PM - Long Le - #24 Keyboard preview screen ([PR #51](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/51))
 - The wearer's screen exists: two big choice tiles, then a "Say this?" preview with Confirm and Cancel
     - `python -m signal2speech.ui`. Press 1 or 2 to pick, 1 to confirm, 2 or Esc to cancel
 - A strip along the bottom shows judges the input type (Keyboard, Simulated, Recorded, Live EEG), the round, and the last result, so simulated input is never mistaken for the headset
@@ -10,13 +33,18 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Holding a key down doesn't repeat. Otherwise a held 2 would pick a reply and then immediately cancel it
 - Verified with the keyboard on a Mac (macOS 12), not yet on the judging laptop
 
-## 11/14/26 - 4:39 PM - Long Le (with Claude) - #4 One complete choose, preview, and confirm flow ([PR #54](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/54))
+## 11/14/26 - 4:39 PM - Long Le - #4 One complete choose, preview, and confirm flow ([PR #54](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/54))
 - The whole demo flow runs in one app: choose, preview, then confirm (the map changes and the line is spoken once) or cancel (nothing happens)
     - `python -m signal2speech.app --input keyboard` or `--input simulated`. Press D to fake a headset disconnect
 - Only one place in the code can speak or change the map, so a repeated or late signal can't make the app talk twice
 - A transcript panel shows every round, preview, and result, so judges can follow what happened
 - The map is a clearly labelled stand-in until the OpenOrbit view (#30) is built
 - Verified with Wi-Fi off on a Mac: one map change and one spoken line per confirm, and silence on cancel. Not yet on the judging laptop
+
+## 11/14/26 - 4:41 PM - Vasanth Anbukumar (filled in 11/14/26, 5:21 PM, by MagicJester2764, from git history) - #19 Environment verified ([PR #52](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/52)) ([PR #55](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/55))
+- Installed and pinned exact versions in `requirements-lock.txt`, so every laptop gets the same setup
+- Confirmed g.Pype's scope window opens and shows a moving signal
+- Noted that the install can fail partway on flaky Wi-Fi, and the flag that fixes it
 
 ## 11/14/26 - 4:46 PM - MagicJester2764 - #21 Simulated input ([PR #53](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/53))
 - The app can be driven by a fake brain running through the real g.Pype pipeline, so the team can rehearse the whole flow without the headset
@@ -27,12 +55,17 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Found that tests must create the Qt app as `QApplication`. Otherwise the UI tests crash the whole test run. This is recorded in MEMORY.md
 - Verified on a Linux laptop with simulated input only, not yet on the judging laptop
 
-## 11/14/26 - 4:50 PM - Long Le (with Claude) - #5 AI reply suggestions ([PR #57](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/57))
+## 11/14/26 - 4:50 PM - Long Le - #5 AI reply suggestions ([PR #57](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/57))
 - A judge types a question, and the wearer gets two short replies to pick from. The chosen one is previewed, then spoken once
     - `python -m signal2speech.ai`. "Other replies" asks for a new pair, and "Saved phrases" switches to offline backups like "Yes." / "No."
 - The screen always says where the replies came from: Claude, Stub (practice replies when no API key is set), or Saved phrases
 - If the AI is slow (over 9 seconds), offline, or fails, saved phrases appear with the reason. A late AI answer can never swap the choices while the wearer is picking
 - Verified with the Stub and with a forced timeout. A real Claude reply is still unverified because there's no API key yet (`ANTHROPIC_API_KEY` in `.env`)
+
+## 11/14/26 - 4:51 PM - Vasanth Anbukumar (filled in 11/14/26, 5:21 PM, by MagicJester2764, from git history) - #48 Evidence view for judges ([PR #56](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/56))
+- Added a g.Pype window that shows judges the brain signal: raw and filtered EEG, the spectrum, OSCAR on vs off, and the averaged response to target flashes
+- The window always says whether the input is Simulated, Recorded, or Live EEG
+- Runs can be recorded and replayed (recordings stay out of git): `python -m signal2speech.evidence --source generator`
 
 ## 11/14/26 - 4:56 PM - MagicJester2764 - #47 Alpha-switch confirm ([PR #58](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/58))
 - The wearer can now confirm by closing their eyes for about 2 seconds. That raises the brain's alpha rhythm, and one closure sends exactly one Confirm
@@ -42,6 +75,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The alpha switch can share the headset with the P300 chooser (#46), because the Unicorn can only be opened once
 - Still to do at the headset slot: calibrate on a real wearer (#23). Live confirm stays switched off in the app until #23 says it's safe
 
+## 11/14/26 - 4:57 PM - Vasanth Anbukumar (filled in 11/14/26, 5:21 PM, by MagicJester2764, from git history) - Trimmed dependencies ([PR #59](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/59))
+- Installs only the g.Pype parts we use, and adds scikit-learn, which the P300 classifier needs. Its tests had been silently skipping without it
+- Dropped LSL and EDF, which nothing used. That also frees Windows from being stuck on Python 3.12
+- Everyone needs to rerun `pip install -e ".[dev]"` after pulling
+
 ## 11/14/26 - 5:01 PM - MagicJester2764 - #41 Smoke command and diagnostics ([PR #61](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/61))
 - Added one command that checks the demo without a headset, internet, or screen: `python -m signal2speech.app --smoke`
     - It runs a confirm and a cancel through the real app with fake output, checks that the spoken AQI numbers match the EPA data, and checks that g.Pype can stream
@@ -50,6 +88,26 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every run writes a timing log to `logs/` (not committed) with the input mode and connection state. The log refuses raw EEG data on purpose
 - Breaking the app on purpose so it spoke twice made the smoke check fail, which shows it catches real problems
 
+## 11/14/26 - 5:02 PM - Long Le - #25 Speech and the confirmed action ([PR #60](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/60))
+- Speech moved to `signal2speech/speech/`. It plays a recorded clip for the two fixed OpenOrbit lines if one exists, otherwise uses the computer's built-in offline voice
+- Fixed a bug where a recorded clip could have played instead of an AI reply. AI replies always speak the exact approved words
+- `--input simulated` uses the g.Pype simulator from #21 when it's installed, and the screen says why when it falls back to the scripted version
+- Verified on a Mac with scripted simulated input: one map action and one spoken line, nothing during the preview. This Mac can't run g.Pype (macOS 12), so the g.Pype path was checked with a test stand-in. Still needs the real map (#30) and recorded clips (#29)
+
+## 11/14/26 - 5:08 PM - MagicJester2764 - Devlog ([PR #62](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/62))
+- Started this devlog: one plain-language entry per finished issue, written in the same PR
+- `CLAUDE.md` now tells every teammate's coding agent to add an entry the same way, so the log stays complete without anyone having to remember
+
+## 11/14/26 - 5:13 PM - Vasanth Anbukumar (filled in 11/14/26, 5:21 PM, by MagicJester2764, from git history) - #46 P300 chooser ([PR #63](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/63))
+- The headset can now pick a tile: it learns what the wearer's brain does when the tile they're looking at flashes, and averages over several flashes before deciding
+- Calibrate first, then choose. Decisions reach the app the same way the keyboard's do
+- Verified on synthetic brain data only. Live accuracy on the wearer is still to do at the headset slot
+
+## 11/14/26 - 5:14 PM - Vasanth Anbukumar (filled in 11/14/26, 5:21 PM, by MagicJester2764, from git history) - #37 Tests on every PR ([PR #64](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/64))
+- GitHub now runs the full test suite on Windows, macOS, and Linux for every pull request
+- It already caught a Windows-only bug: Qt returns forward-slash paths there, so tests should compare `Path` objects, not strings
+- Headset pairing, audio, the g.Pype window, and the Wi-Fi-off launch stay manual checks
+
 ## 11/14/26 - 5:15 PM - MagicJester2764 - #47 Code review fixes ([PR #58](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/58))
 - A code review found a way to confirm too early. A closure that came too soon could still count after the eyes had been open for less than the required second. Now every early closure restarts the clock
 - A closure still "in the pipes" from the previous screen can no longer sneak through when the Confirm screen appears
@@ -57,11 +115,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - If the app turns down a live confirm, the switch keeps listening on that same screen, so #23 can enable live confirm without a restart
 - Long demos no longer grow memory, and the switch works with headset streams other than 250 Hz
 - Verified on simulated input: 84 tests pass, and a 10 s rest gave 0 false triggers and 1 confirm per closure
-## 11/14/26 - 5:02 PM - Long Le (with Claude) - #25 Speech and the confirmed action ([PR #60](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/60))
-- Speech moved to `signal2speech/speech/`. It plays a recorded clip for the two fixed OpenOrbit lines if one exists, otherwise uses the computer's built-in offline voice
-- Fixed a bug where a recorded clip could have played instead of an AI reply. AI replies always speak the exact approved words
-- `--input simulated` uses the g.Pype simulator from #21 when it's installed, and the screen says why when it falls back to the scripted version
-- Verified on a Mac with scripted simulated input: one map action and one spoken line, nothing during the preview. This Mac can't run g.Pype (macOS 12), so the g.Pype path was checked with a test stand-in. Still needs the real map (#30) and recorded clips (#29)
 
 ## 11/14/26 - 5:15 PM - MagicJester2764 - #21 Code review fixes ([PR #53](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/53))
 - The full app now runs on the fake g.Pype brain: `python -m signal2speech.app --input simulated` (wired in by #60)
@@ -79,13 +132,15 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Two smoke runs at the same moment get separate log files, and the log no longer claims to time how long speech plays (it only times starting it)
 - Verified: 89 tests pass, and `python -m signal2speech.app --smoke` reports 5 pass, 2 skip (#29, #30)
 - Follow-up: CI on Python 3.13 caught that the new version warning broke a test. Fixed; the smoke check still passes in dev mode on 3.13 and only fails in judging mode
-## 11/14/26 - 5:20 PM - Vasanth Anbukumar (with Claude) - #37 Git hooks: secret scan and pre-push tests ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66))
+
+## 11/14/26 - 5:20 PM - Vasanth Anbukumar - #37 Git hooks: secret scan and pre-push tests ([PR #66](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/66))
 - Every clone can now turn on two shared git hooks with one command, the same on Windows, macOS, and Linux: `git config core.hooksPath .githooks`
     - `pre-commit` blocks API keys and tokens (Anthropic, OpenAI, GitHub, AWS, Google, private keys), raw EEG files (`.edf`, `.bdf`, recordings folders), and `.env`
     - `pre-push` runs `pytest` (about 30 seconds) before anything leaves your laptop. Branch deletions skip it automatically. Skip once with `SKIP_TESTS=1 git push`
 - Why: the secret scan used to exist only on one laptop, and the rule about keeping keys and raw EEG out of git had nothing enforcing it
 - The hooks are plain `sh` with LF line endings forced in `.gitattributes`, so Git for Windows, macOS, and Linux all run them
 - Verified: `tests/test_githooks.py` builds a throwaway repo and confirms a fake key and an `.edf` file get blocked while a clean commit and `.env.example` pass. CI runs it on all three OSes
+
 ## 11/14/26 - 5:24 PM - MagicJester2764 - #37 CI follow-up ([PR #68](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/68))
 - Took over the CI that Vasanth drafted in #64 and fixed what its code review found
 - CI now installs the versions pinned in `requirements-lock.txt` (g.Pype, Qt, numpy, scikit-learn, and the rest), so it tests what the judging laptop runs instead of whatever is newest that day
@@ -94,10 +149,19 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
 - Code review follow-up: the summary is now written even when tests or the smoke check fail, and an app that can't start fails CI instead of looking like a skipped smoke check. The check is renamed `ci (...)` because it runs more than pytest
 
+## 11/14/26 - 5:32 PM - Long Le (with Claude) - #34 Submission plan and checklist ([PR #73](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/73))
+- The team has a plan for the demo and the submission in `docs/demo-submission/`
+    - `run-of-show.md`: the two-minute table demo, with a fallback for every step
+    - `video-shot-list.md`: nine shots under 2:45 for the video
+    - `submission-checklist.md`: the Devpost fields, a draft AI disclosure, and logs for submission status and rehearsals
+- Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
+- Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
+
 ## 11/14/26 - 5:33 PM - Vasanth Anbukumar (with Claude) - #13 Run of show and submission prep ([PR #74](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/74))
 - Added the demo playbook in `docs/demo-submission/`: a second-by-second two-minute run of show with four roles, a shot list for a video under three minutes, a rehearsal checklist, judge Q&A, and an 8:15 PM headset pre-flight
 - Each beat has two tracks. The live track is the goal. The keyboard track is what `main` can do today, and the label you say out loud must match the one on screen
 - Found that the evidence view can't show a real P300 average yet. On the headset its flash markers have no visible flash, so the backup recording is for OSCAR and the eyes-closed alpha peak, and the P300 average stays labelled Simulated until the P300 chooser drives those markers
 - Checked the commands on Windows: keyboard and simulated runs work, and `--input live` refuses as expected. `pytest` passes 124 with 2 skipped after merging the latest `main`
 - Review fixes: marked the alpha confirm (#47) as merged with its real command (`--source hybrid-black`, plus `--demo`), and noted that the app's 175 ms, 10-flash tile timing has not been checked with the classifier, which was tested at 250 ms and 5 flashes
+- Merged with the #34 submission kit from PR #73: its `run-of-show.md` stays as the minute-by-minute plan, and this PR's second-by-second version with roles is now `stage-script.md`
 - Nothing here has been run with a real headset yet
