@@ -282,7 +282,12 @@ def main(argv=None) -> int:
     p.add_argument("--keys", default="", help="keyboard presses after start, e.g. '2,1'")
     p.add_argument("--mute", action="store_true", help="no audio (logs instead)")
     p.add_argument("--screenshot", type=Path, help="save a PNG after the first confirm and exit")
+    p.add_argument("--smoke", nargs="?", const="dev", choices=["dev", "judging"],
+                   help="hardware-free smoke check, exit 0/1 (#41); 'judging' fails on any SKIP")
     args = p.parse_args(argv)
+    if args.smoke:
+        from signal2speech.diagnostics import run_smoke
+        return run_smoke(args.smoke)
     source = InputSources.LIVE_EEG if args.input == "live" else args.input
     if source in BLOCKED_INPUTS:
         print(BLOCKED_INPUTS[source], file=sys.stderr)
