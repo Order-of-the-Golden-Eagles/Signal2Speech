@@ -24,3 +24,19 @@ From the [g.Pype docs](https://gpype.gtec.at). **Each step is unverified until s
 **Verified on 2026-11-14 (Windows 11):** Python 3.12.10, g.Pype 4.2.0, PySide6 6.11.3, `gtec_oscar` 1.3.2, `gtec_unicorn` 2.0.0. `pytest` passes 21 of 21. Built `Generator` → `Bandpass` → `TimeSeriesScope` with `HybridBlack` available. The install fails partway through on a flaky network unless you use `--resume-retries`.
 
 **Offline demo:** g.Pype, the OpenOrbit data, and speech (`pyttsx3`) all work without Wi-Fi. Only AI Answering (#27) needs a network, and it falls back to saved phrases.
+
+## Platform notes
+
+CI (`.github/workflows/tests.yml`) runs `pytest` on Windows, Ubuntu, and macOS (Apple silicon) for every PR. The headset, audio, and Wi-Fi-off launch stay manual.
+
+| | Windows 10/11 x64 | macOS (Apple silicon) | Linux x86_64 |
+| --- | --- | --- | --- |
+| Supported by g.Pype | Yes. Verified on the dev laptop and in CI. | macOS 13 or later (PySide6 6.10+). Intel Macs can't use the Unicorn driver. | Yes. No ARM Linux wheels. |
+| Python | 3.12 (verified), 3.10–3.14 | 3.12 via python.org or Homebrew | 3.12 (CI also tests 3.13) |
+| Extra system setup | None | Grant **Input Monitoring** to your terminal for g.Pype's `Keyboard` source. g.Pype needs the main thread's event loop (`MainApp.run()`). | `sudo apt install espeak-ng libegl1 libxkbcommon0 libbluetooth3` |
+| Headset pairing | Settings → Bluetooth | System Settings → Bluetooth | `bluetoothctl` → `pair` / `trust` |
+| Speech (`pyttsx3`) | SAPI5, built in | NSSpeechSynthesizer, built in | espeak-ng |
+| Keyboard input | Works | Needs Input Monitoring | Needs an X11 session (`pynput`). Wayland may block it. |
+| Paradigm Presenter | Licensed separately | Not available | Not available |
+
+**Judging laptop:** use the Windows laptop. It's the only fully verified setup, and the only one where the Paradigm Presenter is an option.
