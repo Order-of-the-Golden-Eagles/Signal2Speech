@@ -37,7 +37,9 @@ def test_smoke_passes_on_a_good_checkout(qapp):
     code, out = run()
     assert code == 0, out
     assert "FAIL " not in out
-    for name in ("environment", "demo numbers", "confirm flow", "cancel flow", "g.Pype stream"):
+    # Off Python 3.12 the environment check is a WARN (CI also runs 3.13); dev mode still passes.
+    assert "PASS  environment" in out or "WARN  environment" in out
+    for name in ("demo numbers", "confirm flow", "cancel flow", "g.Pype stream"):
         assert f"PASS  {name}" in out
     assert out.count("MANUAL") == len(d.MANUAL_CHECKS)
     assert "SMOKE PASS" in out

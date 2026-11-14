@@ -34,3 +34,4 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The judging check now fails on the wrong Python version. A weird g.Pype version string gives a clear failure instead of a crash
 - Two smoke runs at the same moment get separate log files, and the log no longer claims to time how long speech plays (it only times starting it)
 - Verified: 89 tests pass, and `python -m signal2speech.app --smoke` reports 5 pass, 2 skip (#29, #30)
+- Follow-up: CI on Python 3.13 caught that the new version warning broke a test. Fixed; the smoke check still passes in dev mode on 3.13 and only fails in judging mode
