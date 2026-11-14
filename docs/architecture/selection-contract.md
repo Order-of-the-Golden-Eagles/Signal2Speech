@@ -156,11 +156,9 @@ flowchart LR
     I22["#22 contract ✅"] --> I21["#21 simulated input"]
     I22 --> I24["#24 keyboard preview UI"]
     I22 --> I27["#27 AI reply choices"]
-    I19["#19 Python + g.Pype env"] --> I21
-    I19 --> I24
-    I19 --> I46["#46 P300 chooser"]
-    I19 --> I47["#47 alpha confirm"]
-    I29["#29 NASA/EPA data"] --> I30["#30 offline view"]
+    I22 --> I46["#46 P300 chooser"]
+    I22 --> I47["#47 alpha confirm"]
+    I29["#29 NASA/EPA data"] -.->|swap in real data| I30["#30 offline view"]
     I21 --> I25["#25 confirm → map + speech"]
     I24 --> I25
     I30 --> I25
@@ -174,4 +172,4 @@ flowchart LR
     I27 --> I28["#28 speak AI reply"]
 ```
 
-GitHub tracks the same edges as **Blocked by** relationships on each issue.
+GitHub tracks the solid edges as **Blocked by** relationships. #19 (environment) blocks nothing: each dev follows the launch path on their own machine. #30 starts with placeholder images, so its link to #29 is soft.
