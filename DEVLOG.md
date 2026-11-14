@@ -27,14 +27,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every run writes a timing log to `logs/` (not committed) with the input mode and connection state. The log refuses raw EEG data on purpose
 - Breaking the app on purpose so it spoke twice made the smoke check fail, which shows it catches real problems
 
-## 11/14/26 - 5:15 PM - In Young Song (with Claude) - #29 NASA and EPA dataset (PR pending)
+## 11/14/26 - 5:15 PM - In Young Song (with Claude) - #29 NASA and EPA dataset ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
 - The OpenOrbit demo now has its real data, bundled in the repo so it works with Wi-Fi off
     - `data/openorbit/`: two NASA satellite images of southeast Michigan (June 26 and 28, 2023), the EPA air-quality rows, map marker places, and `SOURCES.md` with every link
 - The EPA numbers were checked against EPA's own file: Washtenaw 32 to 218 (+186), Wayne 58 to 226 (+168). `python data/openorbit/build_dataset.py --verify-only` re-checks the files offline
 - June 26 is mostly cloud on both NASA satellites, so the "before" picture shows little ground. The AQI numbers carry the before and after. The team can decide later whether to change it
 - Verified on Windows with no headset. NASA's coastline map lines up with the image, and the markers sit where EMU and Detroit really are
 
-## 11/14/26 - 5:15 PM - In Young Song (with Claude) - #30 Offline wildfire comparison view (PR pending)
+## 11/14/26 - 5:15 PM - In Young Song (with Claude) - #30 Offline wildfire comparison view ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
 - After a confirm, the app now shows the real map instead of the "not built yet" placeholder
     - "Show the satellite view" shows June 28 with EMU and Detroit marked. "Compare counties" shows both days side by side with the AQI table and which county rose most versus which ended highest
 - The numbers on screen come from the EPA file, and a test checks that they match the spoken line, so the screen and the voice can't disagree
