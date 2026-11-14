@@ -114,6 +114,28 @@ def test_set_next_decides_a_waiting_sequence(rig):
     assert sink.actions == []               # a preview never reaches output
 
 
+def test_flasher_mode_decides_only_after_the_flash_sequence(rig):
+    """Drop-in contract for app.py: arm on on_sequence_started, decide on on_sequence_finished."""
+    from signal2speech.core import InputAdapter
+    from signal2speech.ui import SelectionWindow
+
+    app, h, sink, log, make = rig
+    flashes = []
+    win = SelectionWindow(h, InputAdapter(h, InputSources.KEYBOARD), flash=True,
+                          on_flash=flashes.append)
+    win.flasher.flash_ms, win.flasher.isi_ms, win.flasher.repetitions = 10, 5, 3
+    at_preview = []
+    h.on_preview.append(lambda _c: at_preview.append(len(flashes)))
+    dec = make([2, 1], flasher=win.flasher, confirm_s=0.2)
+    dec.start()
+    h.begin_choice_round(load_demo_choices())
+    assert spin(app, lambda: len(sink.actions) == 1)
+    assert at_preview == [6]                # all 3 x 2 flashes ran before the decision
+    assert [o for _, o in log] == [Outcome.Previewed, Outcome.Confirmed]
+    assert all(e.source == InputSources.SIMULATED for e, _ in log)
+    win.close()
+
+
 def test_parse_picks_rejects_unknown_classes():
     assert parse_picks("2, 1") == [2, 1]
     with pytest.raises(Exception):

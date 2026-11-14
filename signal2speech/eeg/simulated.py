@@ -13,6 +13,7 @@ from ``set_next()``. Every event is labelled ``simulated``.
     python -m signal2speech.eeg.simulated --picks 2,1        # headless: preview, then confirm
     python -m signal2speech.eeg.simulated --ui               # #24 window; Ctrl+1/Ctrl+2 pick
     python -m signal2speech.eeg.simulated --ui --picks 2,1   # window, scripted
+    python -m signal2speech.eeg.simulated --ui --flash --picks 2,1 --confirm-s 2   # P300-like timing
 
 Round rule: ``arm_capture()`` runs when a sequence starts (here, when a round opens), never when
 the decision arrives. A decision from an older sequence is dropped before it reaches the
@@ -30,9 +31,11 @@ from typing import Callable, Iterable, List, Optional
 
 import gpype as gp
 from PySide6.QtCore import QCoreApplication, QObject, Qt, QTimer, Signal, Slot
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import QApplication
 
 from signal2speech.core import (EegClassMap, InputAdapter, InputSources, Outcome, Round,
-                                SelectionEvent, SelectionHandler)
+                                RoundKind, SelectionEvent, SelectionHandler)
 
 PORT_IN = "in"
 DEFAULT_DECISION_S = 0.8   # stand-in for a P300 sequence; long enough to see the preview
@@ -81,12 +84,22 @@ class SimulatedDecoder(QObject):
 
     Create it on the Qt main thread. ``decided`` is emitted on a g.Pype worker thread and
     delivered to ``_on_decided`` on the main thread through a queued connection.
+
+    Timing modes:
+
+    - **No flasher (default).** Every round arms when it opens. The decision arrives after
+      ``decision_s`` (Choose) or ``confirm_s`` (Confirm) seconds of stream.
+    - **With ``flasher=window.flasher``** (the #24 ``FlashScheduler``). A Choose round arms on
+      ``on_sequence_started`` and decides on ``on_sequence_finished``, as the P300 will (#46).
+      A Confirm round arms when it opens and decides after ``confirm_s``, the alpha window
+      (#47). This is the same contract as ``InjectedSimulatedInput`` in ``app.py``.
     """
 
     decided = Signal(int, int)   # (sequence id, classifier class index)
 
     def __init__(self, handler: SelectionHandler, picks: Iterable[int] = (), *,
-                 decision_s: float = DEFAULT_DECISION_S, auto: bool = True,
+                 decision_s: float = DEFAULT_DECISION_S, confirm_s: Optional[float] = None,
+                 flasher=None, auto: bool = True,
                  classes: Optional[EegClassMap] = None, source=None,
                  sampling_rate: float = 250.0, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -94,11 +107,13 @@ class SimulatedDecoder(QObject):
         self.adapter = InputAdapter(handler, InputSources.SIMULATED)
         self.classes = classes or EegClassMap.default()
         self.decision_s = decision_s
+        self.confirm_s = decision_s if confirm_s is None else confirm_s
         self.sampling_rate = sampling_rate
         self._picks = deque(int(p) for p in picks)
         self._seq = 0
         self._pending_seq: Optional[int] = None
         self._waiting_for_pick = False
+        self._held: Optional[int] = None         # pick held until the flash sequence ends
         self.decision_threads: List[str] = []   # thread names that ran _on_decided (tests)
         self.dropped: List[int] = []            # stale sequence ids dropped before the adapter
 
@@ -111,6 +126,10 @@ class SimulatedDecoder(QObject):
         self.decided.connect(self._on_decided, Qt.ConnectionType.QueuedConnection)
         self.running = False
 
+        self.flasher = flasher
+        if flasher is not None:
+            flasher.on_sequence_started = self._flash_started
+            flasher.on_sequence_finished = self._flash_finished
         if auto:
             handler.on_round_opened.append(self._on_round_opened)
             handler.on_cleared.append(lambda _reason: self.cancel_sequence())
@@ -142,38 +161,58 @@ class SimulatedDecoder(QObject):
         """True while a sequence is waiting for its decision or picks remain."""
         return self._pending_seq is not None or bool(self._picks)
 
-    def start_sequence(self) -> Optional[int]:
-        """Arm the adapter for the open round and request a decision if a pick is queued."""
+    def start_sequence(self, delay_s: Optional[float] = None, hold: bool = False) -> Optional[int]:
+        """Arm the adapter for the open round and request a decision if a pick is queued.
+
+        ``hold=True`` keeps the pick until ``_flash_finished()`` asks for it.
+        """
         if self.handler.current is None:
             return None
         self.adapter.arm_capture()             # stamp the round now, as live EEG does
         self._seq += 1
         self._pending_seq = self._seq
+        self._held = None
         self.sink.cancel()
-        if self._picks:
-            self._request(self._picks.popleft())
-        else:
+        if not self._picks:
             self._waiting_for_pick = True      # Ctrl+1/Ctrl+2 or set_next() decides
+        elif hold:
+            self._held = self._picks.popleft()
+        else:
+            self._request(self._picks.popleft(), self.decision_s if delay_s is None else delay_s)
         return self._seq
 
     def set_next(self, cls: int) -> None:
         """Pick for the waiting sequence, or queue the pick for the next one."""
         if self._pending_seq is not None and self._waiting_for_pick:
-            self._request(int(cls))
+            self._request(int(cls), 0.0)
         else:
             self._picks.append(int(cls))
 
     def cancel_sequence(self) -> None:
         self._pending_seq = None
         self._waiting_for_pick = False
+        self._held = None
         self.sink.cancel()
 
-    def _request(self, cls: int) -> None:
+    def _request(self, cls: int, delay_s: float) -> None:
         self._waiting_for_pick = False
-        self.sink.request(self._pending_seq, cls, round(self.decision_s * self.sampling_rate))
+        if self._pending_seq is not None:
+            self.sink.request(self._pending_seq, cls, round(delay_s * self.sampling_rate))
 
-    def _on_round_opened(self, _rnd: Round) -> None:
-        self.start_sequence()
+    def _on_round_opened(self, rnd: Round) -> None:
+        if rnd.kind is RoundKind.CONFIRM:
+            self.start_sequence(self.confirm_s)
+        elif self.flasher is None:
+            self.start_sequence(self.decision_s)
+        # With a flasher, the Choose round arms in _flash_started.
+
+    def _flash_started(self) -> None:
+        self.start_sequence(hold=True)
+
+    def _flash_finished(self) -> None:
+        if self._pending_seq is not None and self._held is not None:
+            cls, self._held = self._held, None
+            self._request(cls, 0.0)            # next stream frame carries the decision
 
     @Slot(int, int)
     def _on_decided(self, seq: int, cls: int) -> None:
@@ -208,27 +247,34 @@ def main(argv=None) -> int:
     p.add_argument("--decision-s", type=float, default=DEFAULT_DECISION_S,
                    help="stream seconds per sequence before the decision")
     p.add_argument("--ui", action="store_true", help="open the #24 window labelled Simulated")
+    p.add_argument("--flash", action="store_true",
+                   help="with --ui: flash Choose tiles, arm/decide on the flash sequence")
+    p.add_argument("--confirm-s", type=float, default=None,
+                   help="stream seconds before a Confirm-round decision (default: --decision-s)")
     p.add_argument("--timeout", type=float, default=20.0, help="headless: give up after N s")
     args = p.parse_args(argv)
 
+    from signal2speech.ui import SelectionWindow
     from signal2speech.ui.__main__ import PrintSink, load_demo_choices   # reuse #24's stubs
 
     if args.ui:
-        from PySide6.QtGui import QKeySequence, QShortcut
-        from PySide6.QtWidgets import QApplication
-        from signal2speech.ui import SelectionWindow
         app = QApplication.instance() or QApplication(sys.argv[:1])
     else:
         app = QCoreApplication.instance() or QCoreApplication(sys.argv[:1])
 
     handler = SelectionHandler(PrintSink())
     handler.on_handled.append(lambda e, o: print(log_line(e, o), flush=True))
-    decoder = SimulatedDecoder(handler, args.picks, decision_s=args.decision_s)
     choices = load_demo_choices()
-
+    win = None
     if args.ui:
         keyboard = InputAdapter(handler, InputSources.KEYBOARD)
-        win = SelectionWindow(handler, keyboard, input_source=InputSources.SIMULATED)
+        win = SelectionWindow(handler, keyboard, input_source=InputSources.SIMULATED,
+                              flash=args.flash)
+    decoder = SimulatedDecoder(handler, args.picks, decision_s=args.decision_s,
+                               confirm_s=args.confirm_s,
+                               flasher=win.flasher if win is not None and args.flash else None)
+
+    if win is not None:
         win.set_connection("simulated stream (g.Pype Generator)")
         for seq, cls in (("Ctrl+1", 1), ("Ctrl+2", 2)):
             sc = QShortcut(QKeySequence(seq), win)

@@ -11,15 +11,18 @@
 - Use platform APIs and hardware-required packages. Bundle OpenOrbit data and demo audio locally.
 - Selection contract is final in [#22](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/22). It covers the event shape, IDs, round rules, folder ownership, and dependency order. See [selection-contract.md](architecture/selection-contract.md). `signal2speech/core/` holds the pure-Python handler, and `pytest` must stay green. Live EEG confirm stays disarmed until #23.
 - **Decoding:** choose with P300 (our flashing tiles → `Epochs` → `Sklearn` LDA, #46). Confirm with an alpha switch, eyes closed for about 2 s (#47). Fallback: step through options one at a time and confirm each with the alpha switch. Judges see evidence scopes (#48).
-- **Simulated input works (#21):** `python -m signal2speech.eeg.simulated --picks 2,1` runs a real g.Pype `Generator` pipeline into the handler, labelled `simulated`. #24 and #25 can rehearse against it. Verified on Linux with Python 3.12 and g.Pype 4.2.0. [Details](eeg-hardware/README.md#simulated-input-21--works)
+- **Simulated input works (#21):** `python -m signal2speech.eeg.simulated --picks 2,1` runs a real g.Pype `Generator` pipeline into the handler, labelled `simulated`. #24 and #25 can rehearse against it. `SimulatedDecoder(h, picks, flasher=window.flasher, confirm_s=2.0)` replaces `InjectedSimulatedInput` in `app.py` in one line, if the #25 owner agrees. Verified on Linux with Python 3.12 and g.Pype 4.2.0. [Details](eeg-hardware/README.md#simulated-input-21--works)
 - **Qt app rule:** create the app with `QApplication`, never `QCoreApplication`. The first one created wins, and the #24 widgets crash pytest otherwise.
 - **Ask the g.tec mentor:** Paradigm Presenter licence, MCP visualizer access, and whether one headset can stream to two apps at once.
 - The AI provider is TBD. See the [architecture walkthrough and input contract](architecture/README.md) and [AI Answering](ai-answering/README.md).
 
 ## Verification and next checkpoint
 
+- **Environment verified (#19, 2026-11-14):** Python 3.12.10, g.Pype 4.2.0, and PySide6 6.11.3 are pinned in `requirements-lock.txt`. `pytest` passes 21 of 21, including the #24 UI tests. Step 6 is verified: the g.Pype scope window runs. Still open: the questions for the g.tec mentor.
+
 - The initial docs record the plan. Live EEG and app behavior are pending verification.
 - **Keyboard UI works (#24):** `python -m signal2speech.ui` covers preview, confirm, cancel, and the judge strip, with offscreen tests in `pytest`. See [Accessibility and UI](accessibility-ui/README.md#running-the-ui-24).
+- **Integrated flow works (#4):** `python -m signal2speech.app --input keyboard|simulated` gives one map action and one spoken line per confirm, and no output on preview or cancel (`tests/test_app.py`). Verified with Wi-Fi off on 2026-11-14: one map action and one audible OS-voice line, run on a dev Mac on macOS 12, not yet the judging laptop. The map is still a labelled stand-in until #30, and simulated input is scripted until #21 (g.Pype). See [Integration](integration/README.md#running-the-integrated-app-4-25).
 - **Setup blocker (#19):** `gpype[all]` 4.2 needs PySide6 6.10.1 or newer, and there's no wheel for macOS 12 (Darwin 21). Use macOS 13 or later for g.Pype work. On macOS 12, `pip install PySide6==6.9.3 pytest` runs the core and the UI, but not g.Pype.
 - See the [sprint issue](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/16) for the current checkpoint and priorities.
 

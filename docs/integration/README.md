@@ -4,17 +4,39 @@ Route keyboard, simulated and live EEG input through one confirmation handler.
 
 **Active work** · [#4](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/4)
 
-## Rehearse without a headset (#21)
+## Running the integrated app (#4, #25)
 
-`SimulatedDecoder` drives the handler through the same `arm_capture()` / `select_captured()` path as live EEG, labelled `simulated`. To wire it into `app.py` (#25):
+```
+python -m signal2speech.app --input keyboard              # keys 1/2, Esc cancels, D simulates a disconnect
+python -m signal2speech.app --input simulated --sim 2,1   # scripted classes: choose target-2, then confirm
+python -m signal2speech.app --input simulated --sim 2,2   # choose, then cancel: expect no output
+```
+
+Add `--mute` for silent runs. Add `--screenshot out.png` to save the window after the first confirm and exit.
+
+- **One output path:** `AppSink.execute` in `signal2speech/app.py` is the only code that changes the map or speaks. It calls the map method first and then speaks `spoken_text`. The handler calls it exactly once per confirmation. Previews, cancels, disconnects, and stale or duplicate events produce no output. `tests/test_app.py` checks this with a fake view and a fake speaker.
+- **Transcript:** the right-hand panel and stdout log each round, preview, outcome (with source, event ID, and round), and output line.
+- **Speech:** a bundled `data/openorbit/audio/<action_id>.wav` plays if it exists. Otherwise the app uses the OS voice through Qt TextToSpeech, which is offline (`darwin` on macOS, SAPI/WinRT on Windows). pyttsx3 is not used yet.
+- **Still stand-ins, all labelled on screen:**
+  - **Map (#30):** until `signal2speech.openorbit.OpenOrbitView` exists, a dashed "OpenOrbit view not built yet (#30)" panel shows which map action ran. When #30 lands, `load_view()` imports it automatically. It needs `show_satellite()` and `compare_air_quality()`.
+  - **Simulated input (#21):** `--input simulated` injects scripted decisions without g.Pype. It uses the same `arm_capture()` and `select_captured()` path as live EEG: arming happens when the tiles start flashing, or when the Confirm round opens. Events are labelled `simulated`. When `signal2speech/eeg/simulated.py` lands, wire its `InputAdapter(handler, InputSources.SIMULATED)` here in place of `InjectedSimulatedInput`.
+  - **Live and recorded input:** `--input live` and `--input recorded` exit with a message that they're blocked on #46, #47, #23, and #48.
+
+## Rehearse without a headset: g.Pype simulated input (#21)
+
+`signal2speech/eeg/simulated.py` (`SimulatedDecoder`) is the g.Pype version of `InjectedSimulatedInput`. A real `gp.Generator` stream runs on g.Pype worker threads. Each decision crosses to the Qt main thread on a queued signal and reaches `InputAdapter(handler, SIMULATED).select_captured()`. Events are labelled `simulated`.
+
+**Drop-in for `app.py` (#25 owner's call):** it has the same timing contract. With `flasher=` it arms on `on_sequence_started` and decides on `on_sequence_finished` in Choose rounds. In Confirm rounds it arms when the round opens and decides after `confirm_s`.
 
 ```python
 from signal2speech.eeg.simulated import SimulatedDecoder
 
-decoder = SimulatedDecoder(handler, picks=[2, 1])  # or picks=() and decoder.set_next(cls)
-decoder.start()                                    # g.Pype Generator stream; call decoder.close() on exit
-window.set_input_source(InputSources.SIMULATED)
-handler.begin_choice_round(choices)                # auto: each opened round starts a sequence
+# replaces: self.sim = InjectedSimulatedInput(h, self.window, sim_script or [2, 1], self.log)
+self.sim = SimulatedDecoder(h, sim_script or [2, 1], flasher=self.window.flasher, confirm_s=2.0)
+self.sim.start()   # starts the Generator stream; call self.sim.close() on exit
 ```
 
-Standalone: `python -m signal2speech.eeg.simulated --ui --picks 2,1`. See [EEG Hardware](../eeg-hardware/README.md#simulated-input-21--works) for the threading details and the stale-decision rule.
+- A decision from an older sequence is dropped before it reaches the adapter. `select_captured()` alone would stamp a late decision with the newest armed round.
+- With no picks left, a sequence waits for `set_next(cls)`.
+- `disconnect_stream()` stops the stream and calls `handler.disconnect()` (#26).
+- Standalone: `python -m signal2speech.eeg.simulated --ui --picks 2,1`. See [EEG Hardware](../eeg-hardware/README.md#simulated-input-21--works) for the threading details.

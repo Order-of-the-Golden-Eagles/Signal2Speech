@@ -22,6 +22,7 @@ Use g.Pype with the `HybridBlack` source (`enable_oscar=True`). Develop against 
 python -m signal2speech.eeg.simulated --picks 2,1        # headless: preview r1, confirm r2, then exit
 python -m signal2speech.eeg.simulated --ui               # #24 window labelled Simulated; Ctrl+1 / Ctrl+2 pick
 python -m signal2speech.eeg.simulated --ui --picks 2,1   # window, scripted
+python -m signal2speech.eeg.simulated --ui --flash --picks 2,1 --confirm-s 2   # flash tiles, P300-like timing
 ```
 
 Each event prints as one JSON line, labelled `"source": "simulated"`. `--decision-s` sets the stream seconds per sequence (default 0.8).
@@ -34,11 +35,12 @@ gp.Generator (8 ch, 250 Hz) -> DecisionSink (gp.INode, g.Pype worker thread)
   -> InputAdapter(handler, SIMULATED).select_captured(EegClassMap.default().target_for(cls))
 ```
 
-- **Arm at sequence start.** `start_sequence()` calls `arm_capture()` when a round opens. With `auto=True`, it hooks `handler.on_round_opened`. #46 should arm from the `SelectionWindow(on_sequence_started=...)` hook instead.
+- **Arm at sequence start.** By default, each round calls `arm_capture()` when it opens and decides after `decision_s` (Choose) or `confirm_s` (Confirm) seconds of stream.
+- **`flasher=window.flasher` mode:** a Choose round arms on the #24 `FlashScheduler.on_sequence_started` and decides on `on_sequence_finished`, the same hooks #46 will use. A Confirm round arms when it opens and decides after `confirm_s`, which is where the #47 alpha window goes. This matches `InjectedSimulatedInput` in `app.py`, so it's a one-line swap. See [Integration](../integration/README.md#rehearse-without-a-headset-gpype-simulated-input-21).
 - **Drop stale decisions before the adapter.** Each sequence gets an ID. A decision whose ID isn't the pending sequence is dropped (`decoder.dropped`), so a late result can't be stamped with the next round's ID. `adapter.select_captured()` alone doesn't protect against this, because it uses the most recent arm.
 - **Picks:** `--picks` gives one class per sequence. With no picks queued, a sequence waits for `set_next(cls)` (Ctrl+1 / Ctrl+2 in `--ui`). Class 2 in a Confirm round means Cancel.
 - `disconnect_stream()` stops the stream and calls `handler.disconnect()`, for recovery checks (#26).
-- Tests: `tests/test_simulated.py` covers preview then confirm through the real pipeline, cancel, stale-drop, keyed picks, and the CLI.
+- Tests: `tests/test_simulated.py` covers preview then confirm through the real pipeline, cancel, stale-drop, keyed picks, flasher mode (the decision comes only after every flash), and the CLI.
 
 **g.Pype facts we verified (4.2.0):**
 
