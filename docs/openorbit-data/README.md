@@ -35,10 +35,22 @@ Windows 11, Python 3.12, and the pinned `requirements-lock.txt`.
 
 - **Real app, offline:** in `signal2speech.app` with keyboard input, every network call blocked inside Python, and audio muted, keys 2,1 give one `compare_air_quality()` and one spoken line. Keys 1,1 give one `show_satellite()` and one spoken line.
 - **Merge check:** a test merge with `main`, #48, #21, and the `issue-5-ai` branch had no conflicts. `pytest` on the result: 102 passed, 2 skipped (the AI tests need the `anthropic` package).
-- **Still to do:** a real Wi-Fi-off run on the judging laptop. See the [runbook](../devops/README.md#judging-laptop-runbook-39).
+- **Still to do:** a real Wi-Fi-off run on the judging laptop. See the [runbook](../devops/judging-build.md#judging-laptop-runbook-39).
 
 ## Known limits
 
 - **June 26 is mostly cloud** on both MODIS Terra and Aqua, so the "before" image shows little ground. The AQI rows carry the before and after. The decision on this is deferred.
 - **Stretched map:** the images are plain lat/lon grids, so they look about 1.35 times wider east to west than the ground really is.
 - **No bundled audio:** the spoken lines use the offline Windows voice, because no `data/openorbit/audio/<action_id>.wav` is bundled.
+
+## FIRMS fire detections (#8, #31, #32): research only, nothing built
+
+- **The demo area has no wildfire hotspots.** Inside the southeast Michigan image bounds, NASA FIRMS has only a handful of detections on June 26 and 28, 2023. Nearly all are type 2 ("other static land source"), clustered around the River Rouge industrial area. So a hotspot layer on the current map would show factories, not wildfires.
+- **The fires were in Quebec and Ontario,** more than 1,000 km away. On June 26 most detections were in central Quebec. NOAA's June 28 smoke bulletin puts the thickest smoke "from western Quebec through southern Ontario and into portions of the Midwestern and Upper Midwest". A useful hotspot view (#31) needs a wider "where the smoke came from" map. **That's a team decision** before anyone builds it.
+- **Data without a key:**
+  - The yearly country files need no key, for example `https://firms.modaps.eosdis.nasa.gov/data/country/viirs-jpss1/2023/viirs-jpss1_2023_Canada.csv`. That one is about 138 MB, but one day is about 650 KB.
+  - The area API needs a free `MAP_KEY` that is sent by email.
+  - NASA GIBS also renders `VIIRS_NOAA20_Thermal_Anomalies_375m_All` as a transparent overlay for a date.
+- **What a detection means:** a satellite pixel (375 m for VIIRS, 1 km for MODIS) with at least one hot spot in it, at a UTC time. It is not a fire outline, and it doesn't measure burned area. `type` 0 means a presumed vegetation fire.
+- **Credit line:** "We acknowledge the use of data and/or imagery from NASA's Fire Information for Resource Management System (FIRMS), part of NASA's LANCE and ESDIS." Use "NASA FIRMS" in captions.
+- **Still to verify (#32):** these counts come from a research pass. Re-count from the downloaded files before anything ships.

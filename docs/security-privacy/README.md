@@ -21,7 +21,7 @@ It never prints a secret value or an email address. Exit code 1 means a check fa
 | Tracked files | `.env`, keys, and raw EEG formats (`.h5`, `.hdf5`, `.edf`, `.bdf`, `.gdf`, `.xdf`, `.fif`, `.mat`) fail. Media, archives, and files over 1 MB are flagged for review. |
 | Raw EEG ignore rules | Recording paths under `recordings/` (g.Pype and the evidence view, #48) and `.env` must be gitignored |
 | Email addresses | Addresses inside tracked files, and commit authors who don't use a GitHub noreply address |
-| Data, tests, offline app | The same checks as the [judging laptop runbook](../devops/README.md#judging-laptop-runbook-39) |
+| Data, tests, offline app | The same checks as the [judging laptop runbook](../devops/judging-build.md#judging-laptop-runbook-39) |
 
 A test run with planted problems (fake keys, a tracked `.env` and `.h5`, removed ignore rules, an email in a file) failed on every one of them.
 
