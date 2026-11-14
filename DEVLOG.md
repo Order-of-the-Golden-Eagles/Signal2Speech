@@ -183,3 +183,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - That closes out #14: every PR now shows a clear pass or fail without needing the headset
 - Explained in the workflow why Ubuntu runs twice: Python 3.12 is what the judging laptop uses, and 3.13 is an early warning for newer Python. It caught a real bug on its first day
 - Recorded a flaky evidence test on macOS (#48) so nobody chases it as a real failure
+
+## 11/14/26 - 6:08 PM - MagicJester2764 - #38 Review follow-up (PR pending)
+- Filled in the green CI run that proves the check passes again, instead of "expected green"
+- The flaky evidence test on macOS is now in living memory, with a firmer rule: re-run once, and if it fails twice it's a real problem
+- The CI matrix explanation lives in one place (the workflow file) and no longer claims Python versions CI doesn't test
