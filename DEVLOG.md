@@ -163,3 +163,4 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Added the confirm timeout the rules always promised: if nobody confirms within 15 seconds, the preview cancels quietly (`--confirm-timeout`, 0 turns it off)
 - Found and fixed a hidden test problem: a leftover 30-second timer from one test could end a later test early. It only showed up once the test suite got long enough
 - Still open for the headset slot (#23): if the headset goes silent without disconnecting, nothing notices yet
+- Code review follow-up: if a preview times out or is cancelled, the simulator now repeats the whole choose-then-confirm step instead of getting out of order. The app's timers stop when it closes, and the timeout flag refuses values that would quietly turn it off

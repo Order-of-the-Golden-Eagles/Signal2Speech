@@ -12,7 +12,7 @@ python -m signal2speech.app --input simulated --sim 2,1   # scripted classes: ch
 python -m signal2speech.app --input simulated --sim 2,2   # choose, then cancel: expect no output
 ```
 
-Add `--mute` for silent runs. `--confirm-timeout SECONDS` (default 15, 0 = never) cancels an unanswered Confirm round. The transcript shows `cleared (timeout): no output` (#26). Add `--screenshot out.png` to save the window after the first confirm and exit.
+Add `--mute` for silent runs. `--confirm-timeout SECONDS` (default 15; 0 = never; otherwise 0.1–3600) cancels an unanswered Confirm round. The timeout lives in `App`, so dev entry points that build their own handler (`python -m signal2speech.ui`, `eeg.simulated --ui`) have no timeout. Moving it into `SelectionHandler` is a #22 contract decision. The transcript shows `cleared (timeout): no output` (#26). Add `--screenshot out.png` to save the window after the first confirm and exit.
 
 - **One output path:** `AppSink.execute` in `signal2speech/app.py` is the only code that changes the map or speaks. It calls the map method first and then speaks `spoken_text`. The handler calls it exactly once per confirmation. Previews, cancels, disconnects, and stale or duplicate events produce no output. `tests/test_app.py` checks this with a fake view and a fake speaker.
 - **Transcript:** the right-hand panel and stdout log each round, preview, outcome (with source, event ID, and round), and output line.

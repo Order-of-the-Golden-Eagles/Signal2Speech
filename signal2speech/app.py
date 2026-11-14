@@ -268,7 +268,9 @@ class App:
         self.log(f"speech: {getattr(self.speaker, 'backend', type(self.speaker).__name__)}")
 
     def close(self) -> None:
-        """Stop the g.Pype stream if one is running (#21)."""
+        """Stop the g.Pype stream (#21) and this app's timers, so nothing fires after close."""
+        self._confirm_timer.stop()
+        self._reopen.stop()
         if hasattr(self.sim, "close"):
             self.sim.close()
 
@@ -290,6 +292,17 @@ class App:
         self.log(f"{o.value}: {ev}")
 
 
+def _timeout_seconds(text: str) -> float:
+    """0 (off) or 0.1-3600 s. Rejects values that would silently round to 0 or overflow QTimer."""
+    try:
+        s = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {text!r}")
+    if s != 0 and not 0.1 <= s <= 3600:
+        raise argparse.ArgumentTypeError("use 0 (never) or 0.1 to 3600 seconds")
+    return s
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python -m signal2speech.app")
     p.add_argument("--input", default=InputSources.KEYBOARD,
@@ -298,7 +311,7 @@ def main(argv=None) -> int:
                                                 "(choose target-2, then confirm)")
     p.add_argument("--keys", default="", help="keyboard presses after start, e.g. '2,1'")
     p.add_argument("--mute", action="store_true", help="no audio (logs instead)")
-    p.add_argument("--confirm-timeout", type=float, default=CONFIRM_TIMEOUT_MS / 1000,
+    p.add_argument("--confirm-timeout", type=_timeout_seconds, default=CONFIRM_TIMEOUT_MS / 1000,
                    help="seconds before an unanswered Confirm round cancels (0 = never)")
     p.add_argument("--screenshot", type=Path, help="save a PNG after the first confirm and exit")
     p.add_argument("--smoke", nargs="?", const="dev", choices=["dev", "judging"],
@@ -324,8 +337,11 @@ def main(argv=None) -> int:
             print(f"saved {args.screenshot}", flush=True)
             qapp.exit(code)
         # Grab before the question reopens (reopen_ms = 2000).
+        after_confirm = QTimer(singleShot=True, interval=1200)
+        after_confirm.timeout.connect(lambda: shoot(0))
+        guards.append(after_confirm)
         app.handler.on_handled.append(
-            lambda _e, o: QTimer.singleShot(1200, lambda: shoot(0)) if o is Outcome.Confirmed else None)
+            lambda _e, o: after_confirm.start() if o is Outcome.Confirmed else None)
         guard = QTimer(singleShot=True, interval=30000)
         guard.timeout.connect(lambda: shoot(1))
         guard.start()
