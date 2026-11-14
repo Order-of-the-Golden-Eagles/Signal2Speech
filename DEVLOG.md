@@ -215,6 +215,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Verified with a new test where two live-EEG adapters preview and then confirm (`tests/test_contract.py`). `tests/test_app.py` and `tests/test_recovery.py` no longer assume IDs like `k1`. Full suite: 176 passed
 - Still needs the headset: the combined P300 + alpha flow on a real wearer (#23)
 
+## 11/14/26 - 6:45 PM - Long Le (with Claude) - #42 Rollback that works with Wi-Fi off ([PR #86](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/86))
+- If the final build breaks at the table, the team can switch back to the draft build without Wi-Fi, even when the two builds need different packages
+    - Make a ready-to-run fallback copy when freezing: `git worktree add ../Signal2Speech-fallback judging-draft`, then set up its own `.venv` while still online. Steps are in `docs/devops/judging-build.md`
+- Why: the old switch-back step said to run `pip install` when the lock file changed, and that fails with Wi-Fi off
+- Switch-back rehearsal on a Mac: 3 seconds from `main` to the known-good build `eecc31a` and one map reveal (keyboard input; the lock file was the same)
+- Also updated the runbook for the smoke check (#41) and the 8-second map reveal (#81). Still needed: tag `judging-draft` and `judging-final` and rehearse the switch on the judging laptop
+
 ## 11/14/26 - 6:20 PM - Long Le (with Claude) - #33 First security pass ([PR #85](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/85))
 - Did a first privacy and security check of the current code, ahead of making the repo and video public
     - `python tools/release_check.py --quick --all-branches`, plus manual checks for trained models, network use, and image metadata
