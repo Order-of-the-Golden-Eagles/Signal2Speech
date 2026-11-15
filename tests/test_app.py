@@ -368,7 +368,7 @@ def test_session_report_counts_and_timings(qapp, tmp_path):
     app.window.press_target(T2)                                 # cancel
     app.handler.handle(SelectionEvent("keyboard", "r1", "k99", T1))   # stale -> rejected
     path = app.write_report(tmp_path)
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     assert path.name.startswith("session-") and path.suffix == ".md"
     assert "| 2 | 1 | 1 | 1 | 1 |" in text                       # previews, confirms, cancels, cleared, rejected
     assert "| 1 | compare_air_quality | keyboard | 3 ms | 203 ms |" in text

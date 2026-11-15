@@ -405,12 +405,28 @@ The board is on the library's first floor. Take the judging laptop there.
 | 5 | **First-run check**, in our repo: `python -m signal2speech.eeg.lsl_source --input live --check` | `device: PiEEG Octopus 16, 16 channels`, the measured sample rate, a contact line per pin, and `READY`. No prompts. Takes about 10 seconds. |
 | 6 | The full session: `python -m signal2speech.eeg.lsl_source --input live --demo` | The steps below |
 | 7 | **In the real app (#172):** `python -m signal2speech.app --input pieeg --pieeg live`. Close step 6 first: both read the same stream. | The same check, prompted on screen. Then key 2 previews "Compare counties", a two-second eye closure confirms, and the map changes and the line is spoken once. The strip says `Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)`. This is the footage to record. |
+| 8 | **The voice-guided session:** `python -m signal2speech.eeg.board_session --input live --consent` | The voice takes over. About 5 minutes (`--quick`: about 3). |
 
-Step 6 walks through, with prompts:
-1. **Channel check** (8 s eyes open, 8 s closed): prints each pin's contact and how much its alpha rose, and picks the pins to use.
-2. **Calibration** (10 s open, 10 s closed), then **20 s of rest** counting false triggers, then **3 eye closures** timing each confirm.
-3. **Verdict.** Live confirm switches on only if the check is clean: 0 false triggers and exactly one confirm per closure.
-4. **Demo:** a keyboard preview of "Compare counties", confirmed by closing the eyes for two seconds.
+**What the session does.** The wearer only listens. Each instruction is spoken, then a beep starts the timed part, so timing never depends on reading speed. A low beep means "do it now", a high beep means "stop", and a double beep means "registered". Raw data is recorded from the first second and saved after every phase.
+
+| Phase | The wearer hears | What we get |
+| --- | --- | --- |
+| 1. Contact | Nothing, unless too few pins touch. Then it gives advice and checks again. | Good pins out of 16, and the real sample rate |
+| 2. Channel pick | "Keep your eyes open… now close your eyes…" | Which pins respond |
+| 3. Calibration | "Eyes open." / "Eyes closed." three times. It tries once more with advice if the difference is too small. | The switch threshold, and labelled open/closed data |
+| 4. Rest | "Rest for 30 seconds. Keep your eyes open. Blink normally." | False triggers at rest |
+| 5. Switch test | Five low beeps. Close on the low beep, open on the high one. | Closures caught, and the delay |
+| 6. Choice test | "One: Yes. Two: No. Three: Compare counties. Four: Satellite view", repeating. Close your eyes on your target, then again when it asks "Confirm?" | Right choices out of 4, and seconds per selection |
+
+At the end it prints a summary, says whether live confirm is safe to switch on (every check must be clean), and checks the saved recording.
+
+- **Consent:** `--consent` means the wearer agreed to their raw EEG being saved. Without it the session still runs, but saves the report only.
+- **Where it saves:** `recordings/<date>_<device>_live/` (gitignored): `eeg.npz` (raw 16-channel data with time stamps), `events.json` (every cue, stamped at its beep), and `report.json`.
+- **Before you leave the board:** `python -m signal2speech.eeg.board_session --verify recordings/<folder>` reads the files back and says whether the recording is complete and usable.
+- **Dry run with no board:** `python -m signal2speech.eeg.board_session --self-test` (add `--no-voice` for silence with the same timing).
+- **A shorter check with prompts in the terminal** is still there: `python -m signal2speech.eeg.lsl_source --input live --demo`.
+
+**Why choices are read out one at a time.** This board gives us one dependable signal: eyes closed. With one signal, the wearer can't pick between two tiles, so the app steps through numbered choices and the wearer closes their eyes on the one they want. A second closure confirms. Measured on the dry run with the real voice, a full pick-and-confirm from four choices takes 14 to 24 seconds, about 19 on average: later choices take longer.
 
 **If it fails**
 - "No LSL stream": step 4 isn't running, or something else still holds the Bluetooth connection (step 2).
@@ -427,5 +443,12 @@ Step 6 walks through, with prompts:
 - With a stream that claims 250 Hz but **really sends 244**, as some boards do: the full check still passes.
 - Host names are matched without case or domain, and a same-named stream from another computer is refused.
 - The laptop's Bluetooth LE adapter can scan (it's what PiEEG's script uses to reach the board).
+
+**Session verified on 2026-11-15, on the judging laptop, all on our simulated 16-pin stream:**
+- A full session with the real voice and beeps: every phase passed and the recording checked out.
+- A full session at 244 samples per second.
+- A wearer with slow, uneven reactions (0.5 to 1.3 s): 4 of 4 choices right, twice.
+- A wearer whose signal barely changes: it retries calibration with advice, then stops with a clear reason, and what was recorded is saved.
+- The board dropping out mid-session: it stops within 3 seconds with a clear reason, and what was recorded is saved.
 
 **Flow verified:** the self-test stream on the judging laptop, end to end. It found the one flat pin and the one railed pin, used the other 14, had 0 false triggers, and gave one confirm per closure in about 1.3 s. **Not verified:** a real Octopus 16, its Bluetooth link, or whether one small spot gives enough alpha on a real person. Some boards sample at 244.1 Hz instead of 250; PiEEG says that's fine for band power, and the check prints the measured rate.
