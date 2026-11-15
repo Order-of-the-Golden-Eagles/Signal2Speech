@@ -510,3 +510,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Reviewers can reproduce our numbers on g.tec's own data with no hardware: `python -m signal2speech.evidence.dataset path/to/p300-speller` (new README section)
 - The library run sheet is in `docs/eeg-hardware/README.md`: power bank only while worn, close PiEEG Cloud first (one Bluetooth connection at a time), puck on the back of the head
 - Verified on our own simulated 16-pin stream: it found the flat pin and the loose pin, used the other 14, and confirmed once per closure. Not yet tried on a real board or a real person
+## 11/14/26 - 11:56 PM - Vasanth Anbukumar - #37 Docs-only changes skip the slow tests ([PR #184](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/184))
+- A PR that only touches docs, the devlog, or images now finishes its checks in under a minute instead of about five: the four test jobs still report (so the PR can merge) but skip install, pytest, and smoke
+- A new "quick checks" job runs on every PR in a few seconds with nothing installed: `python tools/quick_check.py`
+    - It fails on leftover merge-conflict markers and on a devlog entry duplicated by a merge, the two things that have actually broken doc-only PRs today
+- The pre-push hook does the same locally: quick checks always, and the full test suite only when the pushed commits change code, tests, data, or build files
+- Anything under `signal2speech/`, `tests/`, `contracts/`, `data/` (except its `.md` notes), `tools/`, `.github/`, `.githooks/`, or the dependency files still runs everything. Pushes to `main` always run the full suite on every OS
