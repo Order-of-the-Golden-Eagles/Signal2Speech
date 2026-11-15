@@ -64,5 +64,5 @@ def test_every_input_source_has_a_checked_colour():
 def test_ui_code_takes_colours_from_the_palette():
     """A raw #rrggbb in the window or overlay code would bypass this check."""
     for name in ("window.py", "help_overlay.py"):
-        code = [ln for ln in (UI / name).read_text().splitlines() if not ln.lstrip().startswith("#")]
+        code = [ln for ln in (UI / name).read_text(encoding="utf-8").splitlines() if not ln.lstrip().startswith("#")]
         assert not re.findall(r"#[0-9a-fA-F]{6}\b", "\n".join(code)), name
