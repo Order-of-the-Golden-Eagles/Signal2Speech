@@ -747,7 +747,7 @@ class App:
         lines = [f"# Signal2Speech session · {self.started_at}", "",
                  f"- **Commit:** `{commit or 'unknown'}`",
                  f"- **Input:** {self.input_summary()}",
-                 f"- **Connection:** {self.window.connection_label.text().removeprefix('Connection: ')}"
+                 f"- **Connection:** {self.window.connection_label.toolTip().removeprefix('Connection: ')}"
                  if self.window.connection_label.isVisibleTo(self.window) else "- **Connection:** n/a",
                  f"- **Speech:** {getattr(self.speaker, 'backend', type(self.speaker).__name__)}",
                  "", "## Counts", "",

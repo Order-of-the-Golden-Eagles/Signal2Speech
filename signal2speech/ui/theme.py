@@ -126,6 +126,7 @@ QLabel#previewHeader {{ font-size: {px(BODY)}px; font-weight: 600; color: {MUTED
 QLabel#countdown {{ font-size: {px(BODY)}px; color: {QUIET}; }}
 QFrame#strip {{ background: {STRIP_BG}; border-top: 2px solid {STRIP_BORDER}; }}
 QLabel.strip {{ font-size: {px(CAPTION + 2)}px; font-family: {MONO}; color: {STRIP_TEXT}; }}
+QLabel#stripSentence {{ font-size: {px(CAPTION + 2)}px; color: {STRIP_TEXT}; }}
 """
 
 

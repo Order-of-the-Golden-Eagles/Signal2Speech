@@ -68,7 +68,7 @@ def test_key_preview_then_confirm_sends_one_effect(ui):
     assert "Washtenaw's AQI rose 186 points" in w.preview.text()
     assert (w.tiles[T1].label, w.tiles[T2].label) == ("Confirm", "Cancel")
     assert "r2 (confirm)" in w.round_label.text()
-    assert w.outcome_label.text() == "Showing a preview. Nothing has been said yet."   # #179
+    assert w.outcome_label.text() == "Preview shown. Nothing said."   # #179
     assert w.outcome_label.toolTip().startswith("Previewed · keyboard")         # exact, for devs
 
     assert w.press_target(T1) is Outcome.Confirmed
@@ -81,7 +81,7 @@ def test_key_preview_then_confirm_sends_one_effect(ui):
     # #175: a brief "Spoken" state keeps the confirmed words on screen until the next round.
     assert w.preview.isVisibleTo(w) and w.preview_header.text() == "✓ Shown and spoken"
     assert w.ring.model.completed
-    assert w.outcome_label.text() == "Ignored: no question was open yet."
+    assert w.outcome_label.text() == "Ignored: no question open."
     assert "RejectedNoOpenRound" in w.outcome_label.toolTip()
 
 
@@ -92,7 +92,7 @@ def test_key2_in_confirm_cancels_and_clears(ui):
     assert w.press_target(T2) is Outcome.Cancelled
     assert sink.actions == [] and h.current is None
     assert not w.preview.isVisibleTo(w) and w.round_label.text() == "Round: —"
-    assert w.outcome_label.text() == "Nothing was said: the preview was cancelled."
+    assert w.outcome_label.text() == "Nothing said: cancelled."
     assert "Cancelled" in w.outcome_label.toolTip()
 
 
@@ -103,7 +103,7 @@ def test_esc_calls_handler_cancel(ui):
     w.press_cancel()
     assert h.current is None and h.pending is None and sink.actions == []
     assert w.tiles[T1].label == "" and w.outcome_label.toolTip() == "Cleared (cancel)"
-    assert w.outcome_label.text() == "Nothing was said: the preview was cancelled."
+    assert w.outcome_label.text() == "Nothing said: cancelled."
 
 
 def test_stale_event_only_updates_strip(ui):
@@ -111,7 +111,7 @@ def test_stale_event_only_updates_strip(ui):
     h.begin_choice_round(load_demo_choices())
     w.press_target(T2)
     h.handle(SelectionEvent(InputSources.LIVE_EEG, "r1", "e7", T1))
-    assert w.outcome_label.text() == "Ignored a late signal from an earlier question."
+    assert w.outcome_label.text() == "Ignored a late signal."
     assert "RejectedStaleRound" in w.outcome_label.toolTip()
     assert w.preview.isVisibleTo(w) and h.current.id == "r2"
 
@@ -130,7 +130,9 @@ def test_every_outcome_has_a_plain_sentence():
     assert set(OUTCOME_SENTENCES) == set(Outcome)
     sentences = list(OUTCOME_SENTENCES.values()) + list(CLEARED_SENTENCES.values())
     assert all(s.endswith(".") and "Rejected" not in s and "_" not in s for s in sentences)
-    assert CLEARED_SENTENCES["timeout"] == "Nothing was said: the preview timed out."
+    from signal2speech.ui.window import SENTENCE_MAX
+    assert all(len(s) <= SENTENCE_MAX for s in sentences), [s for s in sentences if len(s) > SENTENCE_MAX]
+    assert CLEARED_SENTENCES["timeout"] == "Nothing said: timed out."
 
 
 def test_badges_use_one_colour_per_input_and_only_live_is_green(ui):

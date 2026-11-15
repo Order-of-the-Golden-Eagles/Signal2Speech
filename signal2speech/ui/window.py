@@ -28,25 +28,27 @@ _INPUT_COLORS = P.INPUT_COLORS
 
 # What judges read in the strip (#179): one plain sentence per outcome. The exact outcome name,
 # event and round go to the developer log and the tooltip. tests/ check every Outcome is here.
+# At most ~29 characters: the strip shares one line with the input badge at 1280 x 720.
+SENTENCE_MAX = 29
 OUTCOME_SENTENCES = {
-    Outcome.Previewed: "Showing a preview. Nothing has been said yet.",
-    Outcome.Confirmed: "Confirmed: shown and said once.",
-    Outcome.Cancelled: "Nothing was said: the preview was cancelled.",
-    Outcome.RejectedNoOpenRound: "Ignored: no question was open yet.",
-    Outcome.RejectedStaleRound: "Ignored a late signal from an earlier question.",
+    Outcome.Previewed: "Preview shown. Nothing said.",
+    Outcome.Confirmed: "Confirmed: shown, said once.",
+    Outcome.Cancelled: "Nothing said: cancelled.",
+    Outcome.RejectedNoOpenRound: "Ignored: no question open.",
+    Outcome.RejectedStaleRound: "Ignored a late signal.",
     Outcome.RejectedDuplicateEvent: "Ignored a repeated signal.",
-    Outcome.RejectedRoundConsumed: "Ignored: this question was already answered.",
-    Outcome.RejectedUnknownTarget: "Ignored: that choice isn't on screen.",
-    Outcome.RejectedUnknownSource: "Ignored a signal from an unknown input.",
+    Outcome.RejectedRoundConsumed: "Ignored: already answered.",
+    Outcome.RejectedUnknownTarget: "Ignored: not on screen.",
+    Outcome.RejectedUnknownSource: "Ignored an unknown input.",
     Outcome.RejectedMalformed: "Ignored a broken signal.",
-    Outcome.RejectedLiveConfirmDisarmed: "Eye closure ignored: eye confirm is off. Hold 1 to confirm.",
+    Outcome.RejectedLiveConfirmDisarmed: "Eye closure off: hold 1.",
 }
 CLEARED_SENTENCES = {
-    "cancel": "Nothing was said: the preview was cancelled.",
-    "timeout": "Nothing was said: the preview timed out.",
-    "disconnect": "Nothing was said: the headset disconnected.",
-    "restart": "Restarted for the next visitor.",
-    "practice": "Practice round: nothing is sent.",
+    "cancel": "Nothing said: cancelled.",
+    "timeout": "Nothing said: timed out.",
+    "disconnect": "Nothing said: disconnected.",
+    "restart": "Restarted for a new visitor.",
+    "practice": "Practice: nothing is sent.",
 }
 
 
@@ -55,7 +57,7 @@ def plain_outcome(outcome: Outcome) -> str:
 
 
 def plain_cleared(reason: str) -> str:
-    return CLEARED_SENTENCES.get(reason, f"Nothing was said: the question was cleared ({reason}).")
+    return CLEARED_SENTENCES.get(reason, f"Nothing said: cleared ({reason}).")
 
 
 def badge_style(source: str) -> str:
@@ -347,9 +349,17 @@ class SelectionWindow(QMainWindow):
         col.addWidget(self.hint)
 
         strip = QFrame(objectName="strip")
-        srow = QHBoxLayout(strip)
-        srow.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
-        srow.setSpacing(P.L)
+        # #179: one line: badge, the plain sentence, then a short connection state. With two
+        # badges (PiEEG) the sentence gets its own line below, so it's never clipped.
+        scol = QVBoxLayout(strip)
+        scol.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
+        scol.setSpacing(P.XS)
+        srow = QHBoxLayout()
+        srow.setSpacing(P.M)
+        scol.addLayout(srow)
+        self._strip_rows = (srow, scol)
+        self._two_inputs = False           # PiEEG: the sentence always has its own line
+        self._connection_on = False        # an EEG input has a connection to show
         # Two inputs, a device name and a status make a long line (PiEEG, #172). Then it wraps,
         # so the window never has to grow past the screen to fit it.
         self.input_label = WrapWhenLong(limit=60)
@@ -361,6 +371,8 @@ class SelectionWindow(QMainWindow):
         self.connection_label = self._strip_label()
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()
+        for badge in (self.input_label, self.confirm_badge):     # a pill, never a full-width bar
+            badge.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
         srow.addWidget(self.input_label)
         srow.addWidget(self.confirm_badge)
         # #179: round ids live in the developer log now. The label stays (practice and tests
@@ -375,8 +387,15 @@ class SelectionWindow(QMainWindow):
         # The connection text can be long ("scripted, no g.Pype (...)"); let it clip too.
         # The input label never clips: it's what keeps simulated input from looking live.
         self.connection_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        srow.addWidget(self.connection_label, 1)
+        # A sentence reads best in the body font, not the strip's monospace (#179).
+        self.outcome_label.setProperty("class", "")
+        self.outcome_label.setObjectName("stripSentence")
+        # The connection gets what it needs up to a cap; the sentence gets the rest.
+        self.connection_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        self.connection_label.setMaximumWidth(P.px(150))
         srow.addWidget(self.outcome_label, 1)
+        srow.addWidget(self.connection_label)
+        srow.addStretch()                  # keeps a lone badge on the left, not centred
         col.addWidget(strip)
         self.setCentralWidget(root)
 
@@ -420,6 +439,8 @@ class SelectionWindow(QMainWindow):
         self.input_label.setToolTip(self.input_label.text())
         self.input_label.setStyleSheet(badge_style(source))
         self.confirm_badge.setVisible(False)
+        self._two_inputs = False
+        self._sentence_on_own_line(False)
 
     def set_input_text(self, text: str, color_source: str) -> None:
         """One badge with custom text, in ``color_source``'s colour."""
@@ -439,10 +460,31 @@ class SelectionWindow(QMainWindow):
         self.confirm_badge.setToolTip(confirm_text)
         self.confirm_badge.setStyleSheet(badge_style(confirm_source))
         self.confirm_badge.setVisible(True)
+        self._two_inputs = True
+        self._sentence_on_own_line(True)
+
+    def _narrow_strip(self, narrow: bool) -> None:
+        """During a map reveal the selection side is narrow: give the sentence its own line and
+        drop the connection until the next question (#179). The reveal has the height for it."""
+        self._sentence_on_own_line(narrow or self._two_inputs)
+        self.connection_label.setVisible(self._connection_on and not narrow)
+
+    def _sentence_on_own_line(self, own: bool) -> None:
+        srow, scol = self._strip_rows
+        in_row = srow.indexOf(self.outcome_label) >= 0
+        if own and in_row:
+            srow.removeWidget(self.outcome_label)
+            scol.addWidget(self.outcome_label)
+        elif not own and not in_row:
+            scol.removeWidget(self.outcome_label)
+            srow.insertWidget(srow.indexOf(self.connection_label), self.outcome_label, 1)
 
     def set_connection(self, state: str) -> None:
-        self.connection_label.setText(f"Connection: {state}")
-        self.connection_label.setToolTip(self.connection_label.text())
+        """A short state in the strip (the part before the first " · "); the full text is in the
+        tooltip and the session report (#179)."""
+        self.connection_label.setText(f"● {state.split(' · ')[0]}")
+        self.connection_label.setToolTip(f"Connection: {state}")
+        self._connection_on = state != "n/a"
         # Keyboard has no connection to report; hide "n/a" so small screens keep room (#94).
         self.connection_label.setVisible(state != "n/a")
 
@@ -511,6 +553,7 @@ class SelectionWindow(QMainWindow):
             self.press_target(target)
 
     def show_round(self, rnd: Round) -> None:
+        self._narrow_strip(False)
         self.flasher.stop()
         self.prompt.setVisible(True)
         for target, tile in self.tiles.items():
@@ -566,6 +609,8 @@ class SelectionWindow(QMainWindow):
         detail = f" · {e.source} {e.eventId} {e.roundId}→{e.targetId}" if e else ""
         self.outcome_label.setText(plain_outcome(outcome))
         self.outcome_label.setToolTip(f"{outcome.value}{detail}")   # exact, for developers
+        if outcome is Outcome.Confirmed:
+            self._narrow_strip(True)                                 # the map reveal follows
         if outcome is Outcome.Confirmed:   # handler closed the round without on_cleared
             last = getattr(self, "_last_round", None)
             spoken = self._preview

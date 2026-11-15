@@ -165,6 +165,18 @@ When nobody has touched the table for 60 s, the app loops a narrated walkthrough
 
 ![attract mode](media/193-attract.jpg)
 
+## Status strip: input badges and plain sentences (#179)
+
+The bottom strip used to read `Input: Keyboard   Round: r3 (choose)   Last: Cleared (timeout)`. Now it shows:
+
+- **An input badge**, a coloured pill in the same colour as the evidence view's banner: Keyboard slate, Simulated amber, Recorded blue, and **only Live EEG green**. Both windows take the colours from `theme.BADGE_COLORS`, so they can't drift apart. Each badge's text colour passes WCAG AA, which the contrast test checks; the evidence banner's old green (#2e8b57) and white-on-amber didn't, so both changed.
+- **Two badges** when choose and confirm use different inputs, e.g. `[Choose: Keyboard] [Confirm: Live EEG (PiEEG Octopus 16)]` (#172). The confirm badge only turns green once the board's eye check has passed; until then it's the keyboard's colour, because holding 1 is what confirms.
+- **One plain sentence** for the last thing that happened, at most 29 characters so it fits beside the badge at 1280 × 720: "Preview shown. Nothing said.", "Confirmed: shown, said once.", "Nothing said: timed out.", "Ignored a late signal." Every `Outcome` has one, in a single table (`OUTCOME_SENTENCES` and `CLEARED_SENTENCES` in `signal2speech/ui/window.py`). A test checks that none is missing or too long. During a map reveal, when the selection side is narrow, the sentence moves to its own line.
+- **A short connection state** for EEG inputs, e.g. "● g.Pype Generator stream". The full text is in its tooltip and in the session report.
+- **The exact outcome**, its event and round (`Previewed · keyboard k1 r1→target-2`), stays in the tooltip and the developer log (F2). Round IDs no longer show in the strip.
+
+![status strip](media/179-strip.jpg)
+
 ## Text size (#195)
 
 **Ctrl+=** and **Ctrl+-** step all app text through 80, 90, 100, 115, 130, 145, and 160%. **Ctrl+0** resets it. On macOS these are **Cmd+=**, **Cmd+-**, and **Cmd+0**. A toast shows the new size for 1.5 s. `--text-scale 1.3` starts at a given size.

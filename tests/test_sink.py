@@ -129,7 +129,8 @@ def test_simulated_uses_gpype_decoder_when_available(qapp, monkeypatch):
     assert isinstance(app.sim, FakeDecoder) and app.sim.started
     assert made["handler"] is app.handler and made["picks"] == [2, 1]
     assert made["flasher"] is app.window.flasher and made["confirm_s"] == 1.5
-    assert app.window.connection_label.text() == "Connection: g.Pype Generator stream"
+    assert app.window.connection_label.toolTip() == "Connection: g.Pype Generator stream"   # #179: full text
+    assert app.window.connection_label.text() == "● g.Pype Generator stream"
     app.close()
     assert app.sim.closed
 
