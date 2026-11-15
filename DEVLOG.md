@@ -230,7 +230,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Switch-back rehearsal on a Mac: 3 seconds from `main` to the known-good build `eecc31a` and one map reveal (keyboard input; the lock file was the same)
 - Also updated the runbook for the smoke check (#41) and the 8-second map reveal (#81). Still needed: tag `judging-draft` and `judging-final` and rehearse the switch on the judging laptop
 
-## 11/14/26 - 7:01 PM - MagicJester2764 - #40 Pre-headset checkpoint (PR pending)
+## 11/14/26 - 7:01 PM - MagicJester2764 - #40 Pre-headset checkpoint ([PR #90](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/90))
 - Wrote down where the demo stands before the headset arrives: `docs/sprint-operations/pre-headset-checkpoint.md`
 - The reveal works with no headset: InYoung's Wi-Fi-off keyboard run, plus a fresh simulated run where the real NASA/EPA view appears with one spoken line
 - The smoke check is now fully green (7 of 7), now that the map and data have landed
