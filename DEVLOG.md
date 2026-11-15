@@ -527,3 +527,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The two choice tiles are redesigned: an icon, a clear title, a one-line "what happens" line, and the key as a small badge in the corner instead of "[1]" in the title. They have distinct idle, flashing, selected (green check after a confirm), and waiting states
 - The flash looks the same as before (plain white with black content), so the brain-signal stimulus doesn't change. The flash timing check still passes, and the new tiles repaint in about 3 ms
 - All text still meets WCAG AA. A test fails if any screen uses a colour outside the theme. Before and after screenshots are in `docs/accessibility-ui/README.md`
+
+## 11/15/26 - 12:34 AM - MagicJester2764 - #34 Submission checklist matches main again (PR pending)
+- The Devpost checklist now has one AI answer to paste, and the story's AI bullet already matches it
+- The old wording said Claude "can't invent numbers". That's only true for map answers, which speak the dataset's numbers. Ordinary replies are the model's own words, kept to the facts by the prompt, so the text now says exactly that
+- Every video length check now says 2:30 or less, g.tec's cap (#160). The fact check was redone at `da6e00d`: 408 tests, and `main` now requires the four CI jobs before a merge
+- Docs only. If the Devpost draft was already submitted with the old AI answer, replace it before the final

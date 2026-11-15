@@ -2,7 +2,7 @@
 
 **The video we're recording: screen only, no headset ([#160](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/160)).** The team decided on a screen recording with simulated and keyboard input only, at 2:30 or less (2:25 target), so the same cut meets Devpost's 3:00 limit and g.tec's 2:30 cap. #160 has the shot list, the commands, the narration, and the export steps. The cut below is the original plan with a wearer on camera. Keep it for a later live version.
 
-**Hard limit: under 3:00. Target: 2:45.** That leaves 15 seconds of margin for titles and export rounding. Check the exported file's length, not the editor timeline.
+**This original cut: under 3:00, target 2:45.** That fits Devpost only. For g.tec's entry (#108), cut it to 2:30 or less, as #160 does. Check the exported file's length, not the editor timeline.
 
 Every shot that shows EEG carries an on-screen caption naming its source: **Live EEG**, **Recorded**, **Simulated** or **Keyboard**. The app's judge strip and the evidence banner already show it, so the caption must agree with them. Never cut a Simulated or Keyboard shot under narration that says "live".
 
@@ -46,7 +46,7 @@ Use this if live capture fails or is too noisy to read. It's honest as long as e
 - Screen at 1920×1080. Use OBS or the OS recorder. Turn off notifications and Wi-Fi (the demo runs offline).
 - Record app audio directly, not through a microphone near the speakers.
 - Record each shot on its own and assemble afterwards. Keep two good takes of shots 3 to 7.
-- Export as H.264 MP4. Check that the length is under 3:00 and that the audio is in sync on the confirm-to-speech cut.
+- Export as H.264 MP4. Check that the length is under 3:00 (2:30 or less for g.tec) and that the audio is in sync on the confirm-to-speech cut.
 
 ## Submission fields (#34)
 
