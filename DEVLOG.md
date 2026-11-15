@@ -180,6 +180,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The old mode without `--p300` works as before
 - Verified on simulated input only: new headless tests pass, and a 22 s offscreen run calibrated, trained, and made 2 of 2 correct simulated selections. Not tried with a headset
 
+## 11/14/26 - 5:41 PM - Vasanth Anbukumar - #46 Flash timing check ([PR #77](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/77))
+- Added a tool that checks whether the P300 flash markers line up with what the screen actually shows: `python -m signal2speech.eeg.flash_timing --seconds 30`
+    - It flashes the same kind of tiles the chooser uses and compares each marker with the moment the frame reaches the display. Then it prints the average and worst gap, the jitter, and the refresh rate, plus PASS or WARN (WARN above 20 ms of jitter)
+- Wrote a step-by-step check with a phone slow-motion camera or a cheap light sensor, so we can confirm the real screen timing on the judging laptop before 8:15. The tool compares those light times with its markers, so the two clocks don't need to match
+- Tested the maths and the PASS/WARN rules without a screen (18 tests), and ran the tool briefly in headless mode to show it works. Headless numbers mean nothing, so the tool always says WARN there
+- Not done yet: a run on the judging laptop's real display, and the camera or light-sensor check
+
 ## 11/14/26 - 5:45 PM - Vasanth Anbukumar - #23 Guided live-run harness ([PR #78](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/78))
 - Added one command for the headset slot: `python -m signal2speech.eeg.live --source hybridblack`. It walks through the device check, signal quality, P300 calibration, confirm calibration, 10 live attempts, and a summary
 - If the headset isn't paired, it says how to pair it and exits cleanly. If signal quality is bad, it names the bad channels and stops unless you choose to continue
