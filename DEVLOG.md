@@ -705,7 +705,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Each launch of recorded mode now draws the recorded brain responses in a fresh order, so two runs can differ. Before, every launch replayed the same ones
 - Verified by screenshots of every screen on the judging laptop and by the interface tests. The opening animation ran without errors; Vasanth watched it once and it looked right
 
-## 11/15/26 - 9:43 AM - Vasanth Anbukumar - #228 Docs refresh, team briefing, recorded EEG in the phrase demo (PR pending)
+## 11/15/26 - 9:43 AM - Vasanth Anbukumar - #228 Docs refresh, team briefing, recorded EEG in the phrase demo ([PR #229](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/229))
 - Everyone on the team can now read one page before judging: [docs/TEAM-BRIEFING.md](docs/TEAM-BRIEFING.md). It covers what we built, what is real and what is scripted, the numbers to know, the questions judges will ask, and where each topic lives in the repo
 - The phrase selection demo can now be driven by g.tec's recorded brain data, like the NASA demo
     - `python -m signal2speech.ai --input recorded`, wait about 90 seconds, then type a question and press Enter
