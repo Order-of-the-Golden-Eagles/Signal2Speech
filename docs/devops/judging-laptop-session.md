@@ -22,7 +22,7 @@ Turn Wi-Fi **off** (and unplug Ethernet). Activate the main folder's `.venv`. Se
 
 | # | Do | Expect | Closes |
 | --- | --- | --- | --- |
-| B1 | `python -m signal2speech.app --input keyboard`. Press **2**, then **1**. | The county comparison fills most of the window for 8 s, and **one** line is spoken: "Washtenaw's AQI rose 186 points. Wayne's rose 168 points." | #39 |
+| B1 | `python -m signal2speech.app --input keyboard --fullscreen` (F1 shows the keys, F11 leaves fullscreen). Press **2**, then **1**. | The county comparison fills most of the window for 8 s, and **one** line is spoken: "Washtenaw's AQI rose 186 points. Wayne's rose 168 points." | #39 |
 | B2 | When the next question appears, press **1**, then **1**. | The June 28 satellite view appears, and **one** line is spoken | #39 |
 | B3 | Press **2** (preview), then **2** (cancel). Then press **2**, then **D** (disconnect during preview). | Nothing appears and nothing is spoken, both times. The transcript shows `cleared (cancel)` and `cleared (disconnect)`. | #39, #26 |
 | B4 | Close the app. Run `python -m signal2speech.app --input simulated --sim 2,1`. | The bottom strip says **Input: Simulated** and **Connection: g.Pype Generator stream**. If it says "scripted", g.Pype didn't load: stop and note it. The tiles flash, then the preview shows, then the comparison appears with **one** spoken line. | **#4** |
