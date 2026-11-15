@@ -672,3 +672,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why: on the judging laptop the app's first screen was half empty, which read as unfinished
 - This is the first part of #182 only. The animated reveal and the bar chart of the two counties aren't built
 - Verified by screenshot on the judging laptop's real display, and by one new test that checks no results appear before a confirm
+## 11/15/26 - 7:36 AM - Vasanth Anbukumar - #143 The two-minute script and judge answers now match what we can actually show ([PR #220](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/220))
+- `docs/demo-submission/stage-script.md` opens with a judging-day plan for no headset: one command to start, what to say second by second, and what never to say
+    - Start it before the judge arrives: `python -m signal2speech.app --input recorded --sim 2,1,1,1,2,1,1,1 --fullscreen`. Setup takes about 70 seconds and is silent
+    - That script gives four exchanges of about 15 seconds each. Restart for the next judge
+- `docs/demo-submission/judge-qa.md` has straight answers to the questions we'll get: is this live, is the choice faked, how accurate is it, did you try real hardware, and why not a blink
+- Why: the old script assumed someone wearing a g.tec headset. Reading from it at the table would have meant saying things that aren't true today
+- Checked on the judging laptop: the four-exchange command ran and the recorded data picked the scripted tile all four times (2, 1, 2, 1). The older live-wearer plan is kept below the new section for reference
