@@ -32,11 +32,29 @@ TILE_DISABLED_BG, TILE_DISABLED_TEXT, TILE_DISABLED_BORDER = "#11151a", QUIET, "
 # Back-compat names from palette.py (#135)
 TILE_EMPTY_BG, TILE_EMPTY_BORDER = TILE_DISABLED_BG, TILE_DISABLED_BORDER
 
+# Text in an input's colour on the dark background (#179): the same hue as its badge below,
+# lighter so it reads on dark. Keyboard slate, Simulated amber, Recorded blue, Live EEG green.
 INPUT_COLORS = {
-    InputSources.KEYBOARD: "#3b82f6",
+    InputSources.KEYBOARD: "#94a3b8",
     InputSources.SIMULATED: "#f59e0b",
-    InputSources.RECORDED: "#c084fc",
+    InputSources.RECORDED: "#7fb2e5",
     InputSources.LIVE_EEG: "#22c55e",
+}
+
+# Input badges (#179): one colour per input, shared with the evidence view's banner so both
+# windows match. Keyboard is slate so it can't be mistaken for Recorded's blue, and nothing
+# but Live EEG is ever green. Each badge's text colour is the one that passes WCAG AA on it.
+BADGE_COLORS = {
+    InputSources.KEYBOARD: "#475569",
+    InputSources.SIMULATED: "#c98a00",
+    InputSources.RECORDED: "#2f6fb0",
+    InputSources.LIVE_EEG: "#1f7a46",
+}
+BADGE_TEXT = {
+    InputSources.KEYBOARD: "#ffffff",
+    InputSources.SIMULATED: "#111111",
+    InputSources.RECORDED: "#ffffff",
+    InputSources.LIVE_EEG: "#ffffff",
 }
 
 # AI reply origin labels in the question panel
@@ -154,9 +172,13 @@ TEXT_PAIRS = [
     ("tile selected description", TILE_SELECTED_TEXT, TILE_SELECTED_BG, CAPTION + 2, False),
     ("tile waiting", TILE_DISABLED_TEXT, TILE_DISABLED_BG, BODY, False),
     ("key badge", ON_ACCENT, ACCENT, CAPTION + 2, True),
-    ("strip text", STRIP_TEXT, STRIP_BG, CAPTION + 2, False),
+    ("strip text", STRIP_TEXT, STRIP_BG, CAPTION - 2, False),
     *[(f"input label {name}", colour, STRIP_BG, CAPTION + 2, True)
       for name, colour in INPUT_COLORS.items()],
+    *[(f"input badge {name}", BADGE_TEXT[name], colour, CAPTION - 2, True)
+      for name, colour in BADGE_COLORS.items()],
+    *[(f"evidence banner {name}", BADGE_TEXT[name], colour, 16, True)
+      for name, colour in BADGE_COLORS.items()],
     *[(f"reply origin {name}", colour, BG, CAPTION + 2, True) for name, colour in ORIGIN_COLORS.items()],
     ("transcript", STRIP_TEXT, SURFACE, 15, False),
     ("conversation text", TEXT, SURFACE, BODY - 2, False),
@@ -167,7 +189,7 @@ TEXT_PAIRS = [
     ("panel title", MUTED, BG, BODY, True),
     ("text size toast", TEXT, RAISED, HEADING, True),
     ("help phrase banner", ON_ACCENT, ACCENT, TITLE, True),
-    ("attract banner", ON_ACCENT, INPUT_COLORS[InputSources.SIMULATED], HEADING, True),
+    ("attract banner", BADGE_TEXT[InputSources.SIMULATED], BADGE_COLORS[InputSources.SIMULATED], HEADING, True),
     ("attract caption", TEXT, BG, BODY, False),
     ("button", TILE_TEXT, RAISED, BODY, True),
     ("help text", TEXT, HELP_BG, 26, False),

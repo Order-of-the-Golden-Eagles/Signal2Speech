@@ -416,8 +416,9 @@ def test_long_status_text_wraps_instead_of_widening_the_window(qapp):
     app.root.show()
     app.ask()
     before = app.root.minimumSizeHint().width()
-    app.window.set_input_text("Choose: Keyboard · Confirm: hold 1 · Simulated (self-test LSL "
-                              "stream): eye check not run yet", InputSources.KEYBOARD)
+    app.window.set_two_inputs("Choose: Keyboard", InputSources.KEYBOARD,       # the real PiEEG path
+                              "Confirm: hold 1 · Simulated (self-test LSL stream): eye check not "
+                              "run yet", InputSources.KEYBOARD)
     app.window.prompt.setText("Eye-closure confirm ON: Simulated (self-test LSL stream) passed the check")
     assert app.root.minimumSizeHint().width() <= before
     app.close()
@@ -452,6 +453,32 @@ def test_cancel_in_a_confirm_round_needs_a_hold_and_a_tap_does_nothing(qapp):
     assert "hold 2" in w.confirm_hint()
     app.close()
     app.root.close()
+
+
+@pytest.mark.parametrize("source", [InputSources.KEYBOARD, InputSources.SIMULATED])
+def test_strip_sentence_is_never_clipped_at_1280x720(qapp, source):
+    """#179: the plain sentence fits next to the badge, and on its own line during a reveal."""
+    app = App(source, view=WidgetView(), speaker=FakeSpeaker(), echo=False,
+              reveal_ms=60000, confirm_delay_ms=600000)
+    app.root.show()
+    app.root.resize(1280, 720)
+    app.ask()
+    label = app.window.outcome_label
+    for press in (T2, T1):                        # preview, then the confirmed reveal
+        app.window.press_target(press)
+        for _ in range(10):
+            qapp.processEvents()
+        if label.wordWrap():                       # own line: the whole text, timing note included
+            assert label.height() >= label.heightForWidth(label.width()), label.text()
+        else:
+            text = label.text()
+            assert label.fontMetrics().horizontalAdvance(text) <= label.width(), (text, label.width())
+    # The connection state never shows a word cut in half: it fits, or ends in "…".
+    conn = app.window.connection_label
+    if app.window.has_connection:
+        assert conn.toolTip().startswith("Connection: ")
+        shown = conn.text()
+        assert shown == conn.fullText() or shown.endswith("…"), shown
 
 
 def test_status_strip_spans_the_window_so_its_text_is_not_cut_off(qapp):

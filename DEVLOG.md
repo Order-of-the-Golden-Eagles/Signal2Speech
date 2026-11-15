@@ -639,6 +639,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
 
+## 11/15/26 - 5:57 AM - MagicJester2764 - #179 Status strip a judge can read ([PR #215](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/215))
+- The bottom strip now shows a coloured badge for the input (the same colours as the evidence view, and only live brain input is ever green) and one short sentence for what just happened, like "Nothing said: timed out."
+- With a PiEEG board it shows two badges, one for what chooses and one for what confirms, so nobody mistakes keyboard choosing for brain choosing
+- Round numbers and internal outcome names moved to the tooltip and the developer log. The amber and green the evidence banner used didn't pass the contrast check with white text, so both windows now use colours that do
+- Checked offscreen at 1280 × 720 with keyboard, simulated, and PiEEG-style input, with a test that the sentence is never cut off. The text-size 1.6 check fails on this Linux machine on main too (fonts) and passes in CI
 ## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
 - With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
     - Each tile flash is answered with one real recorded brain response. The same g.Pype pipeline and classifier as the live path calibrate on them and pick the tile

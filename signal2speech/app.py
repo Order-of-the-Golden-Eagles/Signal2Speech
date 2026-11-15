@@ -399,7 +399,9 @@ class App:
                                         script=sim_script or [2, 1], narrator=narrator,
                                         **(live_options or {}))
             sim_label = self.sim.connection_label()
-            self.window.set_input_text(self.sim.strip_text(), InputSources.RECORDED)
+            choose, confirm = self.sim.strip_text().split(" · ", 1)
+            # Two badges (#179): the chooser is recorded EEG, the confirm is simulated.
+            self.window.set_two_inputs(choose, InputSources.RECORDED, confirm, InputSources.SIMULATED)
             alpha = getattr(self.sim, "alpha", None)
             if alpha is not None and hasattr(alpha, "progress"):
                 alpha.progress.connect(self.window.set_eye_progress, Qt.ConnectionType.QueuedConnection)
@@ -807,8 +809,8 @@ class App:
         lines = [f"# Signal2Speech session · {self.started_at}", "",
                  f"- **Commit:** `{commit or 'unknown'}`",
                  f"- **Input:** {self.input_summary()}",
-                 f"- **Connection:** {self.window.connection_label.text().removeprefix('Connection: ')}"
-                 if self.window.connection_label.isVisibleTo(self.window) else "- **Connection:** n/a",
+                 f"- **Connection:** {self.window.connection_label.toolTip().removeprefix('Connection: ')}"
+                 if self.window.has_connection else "- **Connection:** n/a",
                  f"- **Speech:** {getattr(self.speaker, 'backend', type(self.speaker).__name__)}",
                  "", "## Counts", "",
                  "| Previewed | Confirmed | Cancelled | Cleared (cancel, disconnect, timeout) | Rejected |",

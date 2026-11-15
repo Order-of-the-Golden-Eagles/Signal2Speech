@@ -25,7 +25,48 @@ from . import theme as P
 
 INPUT_LABELS = {InputSources.KEYBOARD: "Keyboard", InputSources.SIMULATED: "Simulated",
                 InputSources.RECORDED: "Recorded", InputSources.LIVE_EEG: "Live EEG"}
-_INPUT_COLORS = P.INPUT_COLORS
+
+# What judges read in the strip (#179): one plain sentence per outcome. The exact outcome name,
+# event and round go to the developer log and the tooltip. tests/ check every Outcome is here.
+# At most ~29 characters: the strip shares one line with the input badge at 1280 x 720.
+SENTENCE_MAX = 29
+OUTCOME_SENTENCES = {
+    Outcome.Previewed: "Preview shown. Nothing said.",
+    Outcome.Confirmed: "Confirmed: shown, said once.",
+    Outcome.Cancelled: "Nothing said: cancelled.",
+    Outcome.RejectedNoOpenRound: "Ignored: no question open.",
+    Outcome.RejectedStaleRound: "Ignored a late signal.",
+    Outcome.RejectedDuplicateEvent: "Ignored a repeated signal.",
+    Outcome.RejectedRoundConsumed: "Ignored: already answered.",
+    Outcome.RejectedUnknownTarget: "Ignored: not on screen.",
+    Outcome.RejectedUnknownSource: "Ignored an unknown input.",
+    Outcome.RejectedMalformed: "Ignored a broken signal.",
+    Outcome.RejectedLiveConfirmDisarmed: "Eye closure off: hold 1.",
+}
+CLEARED_SENTENCES = {
+    "cancel": "Nothing said: cancelled.",
+    "timeout": "Nothing said: timed out.",
+    "disconnect": "Nothing said: disconnected.",
+    "restart": "Restarted for a new visitor.",
+    "practice": "Practice: nothing is sent.",
+}
+
+
+def plain_outcome(outcome: Outcome) -> str:
+    return OUTCOME_SENTENCES.get(outcome, outcome.value)
+
+
+def plain_cleared(reason: str) -> str:
+    return CLEARED_SENTENCES.get(reason, f"Nothing said: cleared ({reason}).")
+
+
+def badge_style(source: str) -> str:
+    """The strip's pill filled with the input's colour (#179), the same colour as the evidence
+    banner. Shape and padding come from the strip's pill style (``QLabel.strip``)."""
+    bg = P.BADGE_COLORS.get(source, P.RAISED)
+    fg = P.BADGE_TEXT.get(source, P.TEXT)
+    return f"background:{bg}; color:{fg}; border:1px solid {bg}; font-weight:700;"
+
 _TILE_ORDER = (TargetIds.TARGET_1, TargetIds.TARGET_2)
 
 _STYLE = P.window_qss()
@@ -236,6 +277,43 @@ class Tile(QLabel):
         p.end()
 
 
+class ElidedLabel(QLabel):
+    """Shows as much of its text as fits, ending in "…", never a word cut in half (#179)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._full = ""
+
+    def setText(self, text: str) -> None:
+        self._full = text
+        self._elide()
+
+    def fullText(self) -> str:
+        return self._full
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._elide()
+
+    def _elide(self) -> None:
+        width = self.contentsRect().width()
+        shown = self._full if width <= 0 else self.fontMetrics().elidedText(
+            self._full, Qt.TextElideMode.ElideRight, width)
+        super().setText(shown)
+
+    def _hint_for(self, hint, text: str):
+        # Qt's hint is for the text shown now, plus the pill's padding and border. Swap the text.
+        fm = self.fontMetrics()
+        hint.setWidth(hint.width() - fm.horizontalAdvance(super().text()) + fm.horizontalAdvance(text))
+        return hint
+
+    def minimumSizeHint(self):
+        return self._hint_for(super().minimumSizeHint(), "● …")
+
+    def sizeHint(self):
+        return self._hint_for(super().sizeHint(), self._full)
+
+
 class WrapWhenLong(QLabel):
     """A label that wraps only when its text is long. Short text keeps the height it always had;
     long text wraps instead of forcing the window wider than the screen."""
@@ -348,20 +426,32 @@ class SelectionWindow(QMainWindow):
             r.setSpacing(P.M)
             srow.addLayout(r)
         self._strip_long: Optional[bool] = None
+        self._connection_on = False        # an EEG input has a connection to show (#179)
         # Two inputs, a device name and a status make a long line (recorded input #104, PiEEG
-        # #172). A long input label gets a line of its own across the strip (see _layout_strip);
-        # it still wraps as a last resort, so the window never grows past the screen to fit it.
+        # #172). Long input badges get a line of their own across the strip (see _layout_strip);
+        # they still wrap as a last resort, so the window never grows past the screen to fit them.
         self.input_label = WrapWhenLong(limit=110)
         self.input_label.setProperty("class", "strip")
-        self.connection_label = self._strip_label()
+        # #179: a second badge when choose and confirm use different inputs (PiEEG, #172).
+        self.confirm_badge = WrapWhenLong(limit=60)
+        self.confirm_badge.setProperty("class", "strip")
+        self.confirm_badge.setVisible(False)
+        self.connection_label = ElidedLabel()
+        self.connection_label.setProperty("class", "strip")
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()
-        # Pills hug their text. If the row runs out of room they shrink and clip (the tooltip
-        # and the developer log keep the full text); the input pill never does.
-        for pill in (self.round_label, self.connection_label, self.outcome_label):
-            pill.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
-            pill.setMinimumWidth(1)
-        self.input_label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+        # Badges hug their text and never clip: they are what keeps simulated input from
+        # looking live (#179). A long one wraps as a last resort.
+        for badge in (self.input_label, self.confirm_badge):
+            badge.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+        # #179: round ids live in the developer log and the outcome's tooltip. The label stays
+        # (practice and tests read it) but isn't shown to judges.
+        self.round_label.setVisible(False)
+        # The plain sentence never shrinks below its text: fonts differ by machine, so it can't
+        # rely on a fixed width. The connection state gives way instead, down to "● …".
+        self.outcome_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
+        self.connection_label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+        self.connection_label.setMaximumWidth(P.px(self.CONNECTION_MAX_PX))
         self._layout_strip(False)
         col.addWidget(strip)
         self.strip = strip                 # App moves it to span the whole window
@@ -370,7 +460,7 @@ class SelectionWindow(QMainWindow):
         self.set_input_source(input_source)
         self.set_connection("n/a" if input_source == InputSources.KEYBOARD else "unknown")
         self._set_round_text(None)
-        self.outcome_label.setText("Last: —")
+        self._set_sentence("", "")
 
         self.flasher = FlashScheduler(self._set_tile_lit, on_flash,
                                       on_sequence_started=on_sequence_started,
@@ -400,12 +490,12 @@ class SelectionWindow(QMainWindow):
         lbl.setProperty("class", "strip")
         return lbl
 
-    #: An input label longer than this gets its own line in the strip.
+    #: Input badges longer than this (together) get their own line in the strip.
     STRIP_LONG_LABEL = 40
 
     def _layout_strip(self, long_label: bool) -> None:
-        """One row of pills when the input label is short. When it is long, it takes the first
-        row to itself and the round, connection and last outcome go on the second."""
+        """One row when the input badges are short. When they are long, they take the first row
+        to themselves and the sentence and connection go on the second."""
         if long_label == self._strip_long:
             return
         self._strip_long = long_label
@@ -414,38 +504,56 @@ class SelectionWindow(QMainWindow):
             while row.count():
                 row.takeAt(0)
         first.addWidget(self.input_label)
+        first.addWidget(self.confirm_badge)
         rest = second if long_label else first
-        for pill in (self.round_label, self.connection_label, self.outcome_label):
+        for pill in (self.round_label, self.outcome_label, self.connection_label):
             rest.addWidget(pill)
-        first.addStretch(1)
+        first.addStretch(1)                # keeps the pills on the left, not spread out
         second.addStretch(1)
-
-    def _stretch_strip(self) -> None:
-        """Kept for callers: the pills size themselves now."""
 
     def set_input_source(self, source: str) -> None:
         """Label the decoder actually feeding the handler, so Simulated never reads as Live."""
         self.input_source = source
         self._layout_strip(False)
         self.input_label.setText(f"Input: {INPUT_LABELS.get(source, source)}")
-        self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(source, P.STRIP_TEXT)};"
-                                       "font-weight:700;")
+        self.input_label.setToolTip(self.input_label.text())
+        self.input_label.setStyleSheet(badge_style(source))
+        self.confirm_badge.setVisible(False)
 
-    def set_input_text(self, text: str, color_source: str) -> None:
-        """Name two inputs at once, e.g. 'Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)'
-        (#172). ``input_source`` stays the chooser's; the colour is the confirm's when it's on."""
-        self._layout_strip(len(text) > self.STRIP_LONG_LABEL)
-        self.input_label.setText(text)
-        self.input_label.setToolTip(text)
-        self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(color_source, P.STRIP_TEXT)};"
-                                       "font-weight:700;")
+    def set_two_inputs(self, choose_text: str, choose_source: str,
+                       confirm_text: str, confirm_source: str) -> None:
+        """Both badges when choose and confirm use different inputs, each in its own colour
+        (#172, #179, #104), e.g. [Choose: Keyboard] [Confirm: Live EEG (PiEEG Octopus 16)].
+        ``input_source`` stays the chooser's."""
+        self._layout_strip(len(choose_text) + len(confirm_text) > self.STRIP_LONG_LABEL)
+        self.input_label.setText(choose_text)
+        self.input_label.setToolTip(choose_text)
+        self.input_label.setStyleSheet(badge_style(choose_source))
+        self.confirm_badge.setText(confirm_text)
+        self.confirm_badge.setToolTip(confirm_text)
+        self.confirm_badge.setStyleSheet(badge_style(confirm_source))
+        self.confirm_badge.setVisible(True)
+
+    def _set_sentence(self, text: str, tip: str) -> None:
+        """The plain sentence judges read, and the exact outcome for developers (#179). An
+        empty pill would look like a broken badge, so there's no pill until something happens."""
+        self.outcome_label.setText(text)
+        self.outcome_label.setToolTip(tip)
+        self.outcome_label.setVisible(bool(text))
+
+    @property
+    def has_connection(self) -> bool:
+        """An EEG input reported a connection (keyboard has none)."""
+        return self._connection_on
 
     def set_connection(self, state: str) -> None:
-        self.connection_label.setText(f"Connection: {state}")
-        self.connection_label.setToolTip(self.connection_label.text())
+        """A short state in the strip (the part before the first " · ", shortened with "…" if it
+        still doesn't fit); the full text is in the tooltip and the session report (#179)."""
+        self.connection_label.setText(f"● {state.split(' · ')[0]}")
+        self.connection_label.setToolTip(f"Connection: {state}")
         # Keyboard has no connection to report; hide "n/a" so small screens keep room (#94).
-        self.connection_label.setVisible(state != "n/a")
-        self._stretch_strip()
+        self._connection_on = state != "n/a"
+        self.connection_label.setVisible(self._connection_on)
 
     def _set_round_text(self, rnd: Optional[Round]) -> None:
         self.round_label.setText(f"Round: {rnd.id} ({rnd.kind.value})" if rnd else "Round: —")
@@ -454,7 +562,7 @@ class SelectionWindow(QMainWindow):
     def press_target(self, target_id: str) -> Outcome:
         outcome = self.keyboard.select_now(target_id)
         if outcome is Outcome.RejectedNoOpenRound:   # select_now returns before handle()
-            self.outcome_label.setText(f"Last: {outcome.value} · keyboard {target_id}")
+            self._set_sentence(plain_outcome(outcome), f"{outcome.value} · keyboard {target_id}")
         return outcome
 
     def press_cancel(self) -> None:
@@ -562,12 +670,11 @@ class SelectionWindow(QMainWindow):
         self.prompt.setVisible(True)
         self._set_round_text(None)
         if reason:
-            self.outcome_label.setText(f"Last: Cleared ({reason})")
+            self._set_sentence(plain_cleared(reason), f"Cleared ({reason})")
 
     def show_outcome(self, e: Optional[SelectionEvent], outcome: Outcome) -> None:
         detail = f" · {e.source} {e.eventId} {e.roundId}→{e.targetId}" if e else ""
-        self.outcome_label.setText(f"Last: {outcome.value}{detail}")
-        self.outcome_label.setToolTip(self.outcome_label.text())
+        self._set_sentence(plain_outcome(outcome), f"{outcome.value}{detail}")   # exact in the tip
         if outcome is Outcome.Confirmed:   # handler closed the round without on_cleared
             last = getattr(self, "_last_round", None)
             spoken = self._preview
@@ -592,10 +699,12 @@ class SelectionWindow(QMainWindow):
     # ── Helpers ──────────────────────────────────────────────
     PREVIEW_MAX_PX = P.PREVIEW        # before the text scale (#195)
     PREVIEW_MIN_PX = P.PREVIEW_MIN
+    CONNECTION_MAX_PX = 240           # the strip's connection state, before the text scale
 
     def apply_text_scale(self) -> None:
         """Re-style after theme.set_scale (#195). Tiles and preview refit; flashing is untouched."""
         self.setStyleSheet(P.window_qss())
+        self.connection_label.setMaximumWidth(P.px(self.CONNECTION_MAX_PX))   # #179
         for tile in self.tiles.values():
             tile._fit()
             tile.update()
@@ -605,7 +714,8 @@ class SelectionWindow(QMainWindow):
         """Append e.g. "map 3 ms · speech 180 ms" to the last outcome in the strip (#130)."""
         base = self.outcome_label.text().split("  ⏱ ")[0]
         self.outcome_label.setText(f"{base}  ⏱ {note}")
-        self.outcome_label.setToolTip(self.outcome_label.text())
+        tip = self.outcome_label.toolTip().split("  ⏱ ")[0]
+        self.outcome_label.setToolTip(f"{tip}  ⏱ {note}")
 
     def set_countdown(self, seconds) -> None:
         """Show "Cancels in N s" under the preview, or hide it with None."""

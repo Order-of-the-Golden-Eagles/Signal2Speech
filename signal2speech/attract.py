@@ -125,7 +125,8 @@ class AttractMode(QObject):
         col.setSpacing(0)
         self.banner = QLabel(BANNER)
         self.banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.banner.setStyleSheet(f"background:{T.INPUT_COLORS[InputSources.SIMULATED]}; color:{T.ON_ACCENT};"
+        self.banner.setStyleSheet(f"background:{T.BADGE_COLORS[InputSources.SIMULATED]}; "
+                                  f"color:{T.BADGE_TEXT[InputSources.SIMULATED]};"
                                   f"font-size:{T.px(T.HEADING)}px; font-weight:800; padding:{T.M}px;")
         col.addWidget(self.banner)
         self.caption = QLabel("")

@@ -90,8 +90,8 @@ def test_self_test_board_confirms_in_the_app_exactly_once(make):
     start_or_skip(app)
     assert app.sim.calibrate() is True, app.sim.reasons
     assert app.sim.armed and app.sim.report["false_triggers"] == 0
-    assert app.window.input_label.text() == \
-        "Choose: Keyboard · Confirm: Simulated (self-test LSL stream)"
+    assert (app.window.input_label.text(), app.window.confirm_badge.text()) == (
+        "Choose: Keyboard", "Confirm: Simulated (self-test LSL stream)")
     assert app.handler.live_eeg_confirm_armed is False      # Simulated never arms the Live gate
 
     app.ask()
@@ -120,8 +120,9 @@ def test_a_failed_check_leaves_key_1_as_the_only_confirm(make, monkeypatch):
     assert not app.sim.armed and app.sim.alpha is None      # nothing from the board can confirm
     assert app.sim.reasons and ("channel check" in app.sim.reasons[0]
                                 or "calibration failed" in app.sim.reasons[0])
-    assert app.window.input_label.text().startswith("Choose: Keyboard · Confirm: hold 1 · ")
-    assert app.window.input_label.text().endswith("eye check failed")
+    assert app.window.input_label.text() == "Choose: Keyboard"
+    assert app.window.confirm_badge.text().startswith("Confirm: hold 1 · ")
+    assert app.window.confirm_badge.text().endswith("eye check failed")
     assert "the eye check failed" in app.window.confirm_hint()
 
     app.ask()
@@ -137,14 +138,15 @@ def test_live_label_and_arming_follow_the_check(make):
     sim = app.sim
     assert app.handler.live_eeg_confirm_armed is False and app.window.eye_confirm is False
     assert "the eye check hasn't run yet" in app.window.confirm_hint()
-    assert app.window.input_label.text() == \
-        "Choose: Keyboard · Confirm: hold 1 · Live EEG (PiEEG Octopus 16): eye check not run yet"
+    assert (app.window.input_label.text(), app.window.confirm_badge.text()) == (
+        "Choose: Keyboard", "Confirm: hold 1 · Live EEG (PiEEG Octopus 16): eye check not run yet")
     assert sim._finish({**CLEAN, "false_triggers": 1}) is False
     assert app.handler.live_eeg_confirm_armed is False
     assert sim._finish(CLEAN) is True
     assert app.handler.live_eeg_confirm_armed is True and app.window.eye_confirm is True
-    assert app.window.input_label.text() == "Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)"
-    assert app.root.windowTitle() == "Signal2Speech · " + app.window.input_label.text()
+    assert (app.window.input_label.text(), app.window.confirm_badge.text()) == (
+        "Choose: Keyboard", "Confirm: Live EEG (PiEEG Octopus 16)")
+    assert app.root.windowTitle() == "Signal2Speech · " + sim.strip_text()
     sim.close()
     assert app.handler.live_eeg_confirm_armed is False      # closing disarms
     # The report is written on quit, after close: it still names what really confirmed.
@@ -155,11 +157,11 @@ def test_recorded_and_simulated_streams_are_never_labelled_live(make):
     rec, _ = make(stream_is="recorded")
     assert rec.sim.input_source == InputSources.RECORDED
     rec.sim._finish(CLEAN)
-    assert rec.window.input_label.text() == "Choose: Keyboard · Confirm: Recorded (PiEEG Octopus 16)"
+    assert rec.window.confirm_badge.text() == "Confirm: Recorded (PiEEG Octopus 16)"
     assert rec.handler.live_eeg_confirm_armed is False
     st, _ = make(stream_is="live", self_test=True)          # our simulator can't be called live
     assert st.sim.input_source == InputSources.SIMULATED
-    assert "Live" not in st.window.input_label.text()
+    assert "Live" not in st.window.input_label.text() + st.window.confirm_badge.text()
 
 
 def test_the_board_never_chooses(qapp):

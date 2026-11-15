@@ -68,7 +68,8 @@ def test_key_preview_then_confirm_sends_one_effect(ui):
     assert "Washtenaw's AQI rose 186 points" in w.preview.text()
     assert (w.tiles[T1].label, w.tiles[T2].label) == ("Confirm", "Cancel")
     assert "r2 (confirm)" in w.round_label.text()
-    assert w.outcome_label.text().startswith("Last: Previewed")
+    assert w.outcome_label.text() == "Preview shown. Nothing said."   # #179
+    assert w.outcome_label.toolTip().startswith("Previewed · keyboard")         # exact, for devs
 
     assert w.press_target(T1) is Outcome.Confirmed
     assert [a.action_id for a in sink.actions] == ["compare_air_quality"]
@@ -80,7 +81,8 @@ def test_key_preview_then_confirm_sends_one_effect(ui):
     # #175: a brief "Spoken" state keeps the confirmed words on screen until the next round.
     assert w.preview.isVisibleTo(w) and w.preview_header.text() == "✓ Shown and spoken"
     assert w.ring.model.completed
-    assert "RejectedNoOpenRound" in w.outcome_label.text()
+    assert w.outcome_label.text() == "Ignored: no question open."
+    assert "RejectedNoOpenRound" in w.outcome_label.toolTip()
 
 
 def test_key2_in_confirm_cancels_and_clears(ui):
@@ -90,7 +92,8 @@ def test_key2_in_confirm_cancels_and_clears(ui):
     assert w.press_target(T2) is Outcome.Cancelled
     assert sink.actions == [] and h.current is None
     assert not w.preview.isVisibleTo(w) and w.round_label.text() == "Round: —"
-    assert "Cancelled" in w.outcome_label.text()
+    assert w.outcome_label.text() == "Nothing said: cancelled."
+    assert "Cancelled" in w.outcome_label.toolTip()
 
 
 def test_esc_calls_handler_cancel(ui):
@@ -99,7 +102,8 @@ def test_esc_calls_handler_cancel(ui):
     w.press_target(T1)
     w.press_cancel()
     assert h.current is None and h.pending is None and sink.actions == []
-    assert w.tiles[T1].label == "" and "Cleared (cancel)" in w.outcome_label.text()
+    assert w.tiles[T1].label == "" and w.outcome_label.toolTip() == "Cleared (cancel)"
+    assert w.outcome_label.text() == "Nothing said: cancelled."
 
 
 def test_stale_event_only_updates_strip(ui):
@@ -107,7 +111,8 @@ def test_stale_event_only_updates_strip(ui):
     h.begin_choice_round(load_demo_choices())
     w.press_target(T2)
     h.handle(SelectionEvent(InputSources.LIVE_EEG, "r1", "e7", T1))
-    assert "RejectedStaleRound" in w.outcome_label.text()
+    assert w.outcome_label.text() == "Ignored a late signal."
+    assert "RejectedStaleRound" in w.outcome_label.toolTip()
     assert w.preview.isVisibleTo(w) and h.current.id == "r2"
 
 
@@ -117,6 +122,39 @@ def test_input_label_is_honest(ui):
     assert w.input_label.text() == "Input: Simulated"
     w.set_input_source(InputSources.LIVE_EEG)
     assert w.input_label.text() == "Input: Live EEG"
+
+
+def test_every_outcome_has_a_plain_sentence():
+    """#179: judges read a sentence, never an enum name."""
+    from signal2speech.ui.window import CLEARED_SENTENCES, OUTCOME_SENTENCES
+    assert set(OUTCOME_SENTENCES) == set(Outcome)
+    sentences = list(OUTCOME_SENTENCES.values()) + list(CLEARED_SENTENCES.values())
+    assert all(s.endswith(".") and "Rejected" not in s and "_" not in s for s in sentences)
+    from signal2speech.ui.window import SENTENCE_MAX
+    assert all(len(s) <= SENTENCE_MAX for s in sentences), [s for s in sentences if len(s) > SENTENCE_MAX]
+    assert CLEARED_SENTENCES["timeout"] == "Nothing said: timed out."
+
+
+def test_badges_use_one_colour_per_input_and_only_live_is_green(ui):
+    """#179: the badge colour matches the evidence banner's; Simulated/Recorded never look Live."""
+    from signal2speech.evidence.app import BANNER_COLORS
+    from signal2speech.ui import theme as P
+    _, w, _, _ = ui
+    for src in InputSources.ALL:
+        w.set_input_source(src)
+        assert f"background:{P.BADGE_COLORS[src]}" in w.input_label.styleSheet()
+    live = P.BADGE_COLORS[InputSources.LIVE_EEG]
+    assert list(P.BADGE_COLORS.values()).count(live) == 1
+    assert BANNER_COLORS == {"Simulated": P.BADGE_COLORS[InputSources.SIMULATED],
+                             "Recorded": P.BADGE_COLORS[InputSources.RECORDED],
+                             "Live EEG": live}
+    w.set_two_inputs("Choose: Keyboard", InputSources.KEYBOARD,
+                     "Confirm: Live EEG (PiEEG Octopus 16)", InputSources.LIVE_EEG)
+    assert w.confirm_badge.isVisibleTo(w) and f"background:{live}" in w.confirm_badge.styleSheet()
+    w.set_input_source(InputSources.SIMULATED)
+    assert not w.confirm_badge.isVisibleTo(w)
+    # Text in an input's colour uses the badge's hue family: same input, same colour family.
+    assert P.INPUT_COLORS[InputSources.LIVE_EEG] != P.INPUT_COLORS[InputSources.SIMULATED]
 
 
 def test_keyboard_adapter_required(app):
