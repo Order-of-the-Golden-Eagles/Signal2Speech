@@ -61,6 +61,9 @@ python -m signal2speech.mcp --source hybridblack # Unicorn (Live EEG): signal qu
 - **Live:** there are no tiles to look at in a headless process, so it doesn't flash. The P300 tools say so, and quality and alpha stay live.
 - **Data shape:** results are summaries. The last 10 s of signal stays in the process, and no list in a result is longer than 64 values. A test checks this.
 - **Transport:** stdio only, with no network listener.
+- **Live start is bounded:** a Unicorn scan (15 s) and opening the headset (20 s), because g.Pype's `start()` blocks without one. On failure the server exits 3 and releases the pipeline.
+- **On exit:** an evidence window the server opened is closed (terminated, killed if it won't go, and reaped).
+- **`latest_decisions`:** `accuracy_so_far` covers the whole session, not just the last 200 decisions. A sequence that produced no decision counts as not correct, and `sequences_without_decision` reports it.
 
 **Connect it**
 - **Claude Code:** `claude mcp add signal2speech -- /path/to/Signal2Speech/.venv/bin/python -m signal2speech.mcp`.

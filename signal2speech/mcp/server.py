@@ -34,6 +34,24 @@ Recorded, or Live EEG (the "input" field). Never describe simulated data as a re
 brain. Start with signal_quality, then p300_average for "is the P300 visible?"."""
 
 
+def stop_viewer(viewer: dict, timeout_s: float = 5.0) -> bool:
+    """Terminate the evidence window (kill if it won't go) and reap it. True if it's gone."""
+    proc: Optional[subprocess.Popen] = viewer.get("proc")
+    viewer["proc"] = None
+    if proc is None or proc.poll() is not None:
+        return True
+    proc.terminate()
+    try:
+        proc.wait(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try:
+            proc.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            return False
+    return True
+
+
 def build_server(monitor: Monitor) -> MCPServer:
     server = MCPServer(name="signal2speech", title="Signal2Speech EEG pipeline",
                        instructions=INSTRUCTIONS)
@@ -78,16 +96,18 @@ def build_server(monitor: Monitor) -> MCPServer:
     @server.tool(description="The latest P300 decisions: which tile the classifier picked each "
                              "sequence, and (Generator only) which tile was really attended.")
     def latest_decisions(n: int = 5) -> dict:
-        items = list(monitor.decisions)[-max(1, min(int(n), 50)):]
-        scored = [d for d in monitor.decisions if d.correct is not None]
-        acc = (sum(1 for d in scored if d.correct) / len(scored)) if scored else None
+        recent, totals = monitor.decision_snapshot()
+        items = recent[-max(1, min(int(n), 50)):]
+        seqs = totals["sequences"]
         return labelled({
             "calibrated": monitor.calibrated,
             "decisions": [{"time": time.strftime("%H:%M:%S", time.localtime(d.t)),
                            "attended": d.attended, "decided": d.decided, "correct": d.correct,
                            "mean_scores": d.scores} for d in items],
-            "accuracy_so_far": None if acc is None else round(acc, 2),
-            "sequences_scored": len(scored),
+            # Whole session; a sequence with no decision counts as not correct.
+            "accuracy_so_far": round(totals["correct"] / seqs, 2) if seqs else None,
+            "sequences": seqs,
+            "sequences_without_decision": seqs - totals["decided"],
             "note": monitor.p300_note or ("Attended tiles are the synthetic brain's choices"
                                           if monitor.simulated else "")})
 
@@ -95,9 +115,10 @@ def build_server(monitor: Monitor) -> MCPServer:
                              "channel, in 20 ms bins, with the P300 peak and a visibility "
                              "verdict. Channels: Fz C3 Cz C4 Pz PO7 Oz PO8.")
     def p300_average(channel: str = "Pz") -> dict:
-        if channel not in CHANNELS:
-            raise ToolError(f"channel must be one of {', '.join(CHANNELS)}")
-        return labelled(summarize_average(monitor, channel))
+        try:
+            return labelled(summarize_average(monitor, channel))
+        except ValueError as err:                       # unknown channel
+            raise ToolError(str(err)) from err
 
     @server.tool(description="Occipital alpha (8-13 Hz) band power, the signal behind the "
                              "eye-closure confirm: latest value and the last 30 s spread.")
@@ -111,9 +132,9 @@ def build_server(monitor: Monitor) -> MCPServer:
         if action == "stop":
             if proc is None or proc.poll() is not None:
                 return labelled({"evidence_view": "not running"})
-            proc.terminate()
-            viewer["proc"] = None
-            return labelled({"evidence_view": "stopped"})
+            stopped = stop_viewer(viewer)
+            return labelled({"evidence_view": "stopped" if stopped else "didn't stop",
+                             **({} if stopped else {"note": "close the window by hand"})})
         if action != "start":
             raise ToolError("action is 'start' or 'stop'")
         if proc is not None and proc.poll() is None:
@@ -154,9 +175,12 @@ def main(argv=None) -> int:
     except Exception as err:
         print(f"Couldn't start the {args.source} pipeline: {type(err).__name__}: {err}",
               file=sys.stderr)
+        monitor.stop()                                  # release whatever did open
         return 3
+    server = build_server(monitor)
     try:
-        build_server(monitor).run("stdio")
+        server.run("stdio")
     finally:
+        stop_viewer(server._s2s_viewer)                 # no orphaned evidence window
         monitor.stop()
     return 0

@@ -43,25 +43,9 @@ BIN_MS = 20
 P300_WINDOW_MS = (250, 500)       # where a P300 peaks after the flash
 
 
-class _Tap(gp.INode):
-    """Hands each frame (or event) to ``on_rows`` on the g.Pype worker thread.
-
-    The input inherits its timing, like ``gp.Collector``, so it can follow a stream or an
-    event node such as ``EpochAverage``.
-    """
-
-    def __init__(self, **kwargs):
-        from gpype.backend.core.i_port import IPort
-        kwargs.setdefault("input_ports", [IPort.Configuration(
-            name=Constants.Defaults.PORT_IN, timing=Constants.Timing.INHERITED)])
-        super().__init__(**kwargs)
-        self.on_rows = lambda rows: None
-
-    def step(self, data):
-        block = data.get(Constants.Defaults.PORT_IN)
-        if block is not None and len(block):
-            self.on_rows(np.asarray(block))
-        return {}
+def _Tap(**kwargs):
+    """The shared tap from the alpha switch, with inherited timing (streams and events)."""
+    return am._Tap(inherit_timing=True, **kwargs)
 
 
 @dataclass
@@ -98,9 +82,9 @@ class Monitor:
         self._ring: Deque[np.ndarray] = deque()
         self._ring_rows = 0
         self._avg = {"target": None, "nontarget": None}
-        self._avg_n = {"target": 0, "nontarget": 0}
         self._alpha: Deque[tuple] = deque(maxlen=int(am.FRAME_RATE * 120))
         self.decisions: Deque[Decision] = deque(maxlen=200)
+        self.totals = {"sequences": 0, "decided": 0, "correct": 0}   # whole session, not capped
         self.state = "built"
         self.calibrated = False
         self.p300_note = ("" if self.simulated else
@@ -140,12 +124,8 @@ class Monitor:
                 self._ring_rows -= len(self._ring.popleft())
 
     def _on_average(self, which: str, block: np.ndarray) -> None:
-        avg = np.asarray(block)
-        if avg.ndim == 3:                               # (samples, channels, n): last = all
-            avg = avg[..., -1]
-        with self._lock:
-            self._avg[which] = avg.astype(np.float64, copy=True)
-            self._avg_n[which] += 1
+        with self._lock:                                # running average of all epochs so far
+            self._avg[which] = np.asarray(block, dtype=np.float64).copy()
 
     def _on_alpha_rows(self, rows: np.ndarray) -> None:
         now = time.monotonic()
@@ -154,8 +134,22 @@ class Monitor:
                 self._alpha.append((now, float(v)))
 
     # ── Lifecycle ────────────────────────────────────────────
-    def start(self) -> None:
-        self.graph.pipeline.start()
+    def start(self, open_timeout_s: float = 20.0) -> None:
+        """Start the pipeline. Live, discovery and opening are bounded (g.Pype's start()
+        blocks without a usable headset); raises RuntimeError on failure."""
+        if self.simulated:
+            self.graph.pipeline.start()
+        else:
+            from signal2speech.eeg.app_live import _bounded, find_unicorn
+            if not find_unicorn():
+                raise RuntimeError("no Unicorn Hybrid Black found (not paired, off, or in use)")
+            done, _r, err = _bounded(self.graph.pipeline.start, open_timeout_s, "mcp-open")
+            if not done:
+                self.state = "hung"
+                raise RuntimeError(f"found a Unicorn but couldn't open it within "
+                                   f"{open_timeout_s:g} s (is another app using it?)")
+            if err is not None:
+                raise RuntimeError(f"couldn't open the Unicorn: {type(err).__name__}: {err}")
         self.state = "running"
         if self.simulated:
             self._thread = threading.Thread(target=self._session, daemon=True, name="mcp-session")
@@ -165,6 +159,8 @@ class Monitor:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=5)
+        if self.state == "hung":                        # start() still owns it in its thread
+            return
         if self.state == "running":
             self.graph.pipeline.stop()
         self.graph.pipeline.close()
@@ -215,9 +211,14 @@ class Monitor:
             decided, scores = None, {}
             if len(self.chooser.decisions) > before:
                 cls, means = self.chooser.decisions[-1]
-                decided = EEG_TARGET.get(cls)
+                decided = self.chooser.class_map.target_for(cls)
                 scores = {k: round(float(v), 3) for k, v in means.items()}
-            self.decisions.append(Decision(time.time(), attended, decided, scores))
+            d = Decision(time.time(), attended, decided, scores)
+            with self._lock:
+                self.decisions.append(d)
+                self.totals["sequences"] += 1
+                self.totals["decided"] += decided is not None
+                self.totals["correct"] += bool(d.correct)
             self._stop.wait(max(0.0, self.period))
 
     # ── Snapshots for the tools ──────────────────────────────
@@ -228,17 +229,21 @@ class Monitor:
             return np.concatenate(list(self._ring))[:, :len(CHANNELS)]
 
     def averages(self):
+        counts = {"target": int(self.graph.target_average.accepted),
+                  "nontarget": int(self.graph.nontarget_average.accepted)}
         with self._lock:
-            return ({k: (None if v is None else v.copy()) for k, v in self._avg.items()},
-                    dict(self._avg_n))
+            return {k: (None if v is None else v.copy()) for k, v in self._avg.items()}, counts
+
+    def decision_snapshot(self):
+        """A consistent copy of the recent decisions and the whole-session totals."""
+        with self._lock:
+            return list(self.decisions), dict(self.totals)
 
     def alpha_history(self, seconds: float = 30.0) -> List[float]:
         now = time.monotonic()
         with self._lock:
             return [v for t, v in self._alpha if now - t <= seconds]
 
-
-EEG_TARGET = {1: "target-1", 2: "target-2"}
 
 
 def summarize_quality(monitor: Monitor) -> dict:

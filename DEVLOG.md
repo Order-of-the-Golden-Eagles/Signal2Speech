@@ -425,3 +425,4 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - On the simulator it picked up a clear P300 (about 4.8 µV at 276 ms) and got 3 of 3 choices right
 - With the real headset it reports signal quality and the eye-closure signal. The P300 needs tiles on screen, so use the app or the evidence view for that
 - Still to do: record the 30-second clip for the video (#34), and try it with a real wearer
+- Code review follow-up: the evidence window closes when the assistant disconnects, a missing or busy headset fails cleanly instead of hanging, and the accuracy figure counts every sequence, including ones with no answer

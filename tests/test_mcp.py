@@ -54,6 +54,7 @@ def test_every_tool_answers_from_the_pipeline_and_labels_simulated(running):
 
     d = call(s, "latest_decisions", {"n": 5})
     assert d["calibrated"] and d["decisions"] and d["accuracy_so_far"] is not None
+    assert d["sequences"] >= len(d["decisions"]) and "sequences_without_decision" in d
     assert all(x["attended"] in ("target-1", "target-2") for x in d["decisions"])
 
     al = call(s, "alpha_state")
@@ -90,6 +91,9 @@ def test_evidence_view_start_and_stop(running, monkeypatch):
 
         def terminate(self):
             launched.append("terminated")
+
+        def wait(self, timeout=None):
+            return 0
     monkeypatch.setattr(subprocess, "Popen", lambda args, **kw: launched.append(args) or FakeProc())
     assert call(s, "evidence_view", {"action": "start"})["evidence_view"] == "started"
     assert launched[0][1:] == ["-m", "signal2speech.evidence", "--source", "generator", "--p300"]
@@ -164,3 +168,35 @@ def test_visibility_verdict_is_deterministic():
     assert clear["p300_visible"] is True and 280 <= clear["peak_latency_ms"] <= 320
     flat = summarize_average(Fake(0.0), "Pz")
     assert flat["p300_visible"] is False
+
+
+def test_stop_viewer_kills_and_reaps_a_stubborn_window():
+    from signal2speech.mcp.server import stop_viewer
+    calls = []
+
+    class Stubborn:
+        def poll(self):
+            return None
+
+        def terminate(self):
+            calls.append("terminate")
+
+        def kill(self):
+            calls.append("kill")
+
+        def wait(self, timeout=None):
+            calls.append("wait")
+            if "kill" not in calls:
+                raise subprocess.TimeoutExpired("evidence", timeout)
+            return -9
+    viewer = {"proc": Stubborn()}
+    assert stop_viewer(viewer) is True and viewer["proc"] is None
+    assert calls == ["terminate", "wait", "kill", "wait"]
+
+
+def test_live_start_without_a_headset_exits_3_and_releases(monkeypatch, capsys):
+    from signal2speech.eeg import app_live
+    from signal2speech.mcp import server
+    monkeypatch.setattr(app_live, "find_unicorn", lambda timeout_s=15.0: [])
+    assert server.main(["--source", "hybridblack"]) == 3
+    assert "no Unicorn Hybrid Black found" in capsys.readouterr().err
