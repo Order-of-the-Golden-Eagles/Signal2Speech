@@ -230,6 +230,21 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Switch-back rehearsal on a Mac: 3 seconds from `main` to the known-good build `eecc31a` and one map reveal (keyboard input; the lock file was the same)
 - Also updated the runbook for the smoke check (#41) and the 8-second map reveal (#81). Still needed: tag `judging-draft` and `judging-final` and rehearse the switch on the judging laptop
 
+## 11/14/26 - 6:55 PM - In Young Song - #32 Verified June 2023 fire detections ([PR #89](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/89))
+- The team has a small, checked sample of NASA fire detections for the demo dates, bundled for offline use
+    - `data/openorbit/firms/`: about 10,000 VIIRS detections for June 26 and 28, 2023, from the Great Lakes to Quebec. `SOURCES.md` explains what a detection means
+- Southeast Michigan itself had no wildfire detections on either day, only a few industrial hot spots. The fires were in Quebec and Ontario
+- `python data/openorbit/firms/build_firms.py --verify-only` re-checks every date and coordinate offline
+
+## 11/14/26 - 6:55 PM - In Young Song - #31 Where the smoke came from ([PR #89](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/89))
+- "Show the satellite view" now also shows where the smoke came from: a NASA map with the Quebec and Ontario fires as dots and southeast Michigan circled
+- It has its own heading, legend, and credit, so fire detections are never confused with smoke or air quality, and it never appears on the AQI comparison
+- It's optional. Without the fire files, the view looks exactly as before. Tested with the files missing and with them broken
+- Verified in the real app on Windows with keyboard input. No headset needed
+
+## 11/14/26 - 6:55 PM - In Young Song - #8 NASA FIRMS fire view ([PR #89](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/89))
+- The FIRMS stretch goal is done: a verified sample (#32) and an optional map (#31). The core OpenOrbit comparison and the spoken lines didn't change
+
 ## 11/14/26 - 6:56 PM - Long Le - #39 #4 #42 Judging laptop session script ([PR #88](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/88))
 - Whoever sits at the judging laptop now has one ordered 40-minute checklist: `docs/devops/judging-laptop-session.md`
     - Wi-Fi on: install, release check, smoke check, and the fallback copy. Wi-Fi off: keyboard and simulated runs, the AI fallback, the evidence view, and a timed switch-back
