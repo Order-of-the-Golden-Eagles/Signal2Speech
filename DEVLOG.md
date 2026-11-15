@@ -391,7 +391,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Found a demo risk: without #116's grounding, Claude answered the AQI question wrongly ("Wayne"), when Washtenaw rose more. Don't ask data questions in the AI demo until #116 merges
 - Verified with keyboard input on a Mac, with a fresh question and the demo question. Not yet tried on the judging laptop
 
-## 11/14/26 - 9:03 PM - Long Le - #129 Fuzz test for "speaks exactly once" (PR pending)
+## 11/14/26 - 9:03 PM - Long Le - #129 Fuzz test for "speaks exactly once" ([PR #140](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/140))
 - A new test throws millions of random event sequences at the selection logic and checks that it never speaks twice, never speaks without a fresh preview, and never lets an old decision act in a new round
     - `pytest tests/test_contract_fuzz.py` (3 s in CI). `FUZZ_SEQUENCES=50000` for a long run, and `FUZZ_SEED=<n>` reproduces any failure
 - A long run of 3,000,000 operations found 0 violations. The judge Q&A now cites it
