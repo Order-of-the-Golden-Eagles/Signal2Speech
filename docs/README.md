@@ -1,6 +1,6 @@
 # Engineering docs
 
-Start with the [agent instructions](INSTRUCTIONS.md) and [living memory](MEMORY.md). Open the category that matches your issue.
+Teammates: read the [team briefing](TEAM-BRIEFING.md) first. Then start with the [agent instructions](INSTRUCTIONS.md) and [living memory](MEMORY.md). Open the category that matches your issue.
 
 | Category | Active work |
 | --- | --- |

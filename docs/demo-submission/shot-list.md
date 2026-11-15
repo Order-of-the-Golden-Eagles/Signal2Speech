@@ -6,6 +6,26 @@
 
 Every shot that shows EEG carries an on-screen caption naming its source: **Live EEG**, **Recorded**, **Simulated** or **Keyboard**. The app's judge strip and the evidence banner already show it, so the caption must agree with them. Never cut a Simulated or Keyboard shot under narration that says "live".
 
+## The cut for 11/15: screen only, recorded g.tec EEG (2:30 or less)
+
+No headset and no PiEEG board in the video. Record the screen at 1920 × 1080 with app audio. Every shot carries the label the app shows.
+
+| # | Time | Command and picture | Narration | Caption |
+| --- | --- | --- | --- | --- |
+| 1 | 0:00–0:10 | [Title card](media/title-card.png) | "Signal2Speech is a voice for people who can't speak. They pick a reply by looking at it, confirm by closing their eyes, and the app says it for them." | Signal2Speech · Hack the Nest 2026 |
+| 2 | 0:10–0:25 | `python -m signal2speech.app --input recorded --sim 2,1,1,1 --no-narration`. The opening: two cards, then they settle. | "Our headset was lost in transit. So the brain data here is real human EEG that g.tec recorded on their own amplifier, running through the same pipeline a live headset would use." | Recorded (g.tec dataset) |
+| 3 | 0:25–0:45 | Calibration, speeded up 4×, then the first question: tiles flashing with one outlined. | "Each flash is answered with one real brain response. Our classifier isn't told which card is which. The outline shows where the scripted attention is, not the answer." | Recorded, re-mapped to our tiles · 4× during calibration |
+| 4 | 0:45–0:55 | The *Say this?* preview and the ring filling. | "It picked Compare counties. That's only a preview. Confirming uses a second signal, closing your eyes. Here that part is simulated." | Confirm: Simulated |
+| 5 | 0:55–1:15 | The comparison screen: the image flowing from June 24 to June 28, the table, the spoken line. | Let the app speak. Then: "NASA satellite images and EPA air-quality data. The numbers in the sentence come from the data." | NASA MODIS · EPA AirData |
+| 6 | 1:15–1:30 | The second question: the satellite view with the fire map filling in day by day. | Let the app speak. | NASA MODIS · NASA FIRMS |
+| 7 | 1:30–1:50 | `python -m signal2speech.ai --input recorded --no-cues` (start it early: about 90 s of setup). Type "Would you like some water?". The cards flash, one is picked, the ring fills, the reply is spoken. | "The same controls answer any question. The AI suggests two replies, the recorded brain data picks, and nothing is said until it's confirmed." | Recorded, re-mapped · replies from Claude (or Saved phrases) |
+| 8 | 1:50–2:10 | The chart `docs/eeg-hardware/media/151-flashes.svg`, or `python -m signal2speech.evidence --source dataset <S4.mat>`. | "On g.tec's recordings it picks the right card 94 % of the time from a single flash and 100 % from five, on data it never trained on." | Recorded (g.tec dataset), offline |
+| 9 | 2:10–2:25 | [Architecture diagram](media/architecture.png), then the [closing card](media/closing-card.png). | "What's real: the EEG, the g.Pype pipeline, the classifier. What's scripted: which card counts as looked at. Plug in a Unicorn and the same code runs." | Repo link · AI disclosure |
+
+- Use `--no-narration` for shots 2 to 6 so the app's guidance lines don't talk over the voice-over. Keep the outline (`--no-gaze-mark` off) and explain it in shot 3.
+- Never say "live" and never say "the user chose". Say "recorded" and "the classifier picked".
+- Each launch shuffles the recorded responses, so a take can include a wrong pick. Either keep it and say so, or record another take.
+
 ## Original cut (wearer on camera, Devpost only, 2:45)
 
 **Graphics (#132):** [title card](media/title-card.png) for shot 1, [architecture diagram](media/architecture.png) for shot 9, and [closing card](media/closing-card.png) for shot 10. All are 1920×1080 PNGs. To change the wording, edit `make_graphics.py` and run `python docs/demo-submission/make_graphics.py`.
@@ -36,14 +56,14 @@ Use this if live capture fails or is too noisy to read. It's honest as long as e
    `python -m signal2speech.evidence --source replay recordings/evidence_<timestamp>`
    The window title and banner say **Recorded**. Use `--speed 2` if the shot is short, and say so in the caption ("Recorded, 2× speed").
    **What this recording can honestly show:** OSCAR off against on during blinks, and the alpha peak in the spectrum during eyes closed. **What it can't show:** a real P300 average. On `hybridblack`, the built-in `Flasher` sends markers with no visible flash, so the target trace has no brain response to lock onto. A Recorded P300 average needs the #46 ↔ #48 seam first (the chooser's visible tiles emitting on the evidence graph's marker, with `--no-flasher`). Until then, the P300-average part of shot 7 is **Simulated** and captioned that way.
-3. Shots 3 to 6 then come from the app with `--input keyboard` or `--input simulated`, captioned **Keyboard** or **Simulated**. Recorded replay inside the app (`--input recorded`) is still blocked on `main`. It prints "Recorded replay is blocked: needs record/replay (#48)".
+3. Shots 3 to 6 then come from the app with `--input keyboard` or `--input simulated`, captioned **Keyboard** or **Simulated**. (When this plan was written, `--input recorded` was blocked. It now runs g.tec's recorded EEG through the app: see the 11/15 cut above.)
 4. Narration for shot 7 changes to: "This is a recording of our real headset session, replayed through the same g.Pype pipeline."
 
 **Last-resort path, no headset data at all:** all of shot 7 uses `python -m signal2speech.evidence --source generator`, captioned **Simulated: synthetic P300, not a brain**. Run it for at least 60 seconds before you start the shot. An 8-second run doesn't build a readable average yet.
 
 ## Capture settings
 
-- Screen at 1920×1080. Use OBS or the OS recorder. Turn off notifications and Wi-Fi (the demo runs offline).
+- Screen at 1920×1080. Use OBS or the OS recorder. Turn off notifications. Keep Wi-Fi on for the shot with Claude's reply suggestions; the rest runs without it.
 - Record app audio directly, not through a microphone near the speakers.
 - Record each shot on its own and assemble afterwards. Keep two good takes of shots 3 to 7.
 - Export as H.264 MP4. Check that the length is under 3:00 (2:30 or less for g.tec) and that the audio is in sync on the confirm-to-speech cut.

@@ -16,9 +16,10 @@ Add `--mute` for silent runs. `--confirm-timeout SECONDS` (default 15; 0 = never
 
 - **One output path:** `AppSink.execute` in `signal2speech/app.py` is the only code that changes the map or speaks. It calls the map method first and then speaks `spoken_text`. The handler calls it exactly once per confirmation. Previews, cancels, disconnects, and stale or duplicate events produce no output. `tests/test_app.py` checks this with a fake view and a fake speaker.
 - **Transcript:** the right-hand panel and stdout log each round, preview, outcome (with source, event ID, and round), and output line.
-- **Map reveal:** after a confirmed map action, the empty tiles hide and the map gets most of the window. The judge strip and its input label stay visible. The next question waits 8 s (`reveal_ms`), so the audience can read the AQI table. Spoken replies and cancels go back to the question after 2 s (`reopen_ms`).
+- **Map reveal:** after a confirmed map action, the tiles hide (keeping their space, so nothing shifts) and the map plays its day-by-day sequence. The status pills and the input label stay visible. The next question waits 8 s (`reveal_ms`). Spoken replies and cancels go back to the question after 2 s (`reopen_ms`).
 - **Speech (`signal2speech/speech/`, #25):**
-  - **Bundled clip:** `data/openorbit/audio/<action_id>.wav` plays if it exists. This applies only to the fixed OpenOrbit lines (`show_satellite`, `compare_air_quality`). Generated replies never use a clip, because a recording can't match words the wearer just approved.
+  - **Natural voice:** with Piper and a voice file installed, every line is spoken with it ([setup](../text-to-speech/README.md#a-natural-voice-piper-optional)).
+  - **Bundled clip:** otherwise `data/openorbit/audio/compare_air_quality.wav` plays for the comparison line. Generated replies and the satellite line never use a clip, because a recording can't match words that have changed or that the wearer just approved.
   - **OS voice:** otherwise the app uses the OS voice through Qt TextToSpeech, which is offline and doesn't block the window.
   - **pyttsx3:** used only if Qt has no voice engine, because it freezes the window while it speaks.
   - **Logging:** the transcript logs which voice is in use.

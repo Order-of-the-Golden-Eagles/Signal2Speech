@@ -8,9 +8,9 @@ A conversation partner asks a question and the app offers two answers. The weare
 
 ![The app after a confirmed answer: NASA imagery and EPA county AQI on the right, the transcript below, and the input label "Keyboard" in the bottom strip](docs/demo-submission/media/app-compare-reveal.jpg)
 
-## Try it offline in three commands
+## Try it in three commands
 
-Python 3.12. Works with Wi-Fi off once installed.
+Python 3.12. Reply suggestions come from Claude over the internet. Without a connection or an API key the app offers saved phrases instead. Everything else runs on the laptop: the EEG pipeline, the voice, and the NASA example.
 
 ```
 python -m venv .venv && .venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
@@ -18,17 +18,18 @@ pip install -r requirements-lock.txt
 python -m signal2speech
 ```
 
-A launcher opens with a button for each tool, and each button says which input it uses. Click **Demo · Keyboard**, then press **2** (Compare counties), then hold **1** for 2 s (confirm). The map changes and one line is spoken. Press **2** at the preview, or **Esc**, to cancel, and nothing happens.
+A launcher opens with a button for each tool, and each button says which input it uses. Click **Signal2Speech · Keyboard**, the main app: type a question and press Enter, press **1** or **2** to pick a reply, then hold **1** for 2 s to confirm, and it is spoken. For the NASA example, click **Example: NASA air quality** in the app, press **2** (Compare counties), then hold **1** for 2 s (confirm). The map changes and one line is spoken. Press **2** at the preview, or **Esc**, to cancel, and nothing happens.
 
 The same tools without the launcher (`python -m signal2speech --help` lists them):
 
 | Also try | Command |
 | --- | --- |
-| The demo with keyboard input | `python -m signal2speech.app --input keyboard` |
+| **The main app:** ask any question, pick a reply, confirm, spoken. NASA example inside. `--input keyboard`, `simulated`, `recorded` (g.tec EEG) or `live` (Unicorn headset) | `python -m signal2speech.ai` |
+| The NASA example alone, keyboard input | `python -m signal2speech.app --input keyboard` |
 | Simulated brain signals through a real g.Pype pipeline | `python -m signal2speech.app --input simulated --sim 2,1` |
-| Recorded human EEG from g.tec's dataset chooses the tile (needs the dataset, see [For reviewers](#for-reviewers-reproduce-our-numbers-on-gtec-data)) | `python -m signal2speech.app --input recorded --recording path/to/S4.mat` |
+| **Recorded human EEG from g.tec's dataset chooses the tile**, as a walkthrough of a headset session (needs the dataset, see [For reviewers](#for-reviewers-reproduce-our-numbers-on-gtec-data)) | `python -m signal2speech.app --input recorded --recording path/to/S4.mat` |
 | Keys choose, a simulated board's eye closure confirms. On two real PiEEG boards we measured no usable EEG ([findings](docs/eeg-hardware/README.md#pieeg-octopus-16-on-real-people-no-usable-eeg-2026-11-15)) | `python -m signal2speech.app --input pieeg --pieeg-self-test` |
-| AI reply suggestions for a typed question | `python -m signal2speech.ai` |
+| Phrase selection: type a question, two suggested replies appear, one is picked, previewed, confirmed and spoken. With `--input recorded`, g.tec's recorded brain data does the picking | `python -m signal2speech.ai` (add `--input recorded`) |
 | The g.Pype evidence view (scopes, OSCAR, averaged P300) | `python -m signal2speech.evidence --source generator` |
 | A hardware-free check of the whole demo | `python -m signal2speech.app --smoke` |
 
@@ -36,13 +37,13 @@ g.Pype runs on Windows 10/11 x64, Linux x86_64, and macOS 13+ on Apple silicon. 
 
 ## What works today
 
-We label every input honestly, in the app's bottom strip and in this table.
+We label every input honestly, in the status pills along the bottom of the app and in this table.
 
 | Input | Status |
 | --- | --- |
 | **Keyboard** | ✅ The full flow in the app: choose, preview, confirm or cancel, map reveal, and speech |
 | **Simulated** (g.Pype `Generator`) | ✅ The same flow driven by a real g.Pype pipeline. ✅ Evidence view with a synthetic P300. |
-| **Recorded** (g.Pype replay) | ✅ The evidence view replays a recorded session. Replay inside the app isn't built. |
+| **Recorded** (g.tec's P300 Speller dataset) | ✅ Real recorded human EEG chooses the tile in the app: each flash is answered with one recorded brain response, and the live path's g.Pype pipeline and classifier calibrate on them and decide. Which tile counts as looked-at is scripted and the screen says "re-mapped to our tiles". It runs as a walkthrough of a headset session. ✅ The evidence view plays the same recordings. On them our classifier picks the right tile 94 % of the time from one flash and 100 % from five ([how](docs/eeg-hardware/README.md#how-many-flashes-the-chooser-needs-151)). |
 | **Live EEG** (Unicorn Hybrid Black) | 🔧 The P300 chooser, alpha switch, evidence view, and a guided live-run harness (`python -m signal2speech.eeg.live --source hybridblack`) are built and pass on simulated input. They **haven't run on a real wearer yet**. The app takes live input (`python -m signal2speech.app --input live`): it calibrates on the app's tiles (P300, then 10 s eyes open and 10 s eyes closed), then the P300 chooser picks a tile and key 1 confirms. Eye-closure confirm stays off until a wearer run proves it's safe (then `--arm-live-confirm`) ([#23](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/23), [#103](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/103)). |
 | **AI Answering** | ✅ Claude (`claude-sonnet-5-5`) suggests replies when an API key is in `.env`, grounded in the OpenOrbit data, and can offer a map action (compare counties or show the satellite view) whose spoken line comes from the dataset. Without a key, or offline, it uses clearly labelled practice replies or saved phrases. Real replies verified 11/14/26 (#106). |
 
@@ -57,6 +58,8 @@ We label every input honestly, in the app's bottom strip and in this table.
 
 The app answers out loud: *"Washtenaw's AQI rose 186 points. Wayne's rose 168 points."* NASA imagery shows the smoke from orbit. EPA data measures air quality at ground level.
 
+Both map screens play NASA's daily images from June 24 to June 28, 2023, one day flowing into the next: ground visible on June 24, three days of cloud, then smoke on June 28. The cloudy days are shown as they were and labelled "mostly cloud". The air-quality numbers compare June 26 with June 28, the two days we hold EPA data for, and the screen says so.
+
 ## How it works
 
 ```
@@ -70,7 +73,7 @@ keyboard / simulator ─────┘
 
 - **Choose with P300, confirm with alpha.** They're different brain signals, so a leftover flash response can't confirm by accident.
 - **One selection contract** for every input. Rounds, late or duplicate signals, and cancels are handled in one place ([selection contract](docs/architecture/selection-contract.md)).
-- **One Python process**, fully offline: PySide6 for the screens, offline OS speech, and bundled NASA and EPA data. CI runs the tests on Windows, macOS, and Linux.
+- **One Python process.** The only thing that needs the internet is the AI reply suggestions (Claude); without it the app falls back to saved phrases. Local: PySide6 for the screens, offline speech (a natural neural voice when [Piper is installed](docs/text-to-speech/README.md#a-natural-voice-piper-optional), the operating system's voice otherwise), and bundled NASA and EPA data. CI runs the tests on Windows, macOS, and Linux.
 
 <details><summary><b>The real g.Pype graph</b> behind <code>--input live</code>, generated from the code (#166)</summary>
 
@@ -156,6 +159,7 @@ The same code reads a live g.tec Unicorn Hybrid Black (`--source hybridblack`), 
 
 ## For developers
 
+- **[Team briefing](docs/TEAM-BRIEFING.md): what we built, what is real, and answers to expect from judges**
 - [Engineering docs](docs/README.md), split by area, with the [shared memory](docs/MEMORY.md)
 - [DEVLOG](DEVLOG.md): plain-language notes on every finished issue
 - Tests: `pip install -e ".[dev]"`, then `pytest`. The repo's git hooks: `git config core.hooksPath .githooks`

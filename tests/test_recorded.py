@@ -130,3 +130,32 @@ def test_real_gtec_recording_loads_as_responses():
     # that difference is the human P300 the classifier works from.
     diff = r.pools[True].mean(axis=0) - r.pools[False].mean(axis=0)
     assert np.abs(diff[int(0.2 * p300.RATE):int(0.6 * p300.RATE)]).max() > 3.0
+
+
+@pytest.mark.skipif(bool(os.environ.get("CI")), reason="builds a g.Pype pipeline; see the exit crash on CI (#224)")
+def test_phrase_demo_lets_recorded_data_answer_only_a_question_that_was_asked(qapp):
+    """In the phrase selection demo, recorded EEG picks a reply for each typed question, and
+    never starts choosing by itself between questions."""
+    from signal2speech.ai.__main__ import AnsweringDemo
+
+    demo = AnsweringDemo(InputSources.RECORDED, provider_kind="stub", speaker=FakeSpeaker(), view=FakeView(),
+                         echo=False, recording=made_up_recording())
+    try:
+        sim = demo.app.sim
+        assert isinstance(sim, app_live.RecordedEegInput) and list(sim.script) == []
+        assert "Type a question" in sim.idle_hint
+        saved = demo.suggester.saved.current("waiting for a question")
+        armed = []
+        real_ask = demo.app.ask
+        demo.app.ask = lambda: (armed.append(list(sim.script)), real_ask())[1]
+        demo._show(saved)                                   # nobody asked: nothing for the data to answer
+        assert armed[-1] == []
+        demo.attend(2)                                      # the operator: the wearer looks at reply 2
+        demo._asked = True
+        demo._show(saved)
+        assert armed[-1] == [2, 1] and demo.next_pick == 1  # one look, one confirm, then it alternates
+        demo._show(saved)                                   # replies changed without a new question
+        assert armed[-1] != [1, 1]
+    finally:
+        demo.app.close()
+        demo.root.close()
