@@ -1,6 +1,6 @@
 # Code tour: five minutes from flash to speech (#107)
 
-Judges may ask anyone on the team to walk through the code. This page is that walk, in the order a judge's questions usually come. Each stop has one sentence to say out loud, then the lines to open. The links point at `main` as of `6c273bb` (11/14, 9:00 PM), so line numbers can drift as `main` moves.
+Judges may ask anyone on the team to walk through the code. This page is that walk, in the order a judge's questions usually come. Each stop has one sentence to say out loud, then the lines to open. The links point at `main` as of `893d38f` (11/14, 9:30 PM), so line numbers can drift as `main` moves.
 
 **Judging runs on simulation.** There's no headset at the event. The demo command is `python -m signal2speech.app --input simulated --p300`, and the screen labels it Simulated. Say that up front.
 
@@ -40,9 +40,9 @@ Judges may ask anyone on the team to walk through the code. This page is that wa
 
 > "There's exactly one output path: the sink changes the map, then speaks the line the wearer previewed, once."
 
-- [`app.py:83`](../../signal2speech/app.py#L83) `AppSink.execute` calls `show_satellite()` ([:87](../../signal2speech/app.py#L87)) or `compare_air_quality()` ([:90](../../signal2speech/app.py#L90)), then `speaker.say` once ([:98](../../signal2speech/app.py#L98)).
-- **The map.** [`app.py:128`](../../signal2speech/app.py#L128) `load_view` loads `OpenOrbitView` ([`openorbit/view.py:360`](../../signal2speech/openorbit/view.py#L360), [:364](../../signal2speech/openorbit/view.py#L364)). The AQI changes are computed from EPA's rows, and a test checks them against the spoken line. After a confirm, `_set_reveal` ([`app.py:334`](../../signal2speech/app.py#L334)) hides the tiles and widens the map for 8 s.
-- **The voice.** [`speech/speaker.py:80`](../../signal2speech/speech/speaker.py#L80) `OfflineSpeaker.say` tries a bundled clip, then Qt TextToSpeech (the offline OS voice), then pyttsx3. No clip is bundled, so it uses the OS voice, which works with Wi-Fi off.
+- [`app.py:91`](../../signal2speech/app.py#L91) `AppSink.execute` calls `show_satellite()` ([:99](../../signal2speech/app.py#L99)) or `compare_air_quality()` ([:102](../../signal2speech/app.py#L102)), then `speaker.say` once ([:116](../../signal2speech/app.py#L116)).
+- **The map.** [`app.py:151`](../../signal2speech/app.py#L151) `load_view` loads `OpenOrbitView` ([`openorbit/view.py:360`](../../signal2speech/openorbit/view.py#L360), [:364](../../signal2speech/openorbit/view.py#L364)). The AQI changes are computed from EPA's rows, and a test checks them against the spoken line. After a confirm, `_set_reveal` ([`app.py:368`](../../signal2speech/app.py#L368)) hides the tiles and widens the map for 8 s.
+- **The voice.** [`speech/speaker.py:91`](../../signal2speech/speech/speaker.py#L91) `OfflineSpeaker.say` tries a bundled clip, then Qt TextToSpeech (the offline OS voice), then pyttsx3. No clip is bundled, so it uses the OS voice, which works with Wi-Fi off.
 
 ## 5. CI and the git hooks
 
@@ -60,7 +60,13 @@ Judges may ask anyone on the team to walk through the code. This page is that wa
 
 ## 7. Honest input labels
 
-`InputSources` ([`core/contract.py:9`](../../signal2speech/core/contract.py#L9)) defines keyboard, simulated, recorded, and live-eeg. The judge strip always shows the current one ([`ui/window.py:202`](../../signal2speech/ui/window.py#L202)), and so does the window title ([`app.py:268`](../../signal2speech/app.py#L268)). Never call a simulated or recorded run live.
+`InputSources` ([`core/contract.py:9`](../../signal2speech/core/contract.py#L9)) defines keyboard, simulated, recorded, and live-eeg. The judge strip always shows the current one ([`ui/window.py:202`](../../signal2speech/ui/window.py#L202)), and so does the window title ([`app.py:299`](../../signal2speech/app.py#L299)). Never call a simulated or recorded run live.
+
+## 8. PiEEG's simulator
+
+> "PiEEG's own simulator streams over Lab Streaming Layer into the same alpha confirm. The keyboard picks, and PiEEG's alpha burst confirms it."
+
+`python -m signal2speech.eeg.pieeg_lsl --demo` (#138), with PiEEG's starter `python python_quickstart.py --sim --lsl` running in another terminal. [`find_local_stream`](../../signal2speech/eeg/pieeg_lsl.py#L60) takes only this laptop's `Octopus16` stream, and [`PiEEGRelay`](../../signal2speech/eeg/pieeg_lsl.py#L77) republishes it under a unique name, so another team's simulator can't drive our app. `gp.LslReceiver` ([:109](../../signal2speech/eeg/pieeg_lsl.py#L109)) feeds it into `AlphaConfirm` ([:180](../../signal2speech/eeg/pieeg_lsl.py#L180)). PiEEG's simulators have no P300, so this path never drives the P300 chooser. It's labelled Simulated (PiEEG). The setup is in [pieeg.md](../eeg-hardware/pieeg.md).
 
 ## The three hardest judge questions
 

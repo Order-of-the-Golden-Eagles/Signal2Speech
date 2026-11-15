@@ -104,6 +104,7 @@ Verify on a real wearer with the Unicorn, add more than two choices per round, s
 | Grounded replies, Sonnet 5.5 | ⏳ Only after #116 merges. Until then, use the conditional wording above. | #116 |
 | Spoken calibration cues | ✅ In the guided live run | `signal2speech/eeg/live.py` (#78) |
 | Headset lost in transit | Team statement (Vasanth). Not something the repo can check. | #105 plan |
+> We used Claude (Anthropic) as a coding assistant during the hackathon. In the app, AI Answering can suggest reply options using Claude (`claude-sonnet-5-5`) when an API key is configured. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with LDA, the alpha switch) is our own g.Pype pipeline, not an AI model.
 
 ## Before the final
 
