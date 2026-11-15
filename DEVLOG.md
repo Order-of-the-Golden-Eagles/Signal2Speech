@@ -689,7 +689,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - A cleaner font, a calmer status strip, and short fades when the preview and the map appear. The card flashes are untouched: they stay instant and plain white, because the brain response is timed against them
 - Verified by screenshots on the judging laptop's real display in every screen, and by the interface tests. Not checked on macOS or Linux, where the font and emoji fall back to what's installed
 
-## 11/15/26 - 8:14 AM - Vasanth Anbukumar - #104 Recorded mode now runs like a session with a headset on, with an opening and a calmer look (PR pending)
+## 11/15/26 - 8:14 AM - Vasanth Anbukumar - #104 Recorded mode now runs like a session with a headset on, with an opening and a calmer look ([PR #223](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/223))
 - `python -m signal2speech.app --input recorded` now walks through a session the way a wearer would go through it: the wearer's own prompts ("look at this card and count its flashes", "close your eyes"), and the card the wearer would be looking at is outlined and marked
     - It says what it is. Three guidance lines are spoken during setup, starting with "This is a walkthrough on recorded brain data. Nobody is wearing a headset", and the line under the cards repeats that
     - `--no-gaze-mark` and `--no-narration` turn the outline and the spoken lines off
