@@ -14,6 +14,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 board = ["bleak>=1.0"]   # Bluetooth LE, only to run PiEEG's own starter script for a real board (#150)
+# A natural offline voice (#28). GPL-3.0: we run its command line, we never import it.
+# Also needs a voice file in voices/ (see docs/text-to-speech/README.md).
+voice = ["piper-tts>=1.5"]
 # MCP server for AI assistants (#110): python -m signal2speech.mcp
 mcp = ["mcp>=2.3,<3"]
 

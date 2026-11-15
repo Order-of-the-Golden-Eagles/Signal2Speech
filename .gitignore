@@ -92,3 +92,6 @@ $RECYCLE.BIN/
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# ── Neural voice files (63 MB each, own licences): download, never commit ──
+voices/

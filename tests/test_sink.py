@@ -164,3 +164,90 @@ def test_pyttsx3_fallback_speaks_every_line_from_its_own_process(qapp, tmp_path,
     assert [p.terminated for p in spawned] == [True, False, False]   # only the overlapping one was cut
     assert len(started) == 3
     assert sum("helper process" in l for l in log) == 3
+
+
+# ── Natural voice (Piper) ────────────────────────────────────
+def test_spoken_form_says_known_abbreviations_in_full_and_spells_unknown_ones():
+    from signal2speech.speech.neural import spoken_form
+    assert spoken_form("Washtenaw's AQI rose 186 points.") == "Washtenaw's air quality index rose 186 points."
+    assert spoken_form("Send the PDF to me") == "Send the P.D.F. to me"
+    assert spoken_form("Send me the PDF.") == "Send me the P.D.F."          # no doubled full stop
+    assert spoken_form("NASA imagery. OK? Yes, I am.") == "NASA imagery. OK? Yes, I am."
+    assert spoken_form("Yes, please.") == "Yes, please."
+
+
+def test_find_voice_honours_off_and_an_explicit_file(tmp_path, monkeypatch):
+    from signal2speech.speech import neural
+    (tmp_path / "b.onnx").write_bytes(b"x")
+    (tmp_path / "a.onnx").write_bytes(b"x")
+    monkeypatch.delenv(neural.VOICE_ENV, raising=False)
+    assert neural.find_voice(tmp_path) == tmp_path / "a.onnx"
+    assert neural.find_voice(tmp_path / "missing") is None
+    monkeypatch.setenv(neural.VOICE_ENV, "off")
+    assert neural.find_voice(tmp_path) is None
+    monkeypatch.setenv(neural.VOICE_ENV, str(tmp_path / "b.onnx"))
+    assert neural.find_voice(tmp_path) == tmp_path / "b.onnx"
+
+
+class _FakePiper:
+    """Stands in for the Piper process: writes the WAV when told to finish."""
+    made = []
+
+    def __init__(self, args, **kwargs):
+        self.args, self.code = args, None
+        self.stdin = types.SimpleNamespace(write=lambda b: setattr(self, "text", b.decode()), close=lambda: None)
+        _FakePiper.made.append(self)
+
+    def poll(self):
+        return self.code
+
+    def finish(self, ok=True):
+        if ok:
+            from pathlib import Path
+            Path(self.args[self.args.index("-f") + 1]).write_bytes(b"RIFF" + b"\0" * 100)
+        self.code = 0 if ok else 1
+
+
+def test_piper_voice_makes_each_line_once_and_only_names_finished_files(tmp_path, monkeypatch):
+    from signal2speech.speech import neural
+    _FakePiper.made = []
+    monkeypatch.setattr(neural.subprocess, "Popen", _FakePiper)
+    voice = neural.PiperVoice(tmp_path / "v.onnx", cache_dir=tmp_path / "cache")
+    clip = voice.request("The AQI rose.")
+    assert clip.state() == "working" and not clip.wav.exists()
+    assert voice.request("The AQI rose.") is clip and len(_FakePiper.made) == 1   # previewed, then said
+    assert _FakePiper.made[0].text == "The air quality index rose.\n"
+    scale = lambda proc: proc.args[proc.args.index("--length-scale") + 1]
+    assert scale(_FakePiper.made[0]) == "1.0"                                     # no numbers: normal speed
+    voice.request("It rose 186 points.")
+    assert scale(_FakePiper.made[-1]) == "1.25"                                   # numbers: 25 % slower
+    _FakePiper.made.pop()
+    _FakePiper.made[0].finish()
+    assert clip.state() == "ready" and clip.wav.is_file()
+    bad = voice.request("Another line.")
+    _FakePiper.made[1].finish(ok=False)
+    assert bad.state() == "failed"
+    assert voice.request("Another line.") is not bad                              # a failure is retried
+
+
+def test_speaker_falls_back_for_a_line_the_natural_voice_cannot_make(qapp, tmp_path, monkeypatch):
+    from signal2speech.speech import neural
+    _FakePiper.made = []
+    monkeypatch.setattr(neural.subprocess, "Popen", _FakePiper)
+    monkeypatch.setitem(sys.modules, "pyttsx3", None)
+    log = []
+    sp = OfflineSpeaker(log.append, audio_dir=tmp_path, use_qt_tts=False,
+                        neural=neural.PiperVoice(tmp_path / "v.onnx", cache_dir=tmp_path / "cache"))
+    assert sp.backend == "Piper (v)"
+    played = []
+    monkeypatch.setattr(sp, "_play_wav", played.append)
+    sp.prepare("Yes, please.")                                   # previewed: starts the work, no sound
+    assert len(_FakePiper.made) == 1 and not played
+    _FakePiper.made[0].finish()
+    sp.say("Yes, please.", "speak_reply")
+    assert len(played) == 1 and len(_FakePiper.made) == 1        # ready at once, made once
+    sp.say("No, thank you.", "speak_reply")
+    _FakePiper.made[1].finish(ok=False)
+    sp._play_neural_when_ready()
+    assert len(played) == 1
+    assert any("couldn't make this line" in l for l in log) and any("NO OFFLINE VOICE" in l for l in log)
