@@ -74,7 +74,9 @@ def test_key_preview_then_confirm_sends_one_effect(ui):
     assert [a.action_id for a in sink.actions] == ["compare_air_quality"]
     assert w.press_target(T1) is Outcome.RejectedNoOpenRound   # repeat: no second effect
     assert len(sink.actions) == 1
-    assert w.tiles[T1].label == "" and not w.preview.isVisibleTo(w)
+    # #174: the confirmed tile stays in its selected state; the other one waits.
+    assert (w.tiles[T1].label, w.tiles[T1].state) == ("Confirm", "selected")
+    assert w.tiles[T2].state == "waiting" and not w.preview.isVisibleTo(w)
     assert "RejectedNoOpenRound" in w.outcome_label.text()
 
 
@@ -233,3 +235,72 @@ def test_window_fits_twelve_word_reply_at_1280x720(ui):
     w.press_target(T1)
     app.processEvents()
     assert MIN_PX <= w.preview_px <= w.PREVIEW_MAX_PX
+
+
+# ── #174: redesigned tiles ───────────────────────────────────
+def test_tile_states_and_descriptions(app):
+    from signal2speech.core import ActionIds
+    from signal2speech.ui import theme
+    t = Tile("target-1", "1")
+    t.resize(400, 360)
+    assert t.state == "waiting"
+    t.set_label("Compare counties", ActionIds.COMPARE_AIR_QUALITY)
+    assert t.state == "idle" and t.icon == "chart"
+    assert t.description == theme.ACTION_INFO[ActionIds.COMPARE_AIR_QUALITY][1]
+    assert "[1]" not in t.text()                       # the key is a badge now, not in the title
+    t.set_lit(True)
+    assert t.state == "lit"
+    t.set_lit(False)
+    t.set_selected(True)
+    assert t.state == "selected"
+    t.set_label("Show the satellite view", ActionIds.SHOW_SATELLITE)
+    assert t.state == "idle" and t.icon == "satellite"   # a new label clears "selected"
+
+
+def test_flash_still_looks_the_same(app):
+    """The classifier's stimulus must not change: a lit tile is plain white with black content."""
+    from PySide6.QtGui import QColor
+    from signal2speech.core import ActionIds
+    from signal2speech.ui import theme
+    t = Tile("target-1", "1")
+    t.resize(400, 360)
+    t.set_label("Compare counties", ActionIds.COMPARE_AIR_QUALITY)
+    t.set_lit(True)
+    img = t.grab().toImage()
+    corner = img.pixelColor(40, img.height() // 2)      # inside the border, away from text
+    assert corner == QColor(theme.TILE_LIT_BG)
+    assert (theme.TILE_LIT_BG, theme.TILE_LIT_TEXT) == ("#ffffff", "#000000")
+
+
+def test_every_tile_kind_draws_an_icon(app):
+    from PySide6.QtGui import QImage, QPainter, QColor
+    from PySide6.QtCore import QRectF
+    from signal2speech.ui.icons import draw_icon
+    for kind in ("satellite", "chart", "speech", "check", "cross"):
+        img = QImage(64, 64, QImage.Format.Format_ARGB32)
+        img.fill(QColor("#000000"))
+        p = QPainter(img)
+        draw_icon(p, kind, QRectF(8, 8, 48, 48), "#ffffff")
+        p.end()
+        lit = sum(1 for x in range(64) for y in range(64) if img.pixelColor(x, y).red() > 128)
+        assert lit > 30, kind
+
+
+def test_tile_repaint_stays_well_under_a_frame(app):
+    """#174 draws tiles by hand; a flash must still repaint in far less than one 60 Hz frame."""
+    import time
+    from signal2speech.core import ActionIds
+    t = Tile("target-1", "1")
+    t.resize(420, 560)
+    t.set_label("Compare counties", ActionIds.COMPARE_AIR_QUALITY)
+    t.show()
+    app.processEvents()
+    ms = []
+    for i in range(60):
+        start = time.perf_counter()
+        t.set_lit(i % 2 == 0)
+        t.repaint()
+        ms.append((time.perf_counter() - start) * 1000)
+    ms.sort()
+    assert ms[int(0.95 * len(ms))] < 16.0, ms[-5:]
+    t.close()

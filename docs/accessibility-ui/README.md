@@ -51,7 +51,7 @@ The standalone sink only prints the `ConfirmedAction`. It plays no audio and cha
 
 ## Colour contrast (#135)
 
-Every text colour lives in `signal2speech/ui/palette.py`, and `tests/test_contrast.py` checks each pair against WCAG AA: 4.5:1, or 3:1 for bold text of 24 px or more. It also checks the help overlay drawn over a white flashing tile, and fails if a raw `#rrggbb` appears in the window or overlay code. The only fix needed was **Recorded**'s input-label purple: `#a855f7` (4.4:1) became `#c084fc`.
+Every text colour lives in `signal2speech/ui/theme.py` (`palette.py` is a back-compat alias), and `tests/test_contrast.py` checks each pair against WCAG AA: 4.5:1, or 3:1 for bold text of 24 px or more. It also checks the help overlay drawn over a white flashing tile, and fails if a raw `#rrggbb` appears in the window or overlay code. The only fix needed was **Recorded**'s input-label purple: `#a855f7` (4.4:1) became `#c084fc`.
 
 | Text | Colours | Contrast | Needs |
 | --- | --- | ---: | ---: |
@@ -70,3 +70,23 @@ Every text colour lives in `signal2speech/ui/palette.py`, and `tests/test_contra
 | help text | `#f5f7fa` on `#0b0d10` | 18.1:1 | 4.5:1 |
 | help keys | `#ffe066` on `#0b0d10` | 14.9:1 | 3.0:1 |
 | help footer | `#94a3b8` on `#0b0d10` | 7.6:1 | 4.5:1 |
+
+## One visual design (#174)
+
+`signal2speech/ui/theme.py` is the single source for the look: colour roles (background, surface, raised, border, text, muted, quiet, accent, success), a type scale (56 / 44 / 36 / 28 / 22 / 18 px, with a 32 px floor for fitted text), spacing (4 / 8 / 16 / 24 / 32), and corner radii (8 / 14 / 20). The selection window, tiles, judge strip, help overlay, app shell and transcript, AI question panel, and launcher all take their styling from it. `tests/test_contrast.py` fails if any of them uses a raw colour code. The OpenOrbit map view keeps its own data-display styling (#30).
+
+**Tiles** are drawn by hand: a small drawn icon (satellite, chart, speech bubble, check, cross), the fitted title, a one-line description of what happens, and the key as a corner badge instead of "[1]" in the title.
+
+| State | Look |
+| --- | --- |
+| Idle | Raised surface, white title, muted description, yellow key badge |
+| Flashing | **Plain white with black content, as before.** The badge is an outline, not a filled block, so the P300 stimulus is unchanged. Repaint takes about 3 ms (a test keeps the p95 under one 60 Hz frame). |
+| Selected | Green fill and outline with a check, "Sent to output". It shows the confirmed choice until the next question. |
+| Waiting | Dim surface, "Waiting for the next question" (no round open) |
+
+| Before | After |
+| --- | --- |
+| ![before: choose](media/174-before-1-choose.jpg) | ![after: choose](media/174-after-1-choose.jpg) |
+| ![before: preview](media/174-before-3-preview.jpg) | ![after: preview](media/174-after-3-preview.jpg) |
+
+More after-shots: [flashing](media/174-after-2-flash.jpg), [selected](media/174-after-6-selected.jpg), [waiting](media/174-after-0-idle.jpg).

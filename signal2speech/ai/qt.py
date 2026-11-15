@@ -58,7 +58,10 @@ class AsyncSuggester(QObject):
         self.ready.emit(result)
 
 
-_ORIGIN_COLORS = {CLAUDE: "#22c55e", STUB: "#f59e0b", SAVED: "#60a5fa"}
+from signal2speech.ui import theme as T  # noqa: E402  (#174: one visual design)
+
+_ORIGIN_COLORS = {CLAUDE: T.ORIGIN_COLORS['Claude'], STUB: T.ORIGIN_COLORS['Stub'],
+                  SAVED: T.ORIGIN_COLORS['Saved phrases']}
 
 
 class QuestionPanel(QWidget):
@@ -71,16 +74,16 @@ class QuestionPanel(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setStyleSheet(
-            "QLabel{color:#e2e8f0;font-size:20px;}"
-            "QLineEdit{background:#151a21;color:#f5f7fa;font-size:22px;padding:8px;"
-            "border:2px solid #475569;border-radius:8px;}"
-            "QPushButton{background:#1e2630;color:#f5f7fa;font-size:18px;padding:8px 14px;"
-            "border:2px solid #475569;border-radius:8px;}"
-            "QPushButton:disabled{color:#64748b;}")
+            f"QLabel{{color:{T.STRIP_TEXT};font-size:{T.CAPTION + 2}px;}}"
+            f"QLineEdit{{background:{T.SURFACE};color:{T.TEXT};font-size:{T.BODY}px;padding:{T.S}px;"
+            f"border:2px solid {T.BORDER};border-radius:{T.RADIUS_S}px;}}"
+            f"QPushButton{{background:{T.RAISED};color:{T.TEXT};font-size:{T.CAPTION}px;"
+            f"padding:{T.S}px {T.M}px;border:2px solid {T.BORDER};border-radius:{T.RADIUS_S}px;}}"
+            f"QPushButton:disabled{{color:{T.QUIET};}}")
         col = QVBoxLayout(self)
         col.setContentsMargins(0, 0, 0, 0)
         title = QLabel("Question from the conversation partner")
-        title.setStyleSheet("color:#cbd5e1;font-size:22px;font-weight:600;")
+        title.setStyleSheet(f"color:{T.MUTED};font-size:{T.BODY}px;font-weight:600;")
         col.addWidget(title)
         self.question = QLineEdit(placeholderText="Type a question, then press Enter")
         col.addWidget(self.question)
@@ -115,7 +118,7 @@ class QuestionPanel(QWidget):
             self.origin.setText(f"Asking {provider_note}… current choices stay on screen")
 
     def show_origin(self, rs: ReplySet) -> None:
-        color = _ORIGIN_COLORS.get(rs.origin, "#e2e8f0")
+        color = _ORIGIN_COLORS.get(rs.origin, T.STRIP_TEXT)
         note = f" · {rs.note}" if rs.note else ""
         self.origin.setText(f"<span style='color:{color};font-weight:700'>Replies: {rs.origin}"
                             f"</span>{note}")

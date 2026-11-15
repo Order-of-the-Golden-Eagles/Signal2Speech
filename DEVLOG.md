@@ -507,3 +507,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - It fails on leftover merge-conflict markers and on a devlog entry duplicated by a merge, the two things that have actually broken doc-only PRs today
 - The pre-push hook does the same locally: quick checks always, and the full test suite only when the pushed commits change code, tests, data, or build files
 - Anything under `signal2speech/`, `tests/`, `contracts/`, `data/` (except its `.md` notes), `tools/`, `.github/`, `.githooks/`, or the dependency files still runs everything. Pushes to `main` always run the full suite on every OS
+
+## 11/15/26 - 11:59 PM - Long Le - #174 One visual design and redesigned tiles ([PR #185](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/185))
+- The app now has one visual design: `signal2speech/ui/theme.py` sets the colours, text sizes, spacing, and corners, and every screen we built uses it
+- The two choice tiles are redesigned: an icon, a clear title, a one-line "what happens" line, and the key as a small badge in the corner instead of "[1]" in the title. They have distinct idle, flashing, selected (green check after a confirm), and waiting states
+- The flash looks the same as before (plain white with black content), so the brain-signal stimulus doesn't change. The flash timing check still passes, and the new tiles repaint in about 3 ms
+- All text still meets WCAG AA. A test fails if any screen uses a colour outside the theme. Before and after screenshots are in `docs/accessibility-ui/README.md`

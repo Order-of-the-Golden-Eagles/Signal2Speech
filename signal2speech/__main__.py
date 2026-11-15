@@ -68,7 +68,7 @@ def run_window(spawn: Optional[Callable[[List[str]], object]] = None,
     from PySide6.QtCore import QProcess, Qt
     from PySide6.QtWidgets import (QApplication, QCheckBox, QLabel, QPlainTextEdit, QPushButton,
                                    QVBoxLayout, QWidget)
-    from signal2speech.ui import palette as P
+    from signal2speech.ui import theme as P
 
     QApplication.instance() or QApplication(sys.argv[:1])
 
@@ -78,16 +78,16 @@ def run_window(spawn: Optional[Callable[[List[str]], object]] = None,
     spawn = spawn or detached
     win = QWidget()
     win.setWindowTitle("Signal2Speech")
-    win.setStyleSheet(f"QWidget {{ background: {P.BG}; color: {P.TEXT}; font-size: 18px; }}"
-                      f"QPushButton {{ background: {P.TILE_BG}; color: {P.TILE_TEXT}; font-size: 24px;"
+    win.setStyleSheet(f"QWidget {{ background: {P.BG}; color: {P.TEXT}; font-size: {P.CAPTION}px; }}"
+                      f"QPushButton {{ background: {P.RAISED}; color: {P.TILE_TEXT}; font-size: {P.BODY + 2}px;"
                       f" font-weight: 700; padding: 14px; border: 2px solid {P.TILE_BORDER}; border-radius: 12px; text-align: left; }}"
                       f"QPushButton:disabled {{ color: {P.QUIET}; }}"
                       f"QLabel#what {{ color: {P.MUTED}; padding: 0 0 10px 6px; }}"
                       f"QPlainTextEdit {{ background: {P.STRIP_BG}; color: {P.STRIP_TEXT};"
-                      " font-family: Menlo, Consolas, monospace; font-size: 14px; }")
+                      f" font-family: {P.MONO}; font-size: 14px; }}")
     col = QVBoxLayout(win)
     head = QLabel("Signal2Speech")
-    head.setStyleSheet("font-size: 36px; font-weight: 700;")
+    head.setStyleSheet(f"font-size: {P.TITLE}px; font-weight: 700;")
     col.addWidget(head)
     sub = QLabel("Answer without speaking or typing. Pick a tool:")
     sub.setStyleSheet(f"color: {P.MUTED}; padding-bottom: 8px;")

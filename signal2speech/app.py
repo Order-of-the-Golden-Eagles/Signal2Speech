@@ -36,6 +36,7 @@ from signal2speech.core import (ActionIds, Choice, ConfirmedAction, EegClassMap,
                                 SelectionHandler, TargetIds)
 from signal2speech.speech import MutedSpeaker, OfflineSpeaker, Speaker
 from signal2speech.ui import INPUT_LABELS, KeyHelpOverlay, SelectionWindow
+from signal2speech.ui import theme as T
 from signal2speech.ui.__main__ import load_demo_choices
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -129,8 +130,9 @@ class PendingMapView(QLabel):
         self.calls: List[str] = []
         self.setWordWrap(True)
         self.setMinimumSize(360, 280)
-        self.setStyleSheet("background:#151a21; color:#e2e8f0; border:3px dashed #f59e0b;"
-                           "border-radius:14px; font-size:22px; padding:20px;")
+        self.setStyleSheet(f"background:{T.SURFACE}; color:{T.STRIP_TEXT}; border:3px dashed "
+                           f"{T.INPUT_COLORS[InputSources.SIMULATED]}; border-radius:{T.RADIUS_M}px;"
+                           f"font-size:{T.BODY}px; padding:{T.L}px;")
         self._render()
 
     def show_satellite(self) -> None:
@@ -230,8 +232,8 @@ class App:
         self.input_source = input_source
 
         self.transcript_view = QPlainTextEdit(readOnly=True)
-        self.transcript_view.setStyleSheet("background:#0f1318; color:#e2e8f0; font-size:15px;"
-                                           "font-family: Menlo, Consolas, monospace;")
+        self.transcript_view.setStyleSheet(f"background:{T.SURFACE}; color:{T.STRIP_TEXT}; font-size:15px;"
+                                           f"font-family: {T.MONO};")
         self.log = Transcript(self.transcript_view, echo=echo)
         self.view = view if view is not None else load_view()
         if speaker is None:
@@ -297,10 +299,10 @@ class App:
 
         self.root = QWidget()
         self.root.setWindowTitle(f"Signal2Speech · {INPUT_LABELS[input_source]}")
-        self.root.setStyleSheet("background:#0b0d10;")
+        self.root.setStyleSheet(f"background:{T.BG};")
         right = QVBoxLayout()
         title = QLabel("Output and transcript")
-        title.setStyleSheet("color:#cbd5e1; font-size:22px; font-weight:600;")
+        title.setStyleSheet(f"color:{T.MUTED}; font-size:{T.BODY}px; font-weight:600;")
         right.addWidget(title)
         if isinstance(self.view, QWidget):
             right.addWidget(self.view, 3)
