@@ -70,6 +70,11 @@ Every text colour lives in `signal2speech/ui/theme.py` (`palette.py` is a back-c
 | help text | `#f5f7fa` on `#0b0d10` | 18.1:1 | 4.5:1 |
 | help keys | `#ffe066` on `#0b0d10` | 14.9:1 | 3.0:1 |
 | help footer | `#94a3b8` on `#0b0d10` | 7.6:1 | 4.5:1 |
+| conversation text | `#f5f7fa` on `#151a21` | 16.3:1 | 4.5:1 |
+| conversation label | `#cbd5e1` on `#151a21` | 11.8:1 | 4.5:1 |
+| conversation previewed | `#ffe066` on `#151a21` | 13.4:1 | 4.5:1 |
+| conversation said | `#22c55e` on `#151a21` | 7.7:1 | 4.5:1 |
+| conversation time / input | `#94a3b8` on `#151a21` | 6.8:1 | 4.5:1 |
 
 ## One visual design (#174)
 
@@ -112,3 +117,35 @@ After a confirm, a **"✓ Spoken"** (or "✓ Shown and spoken") state keeps the 
 | Ready | Holding 1 | Spoken |
 | --- | --- | --- |
 | ![preview](media/175-preview.jpg) | ![holding](media/175-holding.jpg) | ![spoken](media/175-spoken.jpg) |
+
+## Readable conversation (#176)
+
+The panel under the map is now a conversation that a judge can read, not the raw log (`signal2speech/ui/conversation.py`). Each entry has a time, a label, and the input that caused it (Keyboard, Simulated, Recorded, or Live EEG):
+
+| Label | When |
+| --- | --- |
+| Question | The AI demo heard or was typed a question |
+| Options | A Choose round opened. It lists both choices and where they came from (the demo script, Claude, or the offline fallback). |
+| Previewed | A choice was picked, with the quoted sentence that will be said |
+| Said aloud / Showed the map and said | The confirm went to output. The text is the exact sentence that was spoken. |
+| Nothing was said | Cancel ("The preview was cancelled."), timeout ("No answer in time, so the preview was cancelled."), or disconnect ("The headset disconnected, so nothing was said.") |
+
+- **F2** swaps the conversation for the developer log (round ids, handler outcomes, timings). The log is unchanged and still feeds the console.
+- Entries are built from the same handler events and output sink as the log, so the two can't disagree.
+- The session report in `logs/` has a `## Conversation` section and a `## Developer log` section.
+
+![conversation after a confirm](media/176-conversation.jpg)
+
+## Sound cues (#177)
+
+A wearer with closed eyes can't see that a pick registered, so each event plays a short, quiet cue (`signal2speech/speech/cues.py`):
+
+| Cue | Sound | When |
+| --- | --- | --- |
+| Preview | One soft note (E5) | A choice is previewed |
+| Confirm | Two rising notes (C5 → G5) | A confirm. Speech starts after the cue ends, so they never overlap. The map changes at once. |
+| Cancel | Two falling notes (A4 → E4) | Cancel, timeout, or disconnect |
+
+- Each cue is 90–205 ms long at about a fifth of full volume, so it sits under the spoken reply.
+- The tones are generated in code with the standard library (sine waves with a 10 ms fade, so there's no click). Nothing is downloaded, and there's no third-party audio to license.
+- Turn them off with `--no-cues`. `--mute` also silences them. Tests use a fake player, so CI never plays sound.

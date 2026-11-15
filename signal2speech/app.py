@@ -37,6 +37,7 @@ from signal2speech.core import (ActionIds, Choice, ConfirmedAction, EegClassMap,
 from signal2speech.speech import MutedSpeaker, OfflineSpeaker, Speaker
 from signal2speech.ui import INPUT_LABELS, KeyHelpOverlay, SelectionWindow
 from signal2speech.ui import theme as T
+from signal2speech.ui.conversation import KINDS, ConversationView
 from signal2speech.ui.__main__ import load_demo_choices
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -88,6 +89,7 @@ class AppSink:
         # confirm -> audio actually started (None until it does, or if nothing is audible).
         self.timings: List[dict] = []
         self.on_timing: Optional[Callable[[dict], None]] = None
+        self.cues = None          # #177: a CuePlayer, or None for no sounds
 
     def execute(self, action: ConfirmedAction) -> None:
         t0 = self.clock()
@@ -109,12 +111,19 @@ class AppSink:
             return
         if action.spoken_text:
             self.log(f"OUTPUT speak: \"{action.spoken_text}\"")
-            if hasattr(self.speaker, "on_started"):
-                def started(entry=entry, t0=t0):
-                    entry["speech_ms"] = round((self.clock() - t0) * 1000, 1)
-                    self._report(entry)
-                self.speaker.on_started = started
-            self.speaker.say(action.spoken_text, action.action_id)
+
+            def speak(entry=entry, t0=t0):
+                if hasattr(self.speaker, "on_started"):
+                    def started():
+                        entry["speech_ms"] = round((self.clock() - t0) * 1000, 1)
+                        self._report(entry)
+                    self.speaker.on_started = started
+                self.speaker.say(action.spoken_text, action.action_id)
+            if self.cues is not None:
+                # #177: the confirm cue first, then the reply, so they never overlap.
+                QTimer.singleShot(self.cues.play("confirm") + 40, speak)
+            else:
+                speak()
         self._report(entry)
 
     def _report(self, entry: dict) -> None:
@@ -236,7 +245,7 @@ class App:
                  confirm_timeout_ms: int = CONFIRM_TIMEOUT_MS,
                  p300: bool = False, arm_live_confirm: bool = False,
                  live_options: Optional[dict] = None,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic, cues: bool = False):
         if input_source in BLOCKED_INPUTS:
             raise ValueError(BLOCKED_INPUTS[input_source])
         if input_source not in (InputSources.KEYBOARD, InputSources.SIMULATED,
@@ -247,6 +256,12 @@ class App:
         self.transcript_view = QPlainTextEdit(readOnly=True)
         self.transcript_view.setStyleSheet(f"background:{T.SURFACE}; color:{T.STRIP_TEXT}; font-size:15px;"
                                            f"font-family: {T.MONO};")
+        self.transcript_view.setFocusPolicy(Qt.FocusPolicy.NoFocus)   # never swallow key 1
+        # #176: what judges read. The developer log stays underneath (F2, session report).
+        self.conversation = ConversationView()
+        self.conversation.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.options_origin = "the demo script"
+        self._previewed = None
         self.log = Transcript(self.transcript_view, echo=echo)
         self.view = view if view is not None else load_view()
         if speaker is None:
@@ -254,6 +269,9 @@ class App:
         self.speaker = speaker
         self.sink = AppSink(self.view, speaker, self.log, clock=clock)
         self.sink.on_timing = self._show_timing
+        if cues and not mute:
+            from signal2speech.speech.cues import CuePlayer
+            self.sink.cues = CuePlayer()
         self.started_at = time.strftime("%Y-%m-%d %H:%M:%S")
         self.events: List[str] = []          # #131: timeline for the session report
         self.handler = SelectionHandler(self.sink)
@@ -268,6 +286,10 @@ class App:
         h.on_preview.append(lambda c: self.log(f"preview (no output): \"{c.spoken_text or c.label}\""))
         h.on_cleared.append(lambda r: self.log(f"cleared ({r}): no output"))
         h.on_handled.append(self._log_outcome)
+        h.on_round_opened.append(self._talk_round)          # #176, same events as the log
+        h.on_handled.append(self._talk_outcome)
+        h.on_cleared.append(self._talk_cleared)
+        h.on_preview.append(self._cue_preview)               # #177
         h.on_round_opened.append(lambda r: self._event(f"round {r.id} ({r.kind.value}) opened"))
         h.on_cleared.append(lambda r: self._event(f"cleared ({r}), no output"))
         h.on_handled.append(lambda e, o: self._event(
@@ -318,12 +340,14 @@ class App:
         self.root.setWindowTitle(f"Signal2Speech · {INPUT_LABELS[input_source]}")
         self.root.setStyleSheet(f"background:{T.BG};")
         right = QVBoxLayout()
-        title = QLabel("Output and transcript")
-        title.setStyleSheet(f"color:{T.MUTED}; font-size:{T.BODY}px; font-weight:600;")
-        right.addWidget(title)
+        self.panel_title = QLabel("Conversation   ·   F2: developer log")
+        self.panel_title.setStyleSheet(f"color:{T.MUTED}; font-size:{T.BODY}px; font-weight:600;")
+        right.addWidget(self.panel_title)
         if isinstance(self.view, QWidget):
             right.addWidget(self.view, 3)
+        right.addWidget(self.conversation, 2)
         right.addWidget(self.transcript_view, 2)
+        self.transcript_view.setVisible(False)
         row = QHBoxLayout(self.root)
         row.setContentsMargins(0, 0, 16, 0)
         row.addWidget(self.window, 3)
@@ -345,16 +369,64 @@ class App:
                 ("Esc", "Cancel and clear the screen"),
                 ("D", "Pretend the headset disconnected"),
                 ("F11", "Fullscreen on or off"),
+                ("F2", "Conversation or developer log"),
                 ("F1", "Show or hide this help")]
         if hasattr(self.sim, "set_next"):
             rows.insert(3, ("Ctrl+1 / Ctrl+2", "Pick for the simulated decoder"))
         self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {INPUT_LABELS[input_source]}")
-        for seq, fn in (("F1", self.help.toggle), ("F11", self.toggle_fullscreen)):
+        for seq, fn in (("F1", self.help.toggle), ("F11", self.toggle_fullscreen),
+                        ("F2", self.toggle_log)):
             s3 = QShortcut(QKeySequence(seq), self.root)
             s3.setAutoRepeat(False)
             s3.activated.connect(fn)
         self.log(f"input: {INPUT_LABELS[input_source]}" + (f" ({sim_label})" if sim_label else ""))
         self.log(f"speech: {getattr(self.speaker, 'backend', type(self.speaker).__name__)}")
+
+    def toggle_log(self) -> None:
+        """F2: swap the readable conversation and the developer log (#176)."""
+        show_log = not self.transcript_view.isVisibleTo(self.root)
+        self.transcript_view.setVisible(show_log)
+        self.conversation.setVisible(not show_log)
+        self.panel_title.setText("Developer log   ·   F2: conversation" if show_log
+                                 else "Conversation   ·   F2: developer log")
+
+    def add_question(self, text: str) -> None:
+        """The conversation partner's question, shown before the options it produced."""
+        self.conversation.add("question", text)
+
+    def _talk_round(self, rnd: Round) -> None:
+        if rnd.kind is RoundKind.CHOOSE:
+            labels = "  ·  ".join(c.spoken_text or c.label if c.action_id == ActionIds.SPEAK_REPLY
+                                  else c.label for c in rnd.choices)
+            self.conversation.add("options", f"{labels}   (from {self.options_origin})")
+
+    def _talk_outcome(self, e: Optional[SelectionEvent], o: Outcome) -> None:
+        label = INPUT_LABELS.get(e.source, e.source) if e is not None else None
+        if o is Outcome.Previewed and self.handler.pending is not None:
+            self._previewed = self.handler.pending
+            c = self._previewed
+            self.conversation.add("preview", f"“{c.spoken_text or c.label}”", label)
+        elif o is Outcome.Confirmed and self._previewed is not None:
+            c, self._previewed = self._previewed, None
+            self.conversation.add("shown" if c.action_id in MAP_ACTIONS else "said",
+                                  f"“{c.spoken_text or c.label}”", label)
+        elif o is Outcome.Cancelled:
+            self.conversation.label_last("nothing", label)
+
+    def _talk_cleared(self, reason: str) -> None:
+        had_preview, self._previewed = self._previewed is not None, None
+        what = "preview" if had_preview else "question"
+        text = {"cancel": f"The {what} was cancelled.",
+                "timeout": f"No answer in time, so the {what} was cancelled.",
+                "disconnect": "The headset disconnected, so nothing was said."}.get(
+                    reason, f"The {what} was cleared ({reason}).")
+        self.conversation.add("nothing", text)
+        if self.sink.cues is not None:
+            self.sink.cues.play("cancel")
+
+    def _cue_preview(self, _choice) -> None:
+        if self.sink.cues is not None:
+            self.sink.cues.play("preview")
 
     def toggle_fullscreen(self) -> None:
         if self.root.isFullScreen():
@@ -468,7 +540,11 @@ class App:
                              f"{fmt(t['speech_ms'])} |")
         else:
             lines.append("No confirms this session.")
+        lines += ["", "## Conversation", ""] + [
+            f"- **{KINDS[k][0]}**" + (f" ({src})" if src else "") + f": {text}"
+            for k, text, src in self.conversation.entries]
         lines += ["", "## Timeline", ""] + [f"- {e}" for e in self.events]
+        lines += ["", "## Developer log", "", "```"] + list(self.log.lines) + ["```"]
         safe = [ln for ln in lines if not _looks_like_samples(ln)]
         if len(safe) != len(lines):
             safe.append("")
@@ -515,6 +591,8 @@ def main(argv=None) -> int:
                                                 "(choose target-2, then confirm)")
     p.add_argument("--keys", default="", help="keyboard presses after start, e.g. '2,1'")
     p.add_argument("--mute", action="store_true", help="no audio (logs instead)")
+    p.add_argument("--no-cues", action="store_true",
+                   help="no preview/confirm/cancel sounds (#177); --mute also turns them off")
     p.add_argument("--confirm-timeout", type=_timeout_seconds, default=CONFIRM_TIMEOUT_MS / 1000,
                    help="seconds before an unanswered Confirm round cancels (0 = never)")
     p.add_argument("--fullscreen", action="store_true", help="start fullscreen (F11 toggles, F1 shows keys)")
@@ -547,7 +625,7 @@ def main(argv=None) -> int:
         return 2
     live_path = source == InputSources.LIVE_EEG or (source == InputSources.SIMULATED and args.p300)
     try:
-        app = App(source, sim_script=script, mute=args.mute,
+        app = App(source, sim_script=script, mute=args.mute, cues=not args.no_cues,
                   confirm_timeout_ms=int(args.confirm_timeout * 1000),
                   p300=args.p300, arm_live_confirm=args.arm_live_confirm,
                   live_options={"calibration_sequences": args.calibration,
