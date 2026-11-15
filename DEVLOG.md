@@ -548,3 +548,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why Windows' own voice: the speech library the app uses for replies spoke the first cue and silently skipped the rest
 - Checked on our simulated 16-pin stream, on the judging laptop: with the real voice, at 244 samples per second, with slow uneven reactions, with almost no eyes-closed response (stops with a clear reason), and with the board dropping out (stops within 3 seconds). Measured there: about 19 seconds for a full pick-and-confirm from four choices
 - Not yet run on a real board or a real person
+## 11/15/26 - 12:32 AM - Long Le - #175 Preview screen with a confirm ring ([PR #189](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/189))
+- The "Say this?" screen now shows what will happen ("This will be said aloud" or "This will show the map and say"), the exact words as a big quotation, and a ring that fills toward the confirm
+- Nothing is spoken until the ring is full. On the keyboard, hold 1 for 2 seconds (a tap no longer confirms). With EEG, the ring follows the eye-closure signal and empties if the eyes open early. After confirming, a "✓ Spoken" state shows until the next question
+- The alpha switch got a read-only progress signal for the ring, and its decision logic didn't change. Scripted simulated input fills the same ring
+- Checked with tests for each ring state (filling, emptying on early release, completing exactly once) and in screenshots. The live eye-closure ring needs g.Pype, so it hasn't been seen on this Mac
