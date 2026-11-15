@@ -2,6 +2,8 @@
 
 Part of [DevOps](README.md). Kept in its own file so it doesn't collide with other DevOps edits.
 
+**At the judging laptop:** follow the [judging laptop session](judging-laptop-session.md). It's one ordered sitting that runs this runbook, the simulated-input check for #4, and the #42 switch-back, with result comments to paste.
+
 ## Judging laptop runbook (#39)
 
 1. Set up from a clean checkout with steps 1 to 5 of the [launch path](../dev-setup-docs/README.md#python-and-gpype-launch-path-19) (`pip install -r requirements-lock.txt` for the exact versions).

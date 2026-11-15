@@ -41,3 +41,30 @@ Scanned `architecture-and-libraries` and every fetched branch.
 **Keep new commits private:** in GitHub Settings → Emails, turn on "Keep my email addresses private" and "Block command line pushes that expose my email". Then set `git config user.email` to your `ID+username@users.noreply.github.com` address. Rewriting existing history would break everyone's branches, so that is a team decision.
 
 **Still to do before submitting (#10 Done when):** run the full check on the exact submission revision, and look through any demo video or screenshots for personal data before uploading them.
+
+## Judging revision review (#33)
+
+### First pass: `main` at `aec013f`, 2026-11-14 6:20 PM ET
+
+This is not the judging commit yet (#42 hasn't frozen one). Repeat the final pass below on the frozen commit and the real submission assets.
+
+| Item | Result | How it was checked |
+| --- | --- | --- |
+| Secrets in any branch's history | None found | `python tools/release_check.py --quick --all-branches` |
+| Credentials, raw EEG, or large files tracked | None | Same |
+| Recording paths and `.env` gitignored | Yes, all 14 sample paths | Same |
+| Trained per-wearer models and logs | Gitignored (`models/`, `*.pkl`, `*.joblib`, `logs/`). P300 calibration stays in memory, and synthetic recordings go to a temporary folder (`signal2speech/eeg/p300.py`). | `git check-ignore` on sample paths, code read |
+| Network senders | None in `signal2speech/` (no `UDPSender`, `LSLSender`, sockets, or HTTP). The only outbound call is the optional Claude request in `signal2speech/ai/`, and it sends the typed question only, never EEG. | `grep`, code read |
+| Tracked images | Two NASA MODIS JPEGs in `data/openorbit/`, with no GPS, author, or camera metadata | `sips -g all` |
+| Personal data in commit metadata | **Warning.** Two commit authors (In Young Song, Long Le) used personal email addresses rather than GitHub noreply ones. They become public if the repo goes public. | `release_check.py` (addresses not printed) |
+
+**Action for those two authors:** in GitHub Settings → Emails, turn on "Keep my email addresses private". Then run `git config user.email <id>+<username>@users.noreply.github.com` for future commits. Whether to rewrite existing history is a team decision, because it breaks every open branch.
+
+### Final pass checklist (run on the frozen judging commit)
+
+- [ ] Check out the exact commit from #42 into a clean folder, and record its hash here: `________`
+- [ ] `python tools/release_check.py --all-branches`: 0 failures. Decide on the email warning before the repo goes public.
+- [ ] No `.env`, `recordings/`, `models/`, or `logs/` content in the commit or in any file attached to the submission
+- [ ] **Video and screenshots (#34):** no API key, `.env`, terminal history, notifications, email, or file paths with personal names on screen. Every EEG shot is labelled Live EEG, Recorded, or Simulated.
+- [ ] **Devpost text:** no personal emails or phone numbers beyond what the team agreed to share
+- [ ] Repo visibility switched to public only after the items above pass

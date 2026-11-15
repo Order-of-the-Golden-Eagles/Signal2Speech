@@ -124,14 +124,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
 
-## 11/14/26 - 5:15 PM - In Young Song (with Claude) - #29 NASA and EPA dataset ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
+## 11/14/26 - 5:15 PM - In Young Song - #29 NASA and EPA dataset ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
 - The OpenOrbit demo now has its real data, bundled in the repo so it works with Wi-Fi off
     - `data/openorbit/`: two NASA satellite images of southeast Michigan (June 26 and 28, 2023), the EPA air-quality rows, map marker places, and `SOURCES.md` with every link
 - The EPA numbers were checked against EPA's own file: Washtenaw 32 to 218 (+186), Wayne 58 to 226 (+168). `python data/openorbit/build_dataset.py --verify-only` re-checks the files offline
 - June 26 is mostly cloud on both NASA satellites, so the "before" picture shows little ground. The AQI numbers carry the before and after. The team can decide later whether to change it
 - Verified on Windows with no headset. NASA's coastline map lines up with the image, and the markers sit where EMU and Detroit really are
 
-## 11/14/26 - 5:15 PM - In Young Song (with Claude) - #30 Offline wildfire comparison view ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
+## 11/14/26 - 5:15 PM - In Young Song - #30 Offline wildfire comparison view ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
 - After a confirm, the app now shows the real map instead of the "not built yet" placeholder
     - "Show the satellite view" shows June 28 with EMU and Detroit marked. "Compare counties" shows both days side by side with the AQI table and which county rose most versus which ended highest
 - The numbers on screen come from the EPA file, and a test checks that they match the spoken line, so the screen and the voice can't disagree
@@ -172,7 +172,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
 
-## 11/14/26 - 5:59 PM - Long Le (with Claude) - #4 Real map in the app, bigger reveal ([PR #81](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/81))
+## 11/14/26 - 5:59 PM - Long Le - #4 Real map in the app, bigger reveal ([PR #81](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/81))
 - The app now shows the real NASA/EPA map from #30 after a confirm. No code change was needed for that, and the stand-in panel is gone
     - `python -m signal2speech.app --input keyboard`. Press 2, then 1, to see the county comparison
 - After a map reveal, the map takes most of the window and stays up for 8 seconds before the next question, so judges can read the AQI table. The input label stays visible the whole time
@@ -196,26 +196,34 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Filled in the green CI run that proves the check passes again, instead of "expected green"
 - The flaky evidence test on macOS is now in living memory, with a firmer rule: re-run once, and if it fails twice it's a real problem
 - The CI matrix explanation lives in one place (the workflow file) and no longer claims Python versions CI doesn't test
-## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
+
+## 11/14/26 - 5:58 PM - In Young Song - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
 - A teammate can now run the whole OpenOrbit reveal with Wi-Fi off and explain it
     - `python -m signal2speech.app --input keyboard`: press 2 then 1 to compare counties, or 1 then 1 for the satellite view
 - The compare view shows the two numbers judges confuse: Washtenaw had the biggest jump (+186), but Wayne ended highest (226)
 - Verified with Wi-Fi actually disconnected on InYoung-Song's laptop, on `main` after PR #65: one map change and one full spoken line per confirm, and nothing on cancel. Keyboard input only, not live EEG
 
-## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #35 Secret, AI key, and network checks ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
+## 11/14/26 - 5:58 PM - In Young Song - #35 Secret, AI key, and network checks ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
 - Checked how the app handles keys and the network. Results are in `docs/security-privacy/README.md`
 - No local bridge exists (the app is one process), so the bridge checks don't apply
 - The AI key is read only from `.env` or the environment and never logged. Only the typed question goes to the AI, never EEG
 - `python tools/release_check.py` re-runs the checks, including secrets in every branch's history (none found)
 
-## 11/14/26 - 6:06 PM - Vasanth Anbukumar (with Claude) - #22 Fix duplicate event IDs between headset decoders ([PR #82](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/82))
+## 11/14/26 - 6:06 PM - Vasanth Anbukumar - #22 Fix duplicate event IDs between headset decoders ([PR #82](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/82))
 - The live flow (P300 picks, eyes-closed alpha switch confirms) can now actually confirm
 - Why: the P300 chooser (#46) and the alpha switch (#47) each make their own live-EEG adapter. Both numbered events `e1`, `e2`…, so the app rejected the alpha confirm as a repeat of the P300 preview. I found this while reviewing #47 after it merged
 - Event IDs now come from one counter shared by every adapter, so they're unique for the whole run
 - Verified with a new test where two live-EEG adapters preview and then confirm (`tests/test_contract.py`). `tests/test_app.py` and `tests/test_recovery.py` no longer assume IDs like `k1`. Full suite: 176 passed
 - Still needs the headset: the combined P300 + alpha flow on a real wearer (#23)
 
-## 11/14/26 - 6:45 PM - Long Le (with Claude) - #42 Rollback that works with Wi-Fi off ([PR #86](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/86))
+## 11/14/26 - 6:20 PM - Long Le - #33 First security pass ([PR #85](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/85))
+- Did a first privacy and security check of the current code, ahead of making the repo and video public
+    - `python tools/release_check.py --quick --all-branches`, plus manual checks for trained models, network use, and image metadata
+- No keys, raw EEG, recordings, or trained models are in git on any branch. Nothing sends EEG over the network. The only outbound call is the optional AI request, which sends the typed question only
+- One warning: two teammates' personal email addresses appear in commit history. They'll be public if the repo goes public. Results and fix steps are in `docs/security-privacy/README.md`
+- Not final: the check has to be repeated on the frozen judging commit (#42) and the actual video and screenshots (#34). The checklist for that is in the same doc
+
+## 11/14/26 - 6:45 PM - Long Le - #42 Rollback that works with Wi-Fi off ([PR #86](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/86))
 - If the final build breaks at the table, the team can switch back to the draft build without Wi-Fi, even when the two builds need different packages
     - Make a ready-to-run fallback copy when freezing: `git worktree add ../Signal2Speech-fallback judging-draft`, then set up its own `.venv` while still online. Steps are in `docs/devops/judging-build.md`
 - Why: the old switch-back step said to run `pip install` when the lock file changed, and that fails with Wi-Fi off
@@ -236,3 +244,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 
 ## 11/14/26 - 6:55 PM - In Young Song (with Claude) - #8 NASA FIRMS fire view ([PR #89](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/89))
 - The FIRMS stretch goal is done: a verified sample (#32) and an optional map (#31). The core OpenOrbit comparison and the spoken lines didn't change
+## 11/14/26 - 6:56 PM - Long Le - #39 #4 #42 Judging laptop session script ([PR #88](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/88))
+- Whoever sits at the judging laptop now has one ordered 40-minute checklist: `docs/devops/judging-laptop-session.md`
+    - Wi-Fi on: install, release check, smoke check, and the fallback copy. Wi-Fi off: keyboard and simulated runs, the AI fallback, the evidence view, and a timed switch-back
+- One sitting produces the evidence to close #39 and #4 and rehearses #42's rollback. Each step has a ready-to-paste result comment for the right issue
+- Turned on GitHub's "delete branch after merge" setting, and cleaned up the merged branches
+- Not run yet: it needs the judging laptop
