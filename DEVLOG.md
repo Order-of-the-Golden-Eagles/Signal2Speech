@@ -427,6 +427,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every claim was checked against the code. Two were fixed: we don't have "required" CI checks (just CI on every change), and the AI-reply wording depends on whether #116 is merged when we submit
 - The text never says the headset was used on a real wearer, because it hasn't been yet
 - Two AI answers are ready, one for each state of #116, so we never claim a feature that isn't merged when we submit
+
 ## 11/14/26 - 9:20 PM - In Young Song - #138 PiEEG's simulator drives the eye-closure confirm ([PR #144](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/144))
 - PiEEG's own simulated EEG now runs through our g.Pype pipeline: a keyboard preview, then PiEEG's "eyes closed" alpha burst confirms it, and the map changes and the line is spoken once
     - `python python_quickstart.py --sim --lsl` (PiEEG's starter), then `python -m signal2speech.eeg.pieeg_lsl --demo`. Setup is in `docs/eeg-hardware/pieeg.md`
@@ -449,6 +450,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - With the real headset it reports signal quality and the eye-closure signal. The P300 needs tiles on screen, so use the app or the evidence view for that
 - Still to do: record the 30-second clip for the video (#34), and try it with a real wearer
 - Code review follow-up: the evidence window closes when the assistant disconnects, a missing or busy headset fails cleanly instead of hanging, and the accuracy figure counts every sequence, including ones with no answer
+
 ## 11/14/26 - 9:36 PM - Long Le - #132 Video title card, closing card, and diagram ([PR #147](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/147))
 - The submission video has its three graphics ready in `docs/demo-submission/media/`: a title card, a closing card with the repo link and AI-use note, and an architecture diagram for shot 9
 - They're drawn by a script, so changing a name or a line is one command: `python docs/demo-submission/make_graphics.py`
@@ -487,6 +489,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The June 26 satellite image is mostly cloud, and the screen now says so, so nobody reads white cloud as clean air
 - Checked against EPA and NASA documentation and news reports of the June 28 smoke alert. The judge Q&A has three science answers ready
 - After review, corrected the fire distances from FIRMS data (most fires about 1,340 km away in Quebec, a few small ones closer, nearest 84 km), made Wayne the like-for-like PM2.5 comparison, and kept the June 26 caption inside the image on small screens. Verified with `pytest tests/test_openorbit.py` (keyboard and offscreen only)
+
 ## 11/14/26 - 11:03 PM - Long Le - #128 Judge Q&A cites the response times ([PR #157](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/157))
 - The judge Q&A now answers "How fast does it respond?" with the measured times: map change in 2–30 ms and speech starting in about 15–50 ms after a confirm
 - It's honest about where the time really goes: the P300 choice takes a flash sequence (about 2.5–3.5 s), and the alpha confirm lands about 1.2–1.5 s after the eyes close. Those EEG numbers come from simulated data until the headset run
@@ -496,10 +499,18 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Worked out what to record for the demo video and handed it to Vasanth as #160: a screen recording only, no headset, 2:30 or less, which fits both the Devpost and g.tec limits
     - Exact commands, what each shot shows, the narration, and how to export. Every brain-signal shot is labelled Simulated or Keyboard
 - The Devpost checklist now uses the grounded-Claude AI answer (#116 merged) and enters the Beyond the Horizon prize (#153)
+
 ## 11/14/26 - 11:14 PM - Long Le - #106 Real Claude replies re-checked after grounding ([PR #158](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/158))
 - Re-tested the AI demo window on the current code (Claude Sonnet 5.5 with grounded replies): a fresh question got two good replies in about 2 seconds, and the confirmed one was spoken once
 - The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
 - With the AI provider unreachable, saved phrases appear right away, labelled offline. A real Wi-Fi-off run is still part of the judging-laptop session
+
+## 11/14/26 - 11:56 PM - Vasanth Anbukumar - #37 Docs-only changes skip the slow tests ([PR #184](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/184))
+- A PR that only touches docs, the devlog, or images now finishes its checks in under a minute instead of about five: the four test jobs still report (so the PR can merge) but skip install, pytest, and smoke
+- A new "quick checks" job runs on every PR in a few seconds with nothing installed: `python tools/quick_check.py`
+    - It fails on leftover merge-conflict markers and on a devlog entry duplicated by a merge, the two things that have actually broken doc-only PRs today
+- The pre-push hook does the same locally: quick checks always, and the full test suite only when the pushed commits change code, tests, data, or build files
+- Anything under `signal2speech/`, `tests/`, `contracts/`, `data/` (except its `.md` notes), `tools/`, `.github/`, `.githooks/`, or the dependency files still runs everything. Pushes to `main` always run the full suite on every OS
 
 ## 11/15/26 - 12:11 AM - Vasanth Anbukumar - #150 The program detects the EEG device and picks the right channels ([PR #186](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/186))
 - One eyes-closed check now works on different amplifiers without anyone setting channel numbers: `python -m signal2speech.eeg.lsl_source --input live --demo`
@@ -510,9 +521,3 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Reviewers can reproduce our numbers on g.tec's own data with no hardware: `python -m signal2speech.evidence.dataset path/to/p300-speller` (new README section)
 - The library run sheet is in `docs/eeg-hardware/README.md`: power bank only while worn, close PiEEG Cloud first (one Bluetooth connection at a time), puck on the back of the head
 - Verified on our own simulated 16-pin stream: it found the flat pin and the loose pin, used the other 14, and confirmed once per closure. Not yet tried on a real board or a real person
-## 11/14/26 - 11:56 PM - Vasanth Anbukumar - #37 Docs-only changes skip the slow tests ([PR #184](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/184))
-- A PR that only touches docs, the devlog, or images now finishes its checks in under a minute instead of about five: the four test jobs still report (so the PR can merge) but skip install, pytest, and smoke
-- A new "quick checks" job runs on every PR in a few seconds with nothing installed: `python tools/quick_check.py`
-    - It fails on leftover merge-conflict markers and on a devlog entry duplicated by a merge, the two things that have actually broken doc-only PRs today
-- The pre-push hook does the same locally: quick checks always, and the full test suite only when the pushed commits change code, tests, data, or build files
-- Anything under `signal2speech/`, `tests/`, `contracts/`, `data/` (except its `.md` notes), `tools/`, `.github/`, `.githooks/`, or the dependency files still runs everything. Pushes to `main` always run the full suite on every OS
