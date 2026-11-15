@@ -167,12 +167,12 @@ When nobody has touched the table for 60 s, the app loops a narrated walkthrough
 
 ## Restart for the next visitor (#180)
 
-Press **R** for a fresh first question from any state: a preview, a confirm countdown, a map reveal, a flash sequence, a practice round, or the attract loop. Nothing is shown or spoken.
+Press **R** for a fresh first question from any state: a preview, a confirm countdown, a map reveal, a flash sequence, a practice round, or the attract loop. Nothing new appears on the map and nothing is spoken. The map panel goes back to blank, and a help banner from the last visitor is hidden. R is **refused while a headset or board is calibrating**, so it can't break a calibration; the developer log says so. In the AI demo (`python -m signal2speech.ai`), R also clears the question box, drops an AI reply that's still on its way, and opens the first question with saved phrases.
 
 - **It goes through the selection contract, never around it.** An open round is ended with `handler.cancel("restart")`, then a new Choose round opens with `begin_choice_round`. A decision still in flight for the old round, such as an EEG flash sequence that was already running, arrives stale and is rejected (`RejectedStaleRound`).
-- **It stops the map reveal, the confirm countdown, the app's own auto-reopen** (so exactly one new question opens), **and a reply still waiting for its sound cue.**
+- **It stops the map reveal, the confirm countdown, the app's own auto-reopen** (so exactly one new question opens), **and a reply still waiting for its sound cue.** During the attract loop R ends the loop and counts as a restart, still opening only one question. A practice round still logs its end.
 - **The session report** counts it under **Other** (`Restarts (R): n`) and lists `restart (R)` in the timeline. A restart isn't counted as a cancel. The conversation shows "Restarted for the next visitor."
-- **Tests:** `tests/test_restart.py` covers a restart during a preview (no output, one new round), a late EEG decision after the restart (stale), a restart during a reveal (no second output), the real R shortcut and the report, and a restart during practice.
+- **Tests:** `tests/test_restart.py` covers a restart during a preview (no output, one new round), a late EEG decision after the restart (stale), a restart during a reveal (no second output, map cleared), the real R shortcut and the report, a restart during practice (end still logged), the calibration guard, the help banner, R during attract (one round), and the AI demo (saved phrases, late AI reply dropped).
 - **Still to do for #180:** the welcome screen after a short idle period. #193's attract loop already takes over after 60 s, so how the two fit together is being agreed with Long on #180.
 
 ## Text size (#195)

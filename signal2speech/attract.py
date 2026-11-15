@@ -79,6 +79,10 @@ class AttractMode(QObject):
             return True
         if t in _WAKE_EVENTS:
             if self.active:
+                if (t == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_R
+                        and hasattr(self.app, "restart")):
+                    self.app.restart()             # R still restarts (#180); it stops the loop
+                    return True
                 self.stop("key" if t == QEvent.Type.KeyPress else "click")
                 return True                        # the waking input doesn't also pick a tile
             self.poke()

@@ -35,6 +35,12 @@ class AsyncSuggester(QObject):
     def pending(self) -> bool:
         return not self._resolved
 
+    def cancel(self) -> None:
+        """Drop any request in flight: its result arrives stale and is ignored (#180)."""
+        self._gen += 1
+        self._resolved = True
+        self._deadline.stop()
+
     def request(self, question: str, avoid: Sequence[str] = ()) -> None:
         self._gen += 1
         gen, self._resolved = self._gen, False

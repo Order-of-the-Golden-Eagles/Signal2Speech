@@ -472,6 +472,9 @@ class App:
         self._restyle_overlays()
 
         self.restarts = 0                               # #180: R presses, for the report
+        self._restarting = False
+        # #180: called on R; return True if you opened the first question yourself.
+        self.on_restart: List[Callable[[], bool]] = []
         restart_key = QShortcut(QKeySequence("R"), self.root)
         restart_key.setAutoRepeat(False)
         restart_key.activated.connect(self.restart)
@@ -516,36 +519,55 @@ class App:
             self.attract.poke()
 
     # ── #180 restart ─────────────────────────────────────────
-    def restart(self) -> None:
+    @property
+    def calibrating(self) -> bool:
+        """True while a headset or board is calibrating (#103, #172): R must not interrupt it."""
+        return bool(getattr(self.sim, "calibrating_now", False))
+
+    def restart(self) -> bool:
         """R: a clean first question from any state, for the next visitor (#180).
 
         It goes through the contract, never around it: an open round is ended with
         ``handler.cancel("restart")``, so a decision still in flight for it arrives stale and is
-        rejected, and a fresh Choose round opens with ``begin_choice_round``. Nothing is shown or
-        spoken. Each restart goes in the session report.
+        rejected, and a fresh Choose round opens with ``begin_choice_round``. Nothing new is
+        shown on the map or spoken. Each restart goes in the session report. It's refused during
+        a calibration. Returns True if it restarted.
         """
         h = self.handler
-        if self.attract is not None and self.attract.active:
-            self.attract.stop("restart")
-        self._reopen.stop()
+        if self.calibrating:
+            self.log("restart (R) ignored: a calibration is running")
+            return False
+        attract_was_on = self.attract is not None and self.attract.active
+        if attract_was_on:
+            self.attract.stop("restart")             # it leaves a clean Choose round itself
         self.sink.stop_output()                      # a reply still waiting for its cue stays unsaid
+        self.help_banner.hide()                      # the last visitor's help request
+        self._help_hide.stop()
         if self.practice.active:
-            finished, self.practice.on_finished = self.practice.on_finished, None
+            self._restarting = True                  # _practice_done logs the end, but doesn't ask
             try:
-                self.practice.stop()                 # without its own "ask", we open the round below
+                self.practice.stop()
             finally:
-                self.practice.on_finished = finished
-            self.window.reset()
-        if h.current is not None:
+                self._restarting = False
+        rnd = h.current
+        fresh = rnd is not None and rnd.kind is RoundKind.CHOOSE and h.pending is None
+        need_round = not (attract_was_on and fresh)  # attract already opened one: don't add another
+        if need_round and rnd is not None:
             h.cancel("restart")
         self._reopen.stop()                          # the cancel scheduled a reopen; we open now
         self._stop_confirm_timeout()
         self._set_reveal(False)
+        if hasattr(self.view, "reset"):
+            self.view.reset()                        # no map left over from the last visitor
         self.restarts += 1
         self.log("restart (R): a fresh first question, nothing was output")
         self._event("restart (R)")
         self.conversation.add("nothing", "Restarted for the next visitor.")
-        self.ask()
+        # Screens that own their own first question (the AI demo's saved phrases) open it here.
+        handled = any([fn() for fn in self.on_restart])
+        if need_round and not handled:
+            self.ask()
+        return True
 
     # ── #196 practice ────────────────────────────────────────
     @property
@@ -572,7 +594,8 @@ class App:
         p = self.practice
         self.log(f"practice: ended after {p.sequences} sequence(s), tile 1 flashed {p.target_flashes} times")
         self.window.reset()
-        self.ask()
+        if not self._restarting:                     # R opens the next question itself (#180)
+            self.ask()
 
     # ── #197 help phrase ─────────────────────────────────────
     def _call_for_help(self, how: str) -> None:
