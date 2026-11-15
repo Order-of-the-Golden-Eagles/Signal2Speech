@@ -110,6 +110,20 @@ def placeholder_model() -> p300.P300Model:
     return _PLACEHOLDER
 
 
+def build_live_alpha(handler, nodes: p300.P300Nodes, input_source: str, *, simulated: bool):
+    """The alpha switch for ``--input live`` (#103): returns ``(AlphaConfirm, AlphaBursts or None)``.
+
+    Live, it hangs off the P300 chooser's HybridBlack pipeline, because the Unicorn opens only
+    once. Simulated, it gets its own Generator with alpha bursts. The pipeline diagram (#166)
+    calls this too, so the drawing can't drift from the app.
+    """
+    if simulated:
+        bursts = am.AlphaBursts()
+        return am.AlphaConfirm(handler, input_source=input_source, bursts=bursts), bursts
+    return am.AlphaConfirm(handler, input_source=input_source, pipeline=nodes.pipeline,
+                           upstream=nodes.eeg), None
+
+
 class SimulatedEyes:
     """A simulated wearer's eyes: close shortly after a Confirm round opens, reopen 2.5 s later.
 
@@ -209,14 +223,8 @@ class LiveEegInput:
         self._decide = QTimer(singleShot=True, interval=int((p300.TIME_POST + 0.5) * 1000))
         self._decide.timeout.connect(self._force_decision)
 
-        if self.simulated:
-            self.bursts: Optional[am.AlphaBursts] = am.AlphaBursts()
-            self.alpha = am.AlphaConfirm(handler, input_source=self.input_source,
-                                         bursts=self.bursts)
-        else:
-            self.bursts = None
-            self.alpha = am.AlphaConfirm(handler, input_source=self.input_source,
-                                         pipeline=self.nodes.pipeline, upstream=self.nodes.eeg)
+        self.alpha, self.bursts = build_live_alpha(handler, self.nodes, self.input_source,
+                                                   simulated=self.simulated)
         handler.live_eeg_confirm_armed = bool(arm_live_confirm)
 
         self.eyes = SimulatedEyes(lambda: self.bursts)

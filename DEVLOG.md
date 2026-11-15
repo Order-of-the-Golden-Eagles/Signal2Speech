@@ -584,3 +584,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The library run isn't affected either way: on the judging laptop the session uses Windows' own voice, which always spoke every cue
 - If no voice works at all, the cue is still printed and the session carries on
 - Verified on the judging laptop by switching the Windows voice off: three cues in a row spoke for 2.3 s, 2.1 s and 2.2 s. Two new tests. Not tried on a real Mac or Linux machine
+
+## 11/15/26 - 2:32 AM - MagicJester2764 - #166 Pipeline diagrams drawn from the code (PR pending)
+- Anyone can show a judge the exact g.Pype graph we run, for the app with live EEG, the evidence view, the P300 chooser, and the eye-closure switch
+    - `python -m signal2speech.evidence.diagram`, or read [pipelines.md](docs/architecture/pipelines.md). The README has the live app's graph
+- Nothing is drawn by hand. Each diagram is built by the same code the app uses, then read back from g.Pype's own record of nodes and connections. A test fails if someone changes a pipeline and forgets `--write`
+- The AI assistant's `pipeline_graph` tool (#110) now returns the same drawing
+- Checked offline with no headset: the live diagrams build the Unicorn's graph without opening the device. GitHub renders Mermaid, but I haven't looked at it on the rendered page yet

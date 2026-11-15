@@ -57,6 +57,18 @@ def build_server(monitor: Monitor) -> MCPServer:
                        instructions=INSTRUCTIONS)
     viewer: dict = {"proc": None}
 
+    diagram_cache: dict = {}
+
+    def generated_diagram() -> str:
+        """Mermaid of the pipeline this server runs (#166). Built once: the graph doesn't change."""
+        if "text" not in diagram_cache:
+            from signal2speech.evidence import diagram
+            try:
+                diagram_cache["text"] = diagram.mermaid(diagram.graph_of(monitor.graph.pipeline))
+            except Exception as err:                  # never fail the tool over the drawing
+                return f"(diagram unavailable: {type(err).__name__})"
+        return diagram_cache["text"]
+
     def labelled(body: dict) -> dict:
         return {"input": monitor.label.value, "source": monitor.kind.value,
                 "pipeline_state": monitor.state, **body}
@@ -91,6 +103,8 @@ def build_server(monitor: Monitor) -> MCPServer:
                 {"name": "quality", "nodes": ["last 10 s per channel (kept in this process)"]},
             ],
             "p300_calibrated": monitor.calibrated,
+            # #166: drawn from this server's own pipeline object, not by hand.
+            "mermaid": generated_diagram(),
             "note": monitor.p300_note or ""})
 
     @server.tool(description="The latest P300 decisions: which tile the classifier picked each "
