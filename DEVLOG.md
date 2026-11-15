@@ -412,7 +412,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The report is ready to paste into the rehearsal log, so every practice run leaves evidence behind
 - Found and fixed two bugs while testing: the map time got overwritten in the strip, and closing the app could raise an error from the sound player. Tests use a fake clock. Not yet measured on the judging laptop
 
-## 11/14/26 - 9:33 PM - MagicJester2764 - #105 Devpost draft text, fact-checked (PR pending)
+## 11/14/26 - 9:33 PM - MagicJester2764 - #105 Devpost draft text, fact-checked ([PR #146](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/146))
 - The whole Devpost entry is ready to paste: tonight's steps, the story sections, Built with, the track, and the AI answer
     - In `docs/demo-submission/submission-checklist.md`. A person still has to submit it on Devpost and in the event app before midnight
 - Every claim was checked against the code. Two were fixed: we don't have "required" CI checks (just CI on every change), and the AI-reply wording depends on whether #116 is merged when we submit
