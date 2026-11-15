@@ -85,18 +85,28 @@ def piper_installed() -> bool:
     return importlib.util.find_spec("piper") is not None
 
 
+#: How many times to retry naming a finished file before giving up on it.
+RENAME_TRIES = 100
+#: Lines made ahead of time are made this many at once. More than that and they slow each other
+#: down enough that the line needed right now arrives late.
+WARM_AT_ONCE = 2
+
+
 class Clip:
     """One line being turned into a WAV file by a Piper process."""
 
     def __init__(self, text: str, wav: Path, process: Optional[subprocess.Popen]):
         self.text, self.wav, self.process = text, wav, process
         self._part = wav.with_suffix(".part.wav")
+        self._rename_tries = 0
+        self.why = ""                              # why it failed, for the log
 
     def state(self) -> str:
         """``ready``, ``working`` or ``failed``."""
         if self.wav.is_file():
             return "ready"
         if self.process is None:
+            self.why = self.why or "Piper could not be started"
             return "failed"
         code = self.process.poll()
         if code is None:
@@ -104,9 +114,17 @@ class Clip:
         if code == 0 and self._part.is_file() and self._part.stat().st_size > 44:
             try:
                 os.replace(self._part, self.wav)      # only a finished file gets the real name
-            except OSError:
-                return "ready" if self.wav.is_file() else "failed"
+            except OSError as err:
+                if self.wav.is_file():
+                    return "ready"
+                # A virus scanner can hold a just-written file for a moment: try again shortly.
+                self._rename_tries += 1
+                if self._rename_tries < RENAME_TRIES:
+                    return "working"
+                self.why = f"could not rename the finished file ({err})"
+                return "failed"
             return "ready"
+        self.why = f"Piper exited with code {code}"
         return "failed"
 
 
@@ -120,6 +138,21 @@ class PiperVoice:
         self.cache_dir = cache_dir or Path(tempfile.gettempdir()) / "signal2speech-voice"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self._clips: Dict[str, Clip] = {}
+        self._queue: list = []                     # lines waiting to be made ahead of time
+
+    def warm(self, lines) -> None:
+        """Make these lines ahead of time, a couple at a time. Call ``pump`` now and then (``say``
+        paths do) to start the next ones."""
+        for line in lines:
+            if line not in self._queue:
+                self._queue.append(line)
+        self.pump()
+
+    def pump(self) -> None:
+        busy = sum(1 for c in self._clips.values() if c.process is not None and c.state() == "working")
+        while self._queue and busy < WARM_AT_ONCE:
+            if self.request(self._queue.pop(0)).state() == "working":
+                busy += 1
 
     @classmethod
     def find(cls) -> Optional["PiperVoice"]:

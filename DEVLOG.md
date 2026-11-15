@@ -601,3 +601,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Licences to know about: Piper is GPL-3.0, so we run it as a separate program. The voice we chose is for non-commercial use with credit. The 63 MB voice file is not in the repo
 - Lines with numbers in them are spoken 25 % slower, so the figures are easy to catch
 - Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux
+
+## 11/15/26 - 2:57 AM - Vasanth Anbukumar - #150 The board session speaks with the natural voice, and repeats itself less (PR pending)
+- The voice-guided board session (`python -m signal2speech.eeg.board_session`) now gives its instructions in the same natural voice as the app, when that voice is installed
+    - `--standard-voice` goes back to the operating system's voice
+    - A new line takes a second or two to make the first time and is kept afterwards, so do one dry run before the real session
+- Calibration says "eyes open" and "eyes closed" on the first round only. After that the beeps are enough, because the introduction already explains them
+- Fixed the voice briefly switching to the old one mid-session: too many lines were being made at once, so one arrived late. They're now made two at a time
+- Verified on the judging laptop with a full spoken dry run from a cold start on our simulated board: no cue fell back to the old voice, and every check passed. Three new tests. Not yet run on a real board

@@ -412,7 +412,7 @@ The board is on the library's first floor. Take the judging laptop there.
 | --- | --- | --- |
 | 1. Contact | Nothing, unless too few pins touch. Then it gives advice and checks again. | Good pins out of 16, and the real sample rate |
 | 2. Channel pick | "Keep your eyes open… now close your eyes…" | Which pins respond |
-| 3. Calibration | "Eyes open." / "Eyes closed." three times. It tries once more with advice if the difference is too small. | The switch threshold, and labelled open/closed data |
+| 3. Calibration | "Eyes open." / "Eyes closed." on the first round, then the beeps alone for the rest (low: open, high: closed). It tries once more with advice if the difference is too small. | The switch threshold, and labelled open/closed data |
 | 4. Rest | "Rest for 30 seconds. Keep your eyes open. Blink normally." | False triggers at rest |
 | 5. Switch test | Five low beeps. Close on the low beep, open on the high one. | Closures caught, and the delay |
 | 6. Choice test | "One: Yes. Two: No. Three: Compare counties. Four: Satellite view", repeating. Close your eyes on your target, then again when it asks "Confirm?" | Right choices out of 4, and seconds per selection |
@@ -422,6 +422,7 @@ At the end it prints a summary, says whether live confirm is safe to switch on (
 - **Consent:** `--consent` means the wearer agreed to their raw EEG being saved. Without it the session still runs, but saves the report only.
 - **Where it saves:** `recordings/<date>_<device>_live/` (gitignored): `eeg.npz` (raw 16-channel data with time stamps), `events.json` (every cue, stamped at its beep), and `report.json`.
 - **Before you leave the board:** `python -m signal2speech.eeg.board_session --verify recordings/<folder>` reads the files back and says whether the recording is complete and usable.
+- **Voice:** the session speaks with the natural voice when it's installed ([setup](../text-to-speech/README.md#a-natural-voice-piper-optional)), and prints `voice: natural voice, Piper (...)` at the start. A new line takes a second or two to make the first time and is kept after that, so do one dry run before the real session and every cue plays at once. `--standard-voice` goes back to the operating system's voice.
 - **Dry run with no board:** `python -m signal2speech.eeg.board_session --self-test` (add `--no-voice` for silence with the same timing).
 - **A shorter check with prompts in the terminal** is still there: `python -m signal2speech.eeg.lsl_source --input live --demo`.
 

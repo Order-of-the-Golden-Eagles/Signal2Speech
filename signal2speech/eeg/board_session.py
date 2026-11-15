@@ -50,14 +50,23 @@ class Voice:
     """Blocking speech and beeps. ``say`` returns only when the words are finished, so a beep
     that follows it marks a clean start. Falls back to printing if no voice is available."""
 
-    def __init__(self, enabled: bool = True, rate: int = 3, simulate_timing: bool = False):
+    def __init__(self, enabled: bool = True, rate: int = 3, simulate_timing: bool = False,
+                 neural=None):
         self.enabled = enabled
         self.simulate_timing = simulate_timing      # silent, but take as long as speech would
         self._sapi = None
         self._beep = None
+        self._neural = None                         # the natural voice (speech/neural.py), if any
+        self._play = None
         self.log: List[str] = []
         if not enabled:
             return
+        try:                                   # the natural voice needs a player that waits
+            import winsound
+            self._play = lambda wav: winsound.PlaySound(str(wav), winsound.SND_FILENAME)
+            self._neural = neural
+        except Exception:
+            self._neural = None
         try:                                   # Windows: SAPI speaks every call reliably
             import win32com.client
             self._sapi = win32com.client.Dispatch("SAPI.SpVoice")
@@ -72,13 +81,43 @@ class Voice:
 
     @property
     def audible(self) -> bool:
-        return self._sapi is not None
+        return self._sapi is not None or self._neural is not None
+
+    @property
+    def name(self) -> str:
+        if self._neural is not None:
+            return f"natural voice, Piper ({self._neural.name})"
+        return "Windows voice" if self._sapi is not None else "backup voice"
+
+    def warm(self, lines) -> None:
+        """Start making lines that will be needed soon, so they play with no wait. The natural
+        voice takes a second or two per new line; a line made once is kept for later runs."""
+        if self._neural is not None:
+            self._neural.warm(lines)
+
+    def _say_natural(self, text: str, wait_s: float = 30.0) -> bool:
+        clip = self._neural.request(text)
+        end = time.monotonic() + wait_s
+        while clip.state() == "working" and time.monotonic() < end:
+            time.sleep(0.02)
+        self._neural.pump()                    # start the next lines waiting to be made
+        if clip.state() != "ready":
+            print(f"voice: standard voice used for this line ({clip.why or 'not ready in time'})", flush=True)
+            return False
+        try:
+            self._play(clip.wav)               # returns when the words are finished
+            return True
+        except Exception as err:
+            print(f"voice: standard voice used for this line (could not play it: {err})", flush=True)
+            return False
 
     def say(self, text: str) -> None:
         self.log.append(text)
         print(f">>> {text}", flush=True)
         if not self.enabled and self.simulate_timing:
             time.sleep(self.estimate_s(text))
+            return
+        if self._neural is not None and self._say_natural(text):
             return
         if self._sapi is not None:
             try:
@@ -447,15 +486,18 @@ class BoardSession:
         for attempt in (1, 2):
             opens, closeds = [], []
             for rep in range(self.opts.calib_reps):
-                self.cue("cal_open", "Eyes open.", rep=rep, attempt=attempt)
+                # The intro explained the beeps. Say the words on the first round only.
+                words = rep == 0 and attempt == 1
+                self.cue("cal_open", "Eyes open." if words else None, rep=rep, attempt=attempt)
                 self.wearer.open()
                 self.wait(settle)
                 opens.extend(self.wait(T - settle).tolist())
-                self.cue("cal_closed", "Eyes closed.", beep="stop", rep=rep, attempt=attempt)
+                self.cue("cal_closed", "Eyes closed." if words else None, beep="stop",
+                         rep=rep, attempt=attempt)
                 self.wearer.close()
                 self.wait(settle)
                 closeds.extend(self.wait(T - settle).tolist())
-            self.cue("cal_end", "Open your eyes.", beep=None)
+            self.cue("cal_end")                      # low beep: eyes open, as in every round
             self.wearer.open()
             try:
                 cal = self.ac.calibrate(opens, closeds)
@@ -530,6 +572,10 @@ class BoardSession:
 
     def scan_test(self) -> None:
         opts = list(OPTIONS)
+        # These lines are timed against the wearer's reaction, so have them ready before they're due.
+        self.voice.warm([spoken_option(i, o) for i, o in enumerate(opts)]
+                        + [f"{o}. Confirm?" for o in opts]
+                        + [f"Your target is {NUMBER_WORDS[i]}: {o}." for i, o in enumerate(opts)])
         self.voice.say(f"Choice test. I will read {len(opts)} numbered choices, again and again. "
                        "As soon as you hear your target, close your eyes until the double beep, "
                        "then open them. I will say what you picked and ask: confirm? "
@@ -712,6 +758,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--channels", default="auto")
     p.add_argument("--quick", action="store_true", help="shorter blocks and fewer trials")
     p.add_argument("--no-voice", action="store_true", help="print the cues, don't speak or beep")
+    p.add_argument("--standard-voice", action="store_true",
+                   help="use the operating system's voice even if the natural voice is installed")
     p.add_argument("--out", default=None, help="folder for this session (default: recordings/...)")
     p.add_argument("--verify", metavar="FOLDER", default=None,
                    help="check a saved session is complete and usable, then exit")
@@ -764,7 +812,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if not args.consent:
                 print("No --consent: the session runs, but raw EEG is NOT saved (report only).", flush=True)
         silent = args.no_voice or args.fast_silent
-        voice = Voice(enabled=not silent, simulate_timing=args.no_voice and not args.fast_silent)
+        natural = None
+        if not silent and not args.standard_voice:
+            from signal2speech.speech.neural import PiperVoice
+            natural = PiperVoice.find()
+        voice = Voice(enabled=not silent, simulate_timing=args.no_voice and not args.fast_silent,
+                      neural=natural)
+        if not silent:
+            print(f"voice: {voice.name}", flush=True)
         wearer = (SimWearer(publisher, args.self_test_reaction[0], args.self_test_reaction[1])
                   if publisher is not None else NoWearer())
         session = BoardSession(
