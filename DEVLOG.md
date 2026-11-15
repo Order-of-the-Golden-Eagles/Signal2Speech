@@ -172,6 +172,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
 
+## 11/14/26 - 5:35 PM - Vasanth Anbukumar - #1 Sync the architecture docs with main ([PR #71](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/71))
+- Added a "Current status" table to the selection contract: what is merged and checked on simulated or synthetic data, what is still in an open PR (#29/#30 OpenOrbit), and what still needs the live headset (P300 accuracy, the alpha-switch threshold, live Unicorn input)
+- Fixed stale lines: the P300 pipeline now matches the code (Trigger per tile, LDA score, sequence vote), the folder table names the real files, and the tests section gives today's count (111 passed, 2 skipped after merging main, with a note that the number grows) and the 3-OS CI
+- Matched the dependency graph to GitHub's "Blocked by" links: added #22 to #30 and #21 to #23, and marked closed issues
+- `docs/MEMORY.md` no longer says simulated input still needs a one-line swap in `app.py`: it already uses the g.Pype stream
+- Docs only. No code changed, and pytest still passes
+
 ## 11/14/26 - 5:38 PM - Vasanth Anbukumar - #48 Evidence view driven by the P300 chooser ([PR #76](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/76))
 - New flag: `python -m signal2speech.evidence --source generator --p300` (or `--source hybridblack --p300`) builds the judge window around the real P300 chooser instead of the stand-in flasher
 - The chooser's filter, scorers and calibration collectors now live in the same g.Pype pipeline as the scopes, and its flash markers go on the evidence view's marker
@@ -264,6 +271,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The smoke check is now fully green (7 of 7), now that the map and data have landed
 - The one thing left for a live demo: the headset isn't connected to the app yet. The P300 chooser and the eyes-closed confirm both work on their own, but nothing wires them into the app (#23)
 - Each developer is asked to confirm their row in #40
+
 ## 11/14/26 - 6:55 PM - In Young Song - #32 Verified June 2023 fire detections ([PR #89](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/89))
 - The team has a small, checked sample of NASA fire detections for the demo dates, bundled for offline use
     - `data/openorbit/firms/`: about 10,000 VIIRS detections for June 26 and 28, 2023, from the Great Lakes to Quebec. `SOURCES.md` explains what a detection means
@@ -303,3 +311,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - My code-review fixes for #26 were pushed a few minutes after its PR merged, so they never reached main. This puts them back
 - If a preview times out or is cancelled, the simulator repeats the whole choose-then-confirm step instead of getting out of order
 - The app's timers stop when it closes, the screenshot timer can't fire into a later run, and `--confirm-timeout` refuses values that would quietly turn it off
+## 11/14/26 - 7:35 PM - Long Le - #95 Long replies fit their tiles ([PR #112](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/112))
+- Long AI replies now shrink to fit the tiles and the preview instead of getting cut off. The text never goes below 32 px, so it stays readable from the judge table
+- The size is only recalculated when the label or the window size changes, never during a flash, so the P300 flash timing isn't affected
+- Checked with screenshots at 1280×720 and 1536×864 using 12-word replies: they fit at 54–56 px. The demo labels stay at full size. Tests cover the 32 px floor, the flash, and the preview
