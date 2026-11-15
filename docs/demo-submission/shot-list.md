@@ -6,6 +6,8 @@ Every shot that shows EEG carries an on-screen caption naming its source: **Live
 
 ## Primary cut (2:45)
 
+**Graphics (#132):** [title card](media/title-card.png) for shot 1, [architecture diagram](media/architecture.png) for shot 9, and [closing card](media/closing-card.png) for shot 10. All are 1920×1080 PNGs. To change the wording, edit `make_graphics.py` and run `python docs/demo-submission/make_graphics.py`.
+
 | # | Time | Picture | Narration (voice-over or on camera) | Caption |
 | --- | --- | --- | --- | --- |
 | 1 | 0:00–0:10 | Wearer in the Unicorn Hybrid Black, looking at the screen. | "Some people can't speak or type. Signal2Speech lets them answer with brain signals." | Signal2Speech · Hack the Nest 2026 |

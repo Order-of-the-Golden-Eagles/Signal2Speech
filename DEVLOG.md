@@ -359,6 +359,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Updated the script for what's on `main` now: the real map with its 8 s reveal, fullscreen, F1 key help, and the confirm countdown. Submission fields live only in `submission-checklist.md`
 - Checked: every relative link in the folder resolves. Docs only
 
+## 11/14/26 - 8:33 PM - MagicJester2764 - #10 Git hook tests no longer touch your real repo ([PR #126](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/126))
+- Found a nasty bug: when the pre-push hook runs the tests, one of them (`tests/test_githooks.py`) was making commits and changing settings in the developer's *real* repository instead of its own scratch copy
+    - It switched the repo to "bare" (so `git status` stopped working), replaced your name and email with "Hook Test", and left a fake `.env` staged
+- Fixed by giving that test a clean environment, plus a new test that proves it can't reach an outer repo even when git's hook variables are set
+- The hook itself now clears git's variables before running the tests, so no other test or tool can do the same thing
+- Verified by pushing through the real pre-push hook: the tests passed, and the repo's settings, history, and staged files were unchanged afterwards. A new test also checks this on every run, in both ways a hook can set git's variables
+- If you pushed with the hooks turned on, check your repo with the steps in `docs/MEMORY.md`
 ## 11/14/26 - 8:13 PM - Vasanth Anbukumar - #23 Plain-language prompts in the live-run guide ([PR #127](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/127))
 - The guided headset test (`python -m signal2speech.eeg.live --source hybridblack`) now speaks to the wearer in plain words: "WEARER: look at the tile with the YELLOW border… count it silently", "If YES, close your eyes for about 2 seconds"
 - Steps read as what's happening ("checking the signal", "learning how your brain reacts to the flashes", "learning your eyes-closed YES signal") instead of jargon
@@ -412,3 +419,21 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `python -m signal2speech.evidence.dataset path/to/p300-speller` prints the numbers: a 7–11 µV target vs non-target difference in all five people, and our chooser's method classifies single flashes at 0.59–0.85 balanced accuracy (chance is 0.50)
 - The dataset stays out of git. The docs say where to download it; cite g.tec and don't redistribute it
 - Verified: the window on the judging laptop with subject S4, and tests that build a small fake file in the same format and check the flashes line up to the sample. Still not a result for our wearer or our two-tile layout
+## 11/14/26 - 9:20 PM - In Young Song - #138 PiEEG's simulator drives the eye-closure confirm ([PR #144](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/144))
+- PiEEG's own simulated EEG now runs through our g.Pype pipeline: a keyboard preview, then PiEEG's "eyes closed" alpha burst confirms it, and the map changes and the line is spoken once
+    - `python python_quickstart.py --sim --lsl` (PiEEG's starter), then `python -m signal2speech.eeg.pieeg_lsl --demo`. Setup is in `docs/eeg-hardware/pieeg.md`
+- Why: the Mind and Machine track is led by g.tec with PiEEG, and judging runs on simulation, so this shows PiEEG's tools and g.Pype working together. It's labelled Simulated (PiEEG) everywhere
+- PiEEG's simulators have no P300, so the choice is made by keyboard here. The P300 chooser stays on `--input simulated --p300`
+- Only the stream from this laptop is used, under a name unique to it, so another team's PiEEG simulator on the venue Wi-Fi can't drive our app
+- Verified on Windows with PiEEG's real starter: 250.0 Hz, calibration ratio 26.2, one confirm and one spoken line. The new tests use a fake stream and skip without `pylsl`, which isn't in the team install yet (Vasanth's call, #19). Not tried on the judging laptop, and not in the evidence view yet
+## 11/14/26 - 9:26 PM - Long Le - #133 Crash-safe launcher for the judging table ([PR #145](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/145))
+- One command starts the demo fullscreen and brings it back by itself if it crashes: `python tools/demo_launcher.py --input keyboard`
+    - Restarts after 1 s, then every 2 s, up to 5 times. Closing the window normally just ends it
+- Every start and exit is logged to `logs/launcher-<time>.log`. If it gives up, it says to switch to the fallback build
+- Checked with real processes: a clean quit stopped the launcher, and a crashing app was restarted after 1 s, then given up on with a clear message. Tests use a fake process. The judging-laptop session and the stage script now use it
+
+## 11/14/26 - 9:36 PM - Long Le - #132 Video title card, closing card, and diagram ([PR #147](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/147))
+- The submission video has its three graphics ready in `docs/demo-submission/media/`: a title card, a closing card with the repo link and AI-use note, and an architecture diagram for shot 9
+- They're drawn by a script, so changing a name or a line is one command: `python docs/demo-submission/make_graphics.py`
+- The diagram shows the real path: headset → g.Pype (OSCAR) → P300 to choose and alpha to confirm → selection contract → speech and map, with keyboard and simulator input going through the same contract
+- Checked by eye at full size, and a test makes sure all three stay 1920×1080, under 500 KB, and linked from the shot list

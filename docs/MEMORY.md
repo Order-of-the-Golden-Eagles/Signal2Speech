@@ -18,6 +18,18 @@
 
 ## Verification and next checkpoint
 
+- **Check your clone if you pushed with the hooks on (fixed by the `test_githooks` env fix):** git exports `GIT_DIR` to hooks, so `tests/test_githooks.py` ran its git commands against your *real* repo during the pre-push pytest. Run `git config --local --list`. If you see `core.bare=true`, `user.name=Hook Test`, `user.email=test@example.com`, `commit.gpgsign=false`, or an absolute `core.hookspath`, fix them:
+  1. `git --git-dir=.git config --local core.bare false`
+  2. `git config --local core.hooksPath .githooks`
+  3. If present: `git config --local --unset commit.gpgsign`
+  4. If present: `git config --local --unset user.name` and `git config --local --unset user.email` (or set your own)
+
+  Then check the index and history:
+  - Run `git status`. The tests may have left `leak.py` (a fake secret), `.env`, or `.env.example` staged. They also ran `git reset` on your real index, so anything you had staged may be unstaged. Remove the stray files with `git rm --cached <file>` and delete them, then re-stage your own work.
+  - Run `git log --all --author='Hook Test'` for stray commits ("add ok.py", "add .env.example"). Their files came from a temp folder, so your checkout shows them as deleted.
+    - On an unpushed branch: drop them with `git reset --soft <last good commit>`, then recommit.
+    - If you already pushed them: don't force-push a shared branch. Commit the deletions, or open a fresh branch from the clean state, as #124 did for #120.
+- **Pre-headset checkpoint (#40, 7:00 PM, `bfce988`):** the keyboard reveal passed with Wi-Fi off (#39, InYoung's Windows laptop, `eecc31a`). A simulated g.Pype reveal passed on `bfce988` (Linux, offscreen, muted, Wi-Fi on). `--smoke` gives 7 pass and 0 skip on `bfce988`. Not yet verified: simulated input with Wi-Fi off, and audible speech on the judging laptop. **Remaining live blocker:** live EEG isn't wired into `App` (`--input live` is refused). #23 must open one HybridBlack pipeline that both the P300 chooser and `AlphaConfirm(pipeline=, upstream=)` share. [Checkpoint](sprint-operations/pre-headset-checkpoint.md)
 - **Live EEG in the app (#103):** `python -m signal2speech.app --input live` calibrates on the app's own tiles, then the P300 chooses and the alpha switch confirms, on one HybridBlack pipeline. Live confirm stays disarmed (key 1 confirms) until #23 says it's safe (`--arm-live-confirm`). Rehearse the same path with `--input simulated --p300`. Verified on simulated input only. With no headset it exits 3 with the pairing checklist instead of hanging, because g.Pype's `start()` blocks without a device. [Details](eeg-hardware/README.md#live-eeg-in-the-app-103)
 - **Pre-headset checkpoint (#40, 7:00 PM, `bfce988`):** the keyboard reveal passed with Wi-Fi off (#39, InYoung's Windows laptop, `eecc31a`). A simulated g.Pype reveal passed on `bfce988` (Linux, offscreen, muted, Wi-Fi on). `--smoke` gives 7 pass and 0 skip on `bfce988`. Not yet verified: simulated input with Wi-Fi off, and audible speech on the judging laptop. The live blocker it named (live EEG not wired into `App`) is resolved by #103, see below. What's left is the run on the wearer at the slot. [Checkpoint](sprint-operations/pre-headset-checkpoint.md)
 - **Known CI flake (#48 owner):** `test_generator_average_separates_target_from_nontarget` in `tests/test_evidence.py` can fail on a slow macOS runner (peak gap 2.41 against `> 2.5`). Re-run once. If it fails twice or on another OS, it's real. [Details](devops/README.md#verified-the-pr-check-passes-and-fails-38)
