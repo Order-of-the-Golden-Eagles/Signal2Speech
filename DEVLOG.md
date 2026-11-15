@@ -405,7 +405,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The report is ready to paste into the rehearsal log, so every practice run leaves evidence behind
 - Found and fixed two bugs while testing: the map time got overwritten in the strip, and closing the app could raise an error from the sound player. Tests use a fake clock. Not yet measured on the judging laptop
 
-## 11/14/26 - 9:26 PM - Long Le - #133 Crash-safe launcher for the judging table (PR pending)
+## 11/14/26 - 9:26 PM - Long Le - #133 Crash-safe launcher for the judging table ([PR #145](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/145))
 - One command starts the demo fullscreen and brings it back by itself if it crashes: `python tools/demo_launcher.py --input keyboard`
     - Restarts after 1 s, then every 2 s, up to 5 times. Closing the window normally just ends it
 - Every start and exit is logged to `logs/launcher-<time>.log`. If it gives up, it says to switch to the fallback build
