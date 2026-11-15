@@ -5,6 +5,7 @@ speaker. Sources are labelled as they are: keyboard, simulated (a real g.Pype Ge
 through #21's SimulatedDecoder), and recorded (contract events replayed as `recorded`).
 Live EEG is out of scope until #23.
 """
+import importlib.util
 import json
 import os
 import time
@@ -24,6 +25,10 @@ from signal2speech.core import (ActionIds, InputSources, Outcome, SelectionEvent
 T1, T2 = TargetIds.TARGET_1, TargetIds.TARGET_2
 EVENTS = Path(__file__).resolve().parents[1] / "contracts" / "events"
 KB, SIM, REC = InputSources.KEYBOARD, InputSources.SIMULATED, InputSources.RECORDED
+# Tests that poke SimulatedDecoder internals need g.Pype; without it App falls back to the
+# scripted InjectedSimulatedInput, which has no stream to stop.
+needs_gpype = pytest.mark.skipif(importlib.util.find_spec("gpype") is None,
+                                 reason="g.Pype not installed: SimulatedDecoder unavailable")
 
 
 @pytest.fixture(scope="module")
@@ -143,13 +148,17 @@ def test_confirm_inside_the_timeout_outputs_once_and_stops_the_timer(qapp, rig):
 
 # ── Disconnect during preview ────────────────────────────────
 def test_keyboard_disconnect_key_during_preview(qapp, rig):
+    from PySide6.QtGui import QShortcut
     app, log, cleared = rig(KB, confirm_timeout_ms=0)
     preview(qapp, app, KB)
-    app.handler.disconnect()                      # what key D does
+    key_d = [s for s in app.root.findChildren(QShortcut) if s.key().toString() == "D"]
+    assert len(key_d) == 1, "key D shortcut missing"
+    key_d[0].activated.emit()                     # exercises the real D wiring
     assert app.window.press_target(T1) is Outcome.RejectedNoOpenRound
     assert cleared == ["disconnect"] and outputs(app) == (0, 0)
 
 
+@needs_gpype
 def test_gpype_stream_stop_during_preview(qapp, rig):
     app, log, cleared = rig(SIM, sim_script=[2, 1], confirm_delay_ms=1500, confirm_timeout_ms=0)
     preview(qapp, app, SIM)
@@ -167,8 +176,9 @@ def test_duplicate_keyboard_event_is_rejected(qapp, rig):
     app, log, cleared = rig(KB, confirm_timeout_ms=0)
     e = SelectionEvent(KB, "r1", "k99", T2)
     assert app.handler.handle(e) is Outcome.Previewed
-    assert app.handler.handle(e) is Outcome.RejectedStaleRound     # round moved on to r2
-    # The same event id again, now stamped with the open round: a true duplicate.
+    # Replaying the identical event: its round r1 is closed, so the stale rule answers first.
+    assert app.handler.handle(e) is Outcome.RejectedStaleRound
+    # The same event id stamped with the open round r2: the duplicate rule rejects it.
     assert app.handler.handle(SelectionEvent(KB, "r2", "k99", T1)) is Outcome.RejectedDuplicateEvent
     assert app.handler.current is not None and outputs(app) == (0, 0)
     confirm = SelectionEvent(KB, "r2", "k100", T1)
@@ -185,6 +195,7 @@ def test_held_or_repeated_confirm_key_outputs_once(qapp, rig):
     assert outputs(app) == (1, 1)
 
 
+@needs_gpype
 def test_duplicate_simulated_decision_outputs_once(qapp, rig):
     app, log, cleared = rig(SIM, sim_script=[2, 1], confirm_delay_ms=200, confirm_timeout_ms=0)
     preview(qapp, app, SIM)
@@ -217,6 +228,7 @@ def test_stale_choose_decision_cannot_confirm(qapp, rig, source):
     assert app.handler.current is not None and outputs(app) == (0, 0)
 
 
+@needs_gpype
 def test_late_simulated_decision_from_a_closed_round_is_dropped(qapp, rig):
     app, log, cleared = rig(SIM, sim_script=[2], confirm_timeout_ms=0)
     preview(qapp, app, SIM)
@@ -250,3 +262,51 @@ def test_gauntlet_then_one_good_confirm(qapp, rig):
     app.window.press_target(T1)                                   # repeat
     assert outputs(app) == (1, 1)
     assert app.view.calls == [ActionIds.COMPARE_AIR_QUALITY]
+
+
+# ── Review fixes (PR #80) ────────────────────────────────────
+@needs_gpype
+def test_timeout_in_the_confirm_round_replays_the_scripted_pair(qapp, rig):
+    app, log, cleared = rig(SIM, sim_script=[2, 1], confirm_delay_ms=30_000,
+                            confirm_timeout_ms=300)
+    preview(qapp, app, SIM)                       # choose 2 used; confirm 1 pending
+    assert pump(qapp, lambda: cleared == ["timeout"], timeout=3.0)
+    assert list(app.sim._picks) == [2, 1]         # the next question gets choose-then-confirm
+    app.ask()
+    assert pump(qapp, lambda: app.handler.pending is not None)
+    assert app.handler.pending.action_id == ActionIds.COMPARE_AIR_QUALITY   # target-2 again
+    assert outputs(app) == (0, 0)
+
+
+@needs_gpype
+def test_scripted_cancel_does_not_replay(qapp, rig):
+    app, log, cleared = rig(SIM, sim_script=[2, 2], confirm_delay_ms=100, confirm_timeout_ms=0)
+    preview(qapp, app, SIM)
+    assert pump(qapp, lambda: cleared == ["cancel"])
+    assert list(app.sim._picks) == [] and outputs(app) == (0, 0)
+
+
+@needs_gpype
+def test_keyboard_preview_then_timeout_drops_the_confirm_pick(qapp, rig):
+    app, log, cleared = rig(SIM, sim_script=[1], confirm_delay_ms=30_000, confirm_timeout_ms=300)
+    app.window.flasher.stop()
+    assert app.window.press_target(T2) is Outcome.Previewed   # keyboard made the preview
+    assert pump(qapp, lambda: cleared == ["timeout"], timeout=3.0)
+    assert list(app.sim._picks) == []             # keyboard took over that question
+
+
+def test_close_stops_the_apps_timers(qapp, rig):
+    app, log, cleared = rig(KB, confirm_timeout_ms=200)
+    preview(qapp, app, KB)
+    app.close()
+    pump(qapp, timeout=0.5)
+    assert cleared == []                          # the confirm timeout never fired after close
+
+
+def test_confirm_timeout_flag_rejects_values_that_round_or_overflow():
+    import argparse
+    from signal2speech.app import _timeout_seconds
+    assert _timeout_seconds("0") == 0 and _timeout_seconds("2.5") == 2.5
+    for bad in ("0.0004", "inf", "3000000", "soon"):
+        with pytest.raises(argparse.ArgumentTypeError):
+            _timeout_seconds(bad)

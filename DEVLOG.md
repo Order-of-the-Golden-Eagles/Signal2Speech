@@ -310,12 +310,23 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Added team and data credits (NASA GIBS MODIS, EPA AirData) and a short AI-use note. The screenshot is 180 KB in `docs/demo-submission/media/`
 - Checked: every relative link resolves, and `tools/release_check.py --quick` passes apart from the known commit-email warning (#33)
 
+## 11/14/26 - 7:12 PM - Vasanth Anbukumar - #37 Faster PR checks, required CI, auto-merge ([PR #100](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/100))
+- PR checks are faster: the six slow real-time tests (live-run, evidence, alpha, and P300 pipelines, about 150 seconds) run on Windows and Ubuntu py3.12 for every PR, and on every OS when code lands on `main`
+    - Locally, `pytest -m "not slow"` runs the rest in about 40 seconds. Plain `pytest` still runs everything
+- `main` now requires all four CI jobs to pass before a PR can merge, and GitHub auto-merge is on: run `gh pr merge <n> --auto --squash` and GitHub merges once the checks are green
+- Why: the full suite had grown to about 3 minutes, and teammates merging during long CI runs kept forcing re-runs
+- The slow tests are listed in one place, `tests/conftest.py`, so no test files changed. Windows, the judging laptop, still runs everything on every PR
+
 ## 11/14/26 - 7:25 PM - Long Le - #94 Fits the judging laptop screen, plus fullscreen and key help ([PR #111](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/111))
 - The app now fits a 1080p laptop at 150% scaling (1280×720) without cutting anything off. Before, it needed 1400 px of width
     - `python -m signal2speech.app --fullscreen`. F11 toggles fullscreen, and F1 shows the keys for whoever runs the demo
 - The input label in the bottom strip always shows in full, so simulated input can't look live on a small screen. Longer connection and outcome text clips instead, and the transcript keeps it
 - Checked with screenshots at 1280×720, 1366×768, and 1536×864 (preview, reveal, and help overlay), and tests assert the size limit in every state. Not yet seen on the judging laptop itself
 
+## 11/14/26 - 7:33 PM - MagicJester2764 - #26 Review fixes that missed the merge ([PR #115](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/115))
+- My code-review fixes for #26 were pushed a few minutes after its PR merged, so they never reached main. This puts them back
+- If a preview times out or is cancelled, the simulator repeats the whole choose-then-confirm step instead of getting out of order
+- The app's timers stop when it closes, the screenshot timer can't fire into a later run, and `--confirm-timeout` refuses values that would quietly turn it off
 ## 11/14/26 - 7:35 PM - Long Le - #95 Long replies fit their tiles ([PR #112](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/112))
 - Long AI replies now shrink to fit the tiles and the preview instead of getting cut off. The text never goes below 32 px, so it stays readable from the judge table
 - The size is only recalculated when the label or the window size changes, never during a flash, so the P300 flash timing isn't affected
