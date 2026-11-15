@@ -146,10 +146,12 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
         kind: The source to build (for a replay, the source that was recorded).
         label: How to label the input. Defaults to Simulated for the
             Generator and Live EEG for the headset; pass RECORDED for a replay.
-        oscar: Show OSCAR. For the headset, the main stream stays OSCAR
-            off and a branch runs OSCAR on, so both are visible. If the
-            standalone OSCAR node is unavailable, the headset is built
-            with ``enable_oscar=True`` instead. Never run on the Generator.
+        oscar: Show OSCAR. For the headset and for g.tec's recording
+            (``dataset``), the main stream stays OSCAR off and a branch runs
+            OSCAR on, so both are visible. If the standalone OSCAR node is
+            unavailable, the headset is built with ``enable_oscar=True``
+            instead; the recording then shows OSCAR off. Never run on the
+            Generator's own simulated samples.
         front_end: Seam for #46. See the module docstring.
         synthetic_p300: Add the simulated P300 after target markers.
             Defaults to True for the Generator and False otherwise.
@@ -182,9 +184,16 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
     oscar_branch = None
     in_source_oscar = False
     if dataset is not None:
+        # #164: the same OSCAR branch as the headset, on g.tec's recording (8 channels, uV).
         from .dataset import LABEL_DETAIL
-        oscar_note = (f"{LABEL_DETAIL}, subject {dataset.name}: recorded by g.tec, "
-                      "not our headset or wearer. OSCAR not applied")
+        oscar_branch = oscar_node() if oscar else None
+        who = f"{LABEL_DETAIL}, subject {dataset.name}: recorded by g.tec, not our headset or wearer"
+        if not oscar:
+            oscar_note = f"{who}. OSCAR off"
+        elif oscar_branch is not None:
+            oscar_note = f"{who}. OSCAR off (top right) vs OSCAR on (middle left)"
+        else:
+            oscar_note = f"{who}. OSCAR unavailable in this g.Pype, so not applied"
     elif kind is SourceKind.GENERATOR:
         oscar_note = "OSCAR unavailable: Generator input, no headset"
     elif not oscar:

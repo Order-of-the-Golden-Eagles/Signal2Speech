@@ -133,10 +133,11 @@ No hardware is needed. With g.tec's P300 Speller dataset (`S1.mat`–`S5.mat`, f
 
 ```
 python -m signal2speech.evidence.dataset path/to/p300-speller            # the numbers
-python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat   # the live view
+python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat   # the live view, OSCAR off and on
+python -m signal2speech.evidence.oscar_report path/to/p300-speller --jobs 5      # what OSCAR changes
 ```
 
-The first command prints, per subject, the target minus non-target peak and our classifier's cross-validated single-flash accuracy (1–30 Hz band-pass, 100 ms bins, shrinkage LDA, 5 folds). On the published files we get a 7–11 µV difference in all five subjects and 0.59–0.85 balanced accuracy, where chance is 0.50 ([full table](docs/eeg-hardware/README.md#recorded-human-p300-from-gtecs-dataset-142)). Any file in the same format (`fs`, `y` as samples × channels, `trig` with +1 for target and −1 for non-target) works. The second command plays the recording through the same g.Pype pipeline the app uses, labelled Recorded.
+The first command prints, per subject, the target minus non-target peak and our classifier's cross-validated single-flash accuracy (1–30 Hz band-pass, 100 ms bins, shrinkage LDA, 5 folds). On the published files we get a 7–11 µV difference in all five subjects and 0.59–0.85 balanced accuracy, where chance is 0.50 ([full table](docs/eeg-hardware/README.md#recorded-human-p300-from-gtecs-dataset-142)). Any file in the same format (`fs`, `y` as samples × channels, `trig` with +1 for target and −1 for non-target) works. The second command plays the recording through the same g.Pype pipeline the app uses, labelled Recorded. The third replays it through g.Pype's OSCAR artifact removal. Blink and movement stretches at Fz come out 14–65% smaller, and single-flash accuracy is unchanged or better once OSCAR's ~324 ms delay is corrected ([OSCAR results](docs/eeg-hardware/README.md#oscar-on-gtecs-recording-164)).
 
 The same code reads a live g.tec Unicorn Hybrid Black (`--source hybridblack`), and it picks the right channels for each device by itself ([devices and channels](docs/eeg-hardware/README.md#devices-and-channels-150)).
 

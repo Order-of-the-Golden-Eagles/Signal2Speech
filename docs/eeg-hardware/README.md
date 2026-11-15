@@ -133,7 +133,7 @@ The synthetic P300 is a 5 µV Gaussian at 300 ms over 10 µV white noise plus 10
 
 **Not verified yet**
 
-- **Live headset:** `--source hybridblack` hasn't been run. Accuracy, trials needed per wearer, and OSCAR's effect on P300 epochs are all unmeasured. Report them here after the first live calibration.
+- **Live headset:** `--source hybridblack` hasn't been run. Accuracy, trials needed per wearer, and OSCAR's effect on P300 epochs are all unmeasured. OSCAR delays the signal ~324 ms and g.Pype doesn't move flash markers to match on a separate OSCAR node; whether the in-source OSCAR does is a headset-slot check ([#164](#oscar-on-gtecs-recording-164)). Report them here after the first live calibration.
 - **Two-tile oddball:** each tile is the target half the time, which isn't rare. Real P300s are larger for rare targets. If live accuracy is weak, add null flashes or more tiles, or fall back to the alpha step-through (#47).
 - **Flash-to-marker timing:** the P300 is locked to the real flash. The marker is emitted right after Qt repaints the tile, not at the monitor's vsync (`FlashScheduler` and the CLI tiles both work this way). Expect 0–17 ms of jitter at 60 Hz plus compositor delay. A constant offset is harmless because calibration learns it, but jitter smears the epoch. OSCAR adds processing delay, and we haven't checked whether g.Pype aligns Marker events to OSCAR-delayed samples.
 
@@ -377,6 +377,42 @@ Offline results on 2026-11-14 (1–30 Hz band-pass, 100 ms bins, shrinkage LDA, 
 | S5 | −11.0 µV at 400 ms (PO7) | 0.75 |
 
 Each subject has 150 target and 1,050 non-target flashes over about 4 minutes. These show our pipeline finds a real P300 in real human EEG. They are **not** a result for our wearer or our two-tile layout. The dataset's files state no licence; it's provided by g.tec for this hackathon, so cite g.tec and don't redistribute it.
+
+### OSCAR on g.tec's recording (#164)
+
+g.tec's judging notes name OSCAR, its real-time artifact removal. Until now we could only show it on a headset we don't have. It does run on replayed data. The evidence view puts g.tec's recording through the same OSCAR branch as the headset, side by side, labelled **Recorded (g.tec dataset)**:
+
+```
+python -m signal2speech.evidence --source dataset path/to/p300-speller/S1.mat      # OSCAR off (top right) vs on (middle left)
+python -m signal2speech.evidence.oscar_report path/to/p300-speller --jobs 5          # the numbers below, about 4 min
+```
+
+**How it's measured:** each subject plays through a real g.Pype pipeline in real time. The recording feeds a "before" tap directly, and an "after" tap through g.Pype's `Oscar` node, the same node the evidence view uses. Offline, with the first 10 s left out while OSCAR adapts:
+- **OSCAR's delay:** the lag that best lines "after" up with "before".
+- **Artifact amplitude:** the median peak-to-peak in 1 s windows at Fz, 1–30 Hz. Fz is the frontal channel, where blinks are largest. "Artifact stretches" are the 5% of windows with the biggest swings before OSCAR; "the rest" is everything else.
+- **Single-flash accuracy:** the same shrinkage LDA as the P300 chooser (`dataset.analyse`), cross-validated, before vs after OSCAR with its delay removed. The extra column epochs OSCAR's output on the flashes **as-is**, the way a pipeline would without correcting the delay.
+
+Results on 2026-11-15 (Recorded, g.tec's subjects, not our wearer, not live):
+
+| Subject | OSCAR delay | Fz, artifact stretches | Fz, the rest | Single-flash accuracy | Same, without the delay fix | P300 peak (target − non-target) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| S1 | 324 ms | 122 → 43 µV | 39 → 36 µV | 0.72 → 0.81 | 0.71 | −9.5 → −9.0 µV |
+| S2 | 328 ms | 38 → 32 µV | 27 → 25 µV | 0.76 → 0.75 | 0.62 | +7.5 → +7.2 µV |
+| S3 | 324 ms | 102 → 36 µV | 33 → 32 µV | 0.60 → 0.62 | 0.56 | +6.8 → +6.2 µV |
+| S4 | 324 ms | 75 → 36 µV | 33 → 31 µV | 0.86 → 0.86 | 0.80 | +8.0 → +7.0 µV |
+| S5 | 324 ms | 86 → 53 µV | 29 → 28 µV | 0.75 → 0.75 | 0.71 | −11.6 → −6.7 µV |
+
+**What it shows:**
+- **OSCAR removes artifacts:** the biggest swings at Fz are 14–65% smaller, while the rest of the signal changes by only 3–8%.
+- **Classification:** once the delay is corrected, it's unchanged within ±0.02 for four subjects. S1 improves (0.72 → 0.81); S1 has the largest artifacts. That's no improvement for most subjects, and no harm.
+- **The P300 survives**, a little smaller (S5's peak at PO7 drops most). The "before" accuracies differ slightly from the #142 table because the first 10 s are left out here.
+- **OSCAR delays the signal by about 324 ms**, steadily, close to the 70 samples (280 ms) g.Pype's own code mentions. **g.Pype doesn't move the flash markers to match** when OSCAR runs as a separate node. Epoched as-is, the P300 lands ~320 ms late (S4's average peaks at 796 ms instead of 488 ms), and accuracy drops by 0.04–0.14. This held with both the recording's flash channel and live-style `Marker` events: a synthetic P300 peaked at 740 ms instead of 504 ms.
+
+**What this means for us:**
+- **Evidence view:** the averages are cut from the OSCAR-off stream, so they're right. The flash lines drawn over the **OSCAR on** scope are ~0.3 s early relative to that trace. Read them as approximate there.
+- **Headset (#23), unverified:** the P300 chooser and `--input live` use OSCAR *inside* the Unicorn source (`HybridBlack(enable_oscar=True)`). If that path delays the EEG the same way, the P300 sits near 600 ms in our 100–700 ms epochs. Calibration runs on the same stream, so it would still classify, but with less of the response in view. **Check at the headset slot:** compare the averaged P300 latency with OSCAR on and with `--no-oscar`. If on is ~300 ms later, lengthen the epoch or move it later when OSCAR is on.
+- **Can't do offline without g.Pype:** the standalone `gtec_oscar` package needs a licence key (`gtec_oscar.authenticate(key)`), so the numbers come from replaying through g.Pype in real time.
+- **Tests:** `tests/test_oscar_report.py` checks the measures on constructed data, plus one slow run of a synthetic recording through the real OSCAR branch.
 
 ## Devices and channels (#150)
 

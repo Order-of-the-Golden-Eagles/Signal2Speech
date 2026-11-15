@@ -607,3 +607,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Licences to know about: Piper is GPL-3.0, so we run it as a separate program. The voice we chose is for non-commercial use with credit. The 63 MB voice file is not in the repo
 - Lines with numbers in them are spoken 25 % slower, so the figures are easy to catch
 - Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux
+
+## 11/15/26 - 4:25 AM - MagicJester2764 - #164 OSCAR shown and measured on g.tec's recorded EEG (PR pending)
+- Judges can now see g.tec's OSCAR artifact removal working on real human EEG, before and after side by side, even without our headset
+    - `python -m signal2speech.evidence --source dataset path/to/p300-speller/S1.mat`, and the numbers with `python -m signal2speech.evidence.oscar_report path/to/p300-speller --jobs 5`
+- On all five of g.tec's recorded subjects, the biggest blink and movement swings got 14–65% smaller, while the rest of the signal barely changed. Classification stayed the same or improved (one subject went from 0.72 to 0.81)
+- We found that OSCAR delays the signal by about a third of a second and g.Pype doesn't shift the flash markers to match. Ignoring that costs up to 0.14 accuracy, so the docs say how to handle it, and the headset session should check it on the live path
+- Measured on g.tec's recordings replayed through g.Pype (Recorded, not our wearer, not live). The g.tec data stays out of git
