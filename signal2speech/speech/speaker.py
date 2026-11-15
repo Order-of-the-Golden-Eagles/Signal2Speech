@@ -6,14 +6,18 @@ Order, all offline:
    recording can't match words the wearer just approved.
 2. The OS voice through Qt TextToSpeech (darwin on macOS, sapi/winrt on Windows, speechd on
    Linux). Non-blocking, so the window keeps updating while it speaks.
-3. pyttsx3, if Qt has no usable engine. It blocks the UI while speaking, so it is last.
+3. pyttsx3, if Qt has no usable engine. Each line is spoken from its own short-lived helper
+   process: inside one process, pyttsx3 speaks the first line and silently skips the rest
+   (measured on Windows, 2026-11-15), and a helper also keeps the window from freezing.
 """
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 from typing import Callable, List, Optional, Protocol
 
-from PySide6.QtCore import QObject, QTimer, QUrl
+from PySide6.QtCore import QObject, QUrl
 
 from signal2speech.core import ActionIds
 
@@ -22,6 +26,9 @@ AUDIO_DIR = ROOT / "data" / "openorbit" / "audio"
 BUNDLED_CLIPS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
 
 Log = Callable[[str], None]
+
+#: Run by the helper process. The text arrives as an argument, never inside the code string.
+PYTTSX3_HELPER = "import sys, pyttsx3; e = pyttsx3.init(); e.say(sys.argv[1]); e.runAndWait()"
 
 
 class Speaker(Protocol):
@@ -53,7 +60,7 @@ class OfflineSpeaker(QObject):
         self.log = log
         self.audio_dir = audio_dir
         self._sound = None
-        self._pyttsx3 = None
+        self._helper: Optional[subprocess.Popen] = None     # the pyttsx3 helper still speaking
         # Called once when audio actually starts for the latest say() (#130 timing).
         self.on_started: Optional[Callable[[], None]] = None
         self._awaiting_start = False
@@ -113,15 +120,22 @@ class OfflineSpeaker(QObject):
             self.tts.say(text)
             return
         if self.backend == "pyttsx3":
-            self.log("speech: pyttsx3 (blocks the window while speaking)")
-            QTimer.singleShot(0, lambda: self._speak_pyttsx3(text))   # let the UI paint first
+            self.log("speech: pyttsx3, in a helper process")
+            self._speak_pyttsx3(text)
             return
         self.log("speech: NO OFFLINE VOICE AVAILABLE, nothing audible")
 
     def _speak_pyttsx3(self, text: str) -> None:
-        import pyttsx3
-        if self._pyttsx3 is None:
-            self._pyttsx3 = pyttsx3.init()
-        self._pyttsx3.say(text)
+        """Speak ``text`` from a fresh process. Returns at once; a line still being spoken is cut
+        off first, as Qt's voice does, so two lines never overlap."""
+        if self._helper is not None and self._helper.poll() is None:
+            self._helper.terminate()
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)      # no console flash on Windows
+        try:
+            self._helper = subprocess.Popen([sys.executable, "-c", PYTTSX3_HELPER, text],
+                                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                            creationflags=flags)
+        except OSError as err:
+            self.log(f"speech: could not start the voice helper ({err}), nothing audible")
+            return
         self._started()
-        self._pyttsx3.runAndWait()

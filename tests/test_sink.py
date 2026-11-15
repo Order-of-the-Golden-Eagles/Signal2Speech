@@ -132,3 +132,35 @@ def test_simulated_uses_gpype_decoder_when_available(qapp, monkeypatch):
     assert app.window.connection_label.text() == "Connection: g.Pype Generator stream"
     app.close()
     assert app.sim.closed
+
+
+def test_pyttsx3_fallback_speaks_every_line_from_its_own_process(qapp, tmp_path, monkeypatch):
+    """pyttsx3 speaks the first line in a process and skips the rest, so each line gets a
+    fresh helper process, and a line still being spoken is cut off before the next starts."""
+    import signal2speech.speech.speaker as speaker_mod
+
+    spawned = []
+
+    class FakeProc:
+        def __init__(self, args, **kwargs):
+            self.args, self.alive, self.terminated = args, True, False
+            spawned.append(self)
+        def poll(self): return None if self.alive else 0
+        def terminate(self): self.terminated, self.alive = True, False
+
+    monkeypatch.setattr(speaker_mod.subprocess, "Popen", FakeProc)
+    monkeypatch.setitem(sys.modules, "pyttsx3", types.ModuleType("pyttsx3"))
+    log, started = [], []
+    sp = OfflineSpeaker(log.append, audio_dir=tmp_path, use_qt_tts=False)
+    assert sp.backend == "pyttsx3"
+    sp.on_started = lambda: started.append(1)
+    lines = ["Yes, please.", "I would like some water.", "Thank you very much."]
+    for i, line in enumerate(lines):
+        if i == 2:
+            spawned[-1].alive = False                          # the second line had finished
+        sp.say(line, "speak_reply")
+    assert [p.args[-1] for p in spawned] == lines              # one helper per line, text as an argument
+    assert all(p.args[1] == "-c" and line not in p.args[2] for p, line in zip(spawned, lines))
+    assert [p.terminated for p in spawned] == [True, False, False]   # only the overlapping one was cut
+    assert len(started) == 3
+    assert sum("helper process" in l for l in log) == 3
