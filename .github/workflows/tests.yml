@@ -83,10 +83,18 @@ jobs:
         id: pytest
         run: |
           set +e                        # write the summary even when tests fail
-          pytest -q -rs 2>&1 | tee pytest.txt
+          # Slow real-time tests run on every OS for pushes to main, and on Windows (the
+          # judging laptop) plus Ubuntu py3.12 for PRs. The other PR jobs skip them.
+          if [ "${{ github.event_name }}" != "pull_request" ] || [ "${{ runner.os }}" = "Windows" ]              || { [ "${{ runner.os }}" = "Linux" ] && [ "${{ matrix.python }}" = "3.12" ]; }; then
+            sel=(); scope="full"
+          else
+            sel=(-m "not slow"); scope="fast (slow tests run on Windows + Ubuntu py3.12)"
+          fi
+          echo "pytest scope: $scope"
+          pytest -q -rs "${sel[@]}" 2>&1 | tee pytest.txt
           rc=${PIPESTATUS[0]}
           {
-            echo "### pytest (${{ matrix.os }}, py${{ matrix.python }}): exit $rc"
+            echo "### pytest (${{ matrix.os }}, py${{ matrix.python }}, $scope): exit $rc"
             echo '```'
             tail -n 1 pytest.txt
             grep '^SKIPPED' pytest.txt || echo "no skips"
