@@ -663,3 +663,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why: on the judging laptop the app's first screen was half empty, which read as unfinished
 - This is the first part of #182 only. The animated reveal and the bar chart of the two counties aren't built
 - Verified by screenshot on the judging laptop's real display, and by one new test that checks no results appear before a confirm
+## 11/15/26 - 7:01 AM - Vasanth Anbukumar - #151 How many flashes our chooser needs, measured on real human EEG ([PR #218](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/218))
+- One command now shows how often our chooser picks the right tile out of two on g.tec's recorded data, by how many flashes it averages: `python -m signal2speech.evidence.dataset <folder> --curve`
+    - Across the five recorded people: 94 % from one flash, 97 % from two, 99 % from three, 100 % from five
+    - `--plot file.svg` saves the chart that's now in `docs/eeg-hardware/README.md`
+- Decision: the app keeps 5 flashes per tile. Three would do on clean data, but the weakest person needs five to reach 99 %, and in the app the responses overlap. No setting changed
+- How we kept it honest: each test uses a separate stretch of the recording from the one the classifier learned on, and with the labels scrambled the same code falls to chance (42 to 46 %)
+- This is offline analysis of five people who are not our wearer, labelled Recorded. It shows the method works on real human brain responses. It doesn't predict a live wearer's accuracy
+- Verified on the judging laptop against the real dataset; one new test uses a made-up recording, since the dataset is never committed
