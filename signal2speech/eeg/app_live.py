@@ -535,10 +535,22 @@ class LiveEegInput:
         self.log(f"guide: {text}")
         from PySide6.QtWidgets import QApplication
         QApplication.processEvents()                     # the screen shows the step before it is spoken
-        try:
-            self.guide(text)
-        except Exception as err:                         # a voice problem must not stop calibration
-            self.log(f"guide voice failed: {type(err).__name__}: {err}")
+        # Speak on a helper thread and keep the window running meanwhile: speaking on the main
+        # thread froze the screen, so the Brain Activity graph paused at every spoken step.
+        failed = []
+
+        def speak() -> None:
+            try:
+                self.guide(text)
+            except Exception as err:                     # a voice problem must not stop calibration
+                failed.append(err)
+        talker = threading.Thread(target=speak, name="calibration-voice", daemon=True)
+        talker.start()
+        while talker.is_alive():
+            QApplication.processEvents()
+            time.sleep(0.02)
+        if failed:
+            self.log(f"guide voice failed: {type(failed[0]).__name__}: {failed[0]}")
 
     def _eye_cue(self, kind: str) -> None:
         if self.eye_cue is None:
