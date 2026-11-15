@@ -340,6 +340,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Only the tests that really need g.Pype are skipped. The rest of `test_diagnostics.py` and `test_recovery.py` still runs everywhere, and CI still runs all of them on Windows, macOS, and Linux
 - Checked on macOS 12 without g.Pype: 183 passed, 0 failed, and the push hook passes again
 
+## 11/14/26 - 8:01 PM - MagicJester2764 - #103 Live EEG inside the app ([PR #124](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/124))
+- The headset can now drive the real demo app: `python -m signal2speech.app --input live`
+    - It calibrates on the app's own tiles first (look at the named tile, then eyes open and eyes closed), then the brain's response picks a tile and closing your eyes confirms
+- The P300 chooser and the eye-closure switch share one headset connection, because the Unicorn can only be opened once
+- Eye-closure confirm stays off until the #23 live run says it's safe. Until then key 1 confirms, and the screen says so
+- With no headset, it now stops within about 15 seconds with pairing steps, instead of freezing forever (the headset library waits indefinitely when no device is there)
+- Rehearse the exact same path without the headset: `--input simulated --p300`. That run worked end to end (one preview, one eye-closure confirm, one spoken line). Nothing has been tried on a real wearer yet
+- After two code reviews: a failed calibration switches that part off and the on-screen hints say so (keys still work); closing the window, a busy headset, a missing driver, or a crash all exit cleanly and release the headset; if the brain gives no answer, the tiles flash again, then hand over to the keys
 ## 11/14/26 - 8:07 PM - Long Le - #5 AI demo shows the map for map suggestions ([PR #118](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/118))
 - When Claude suggests a map answer (from #106), the AI demo window now shows the map and speaks the line once, just like the main app
 - Why: the AI demo had no map on purpose, because replies used to be spoken words only. With #106, picking "Compare counties (shows the map)" would have spoken the line but shown nothing, and logged a BUG line
@@ -383,3 +391,16 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - New `--show` flag: `python -m signal2speech.eeg.live --source generator --show` opens the same window and cues on simulated data, so judges can watch the flow without hardware. `--no-voice` keeps the banner but mutes speech
 - Tiles now read "Tile 1" and "Tile 2" instead of internal IDs
 - Only prompts and the window changed; the EEG decoding and safety rules are the same. Checked with a simulated run (2/2 correct, 0 false confirms) and the fast EEG tests (50 passed). Whether the voice is audible was checked by ear on the judging laptop
+
+## 11/14/26 - 8:51 PM - Long Le - #5 Live AI replies verified in the app ([PR #137](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/137))
+- A typed question now gets real Claude replies in the AI demo window in about 2 seconds, and the confirmed reply is spoken once
+    - `python -m signal2speech.ai`, with `ANTHROPIC_API_KEY` in `.env`
+- Found a demo risk: without #116's grounding, Claude answered the AQI question wrongly ("Wayne"), when Washtenaw rose more. Don't ask data questions in the AI demo until #116 merges
+- Verified with keyboard input on a Mac, with a fresh question and the demo question. Not yet tried on the judging laptop
+
+## 11/14/26 - 9:03 PM - Long Le - #129 Fuzz test for "speaks exactly once" ([PR #140](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/140))
+- A new test throws millions of random event sequences at the selection logic and checks that it never speaks twice, never speaks without a fresh preview, and never lets an old decision act in a new round
+    - `pytest tests/test_contract_fuzz.py` (3 s in CI). `FUZZ_SEQUENCES=50000` for a long run, and `FUZZ_SEED=<n>` reproduces any failure
+- A long run of 3,000,000 operations found 0 violations. The judge Q&A now cites it
+- To prove the test isn't toothless, it also breaks the handler three ways on purpose (double output, a cancel that keeps the preview, ignored round IDs), and it catches each one
+- No product code changed. This is software evidence with keyboard and simulated input, not live-EEG accuracy
