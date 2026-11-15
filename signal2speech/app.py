@@ -218,6 +218,11 @@ def make_simulated_input(handler: SelectionHandler, window: SelectionWindow, scr
     decoder = SimulatedDecoder(handler, script, flasher=window.flasher,
                                confirm_s=confirm_delay_ms / 1000, parent=window)
     decoder.start()
+    # #175: a confirm pick waits for the preview's ring, like a held key or an eye closure.
+    def gate(release):
+        window.ring.handlers["simulated"] = release
+        window.ring.start_hold("simulated", confirm_delay_ms / 1000)
+    decoder.confirm_gate = gate
     return decoder, "g.Pype Generator stream"
 
 
