@@ -110,6 +110,26 @@ def placeholder_model() -> p300.P300Model:
     return _PLACEHOLDER
 
 
+def build_live_graph(handler, source: str, input_source: str, *,
+                     placeholder: Optional[p300.P300Model] = None, enable_oscar: bool = True):
+    """Build (don't start) what ``--input live`` runs (#103): ``(P300Nodes, AlphaConfirm, bursts)``.
+
+    Live, the alpha switch hangs off the P300 chooser's HybridBlack pipeline, because the Unicorn
+    opens only once. Simulated (``generator``), it gets its own Generator with alpha bursts.
+    ``LiveEegInput`` and the pipeline diagram (#166) both call this, so the drawing can't drift
+    from the app.
+    """
+    # g.Pype refuses to start a realtime pipeline with an unfitted scorer, so start from a
+    # small synthetic model (in a private temp folder); calibrate() refits every scorer.
+    nodes = p300.build_pipeline(source, model=placeholder or placeholder_model(),
+                                enable_oscar=enable_oscar)
+    if source == "generator":
+        bursts = am.AlphaBursts()
+        return nodes, am.AlphaConfirm(handler, input_source=input_source, bursts=bursts), bursts
+    return nodes, am.AlphaConfirm(handler, input_source=input_source, pipeline=nodes.pipeline,
+                                  upstream=nodes.eeg), None
+
+
 class SimulatedEyes:
     """A simulated wearer's eyes: close shortly after a Confirm round opens, reopen 2.5 s later.
 
@@ -188,10 +208,8 @@ class LiveEegInput:
         self.p300_calibration: dict = {}
         self.alpha_calibration: Optional[am.Calibration] = None
 
-        # g.Pype refuses to start a realtime pipeline with an unfitted scorer, so start from a
-        # small synthetic model (in a private temp folder); calibrate() refits every scorer.
-        placeholder = placeholder or placeholder_model()
-        self.nodes = p300.build_pipeline(source, model=placeholder, enable_oscar=enable_oscar)
+        self.nodes, self.alpha, self.bursts = build_live_graph(
+            handler, source, self.input_source, placeholder=placeholder, enable_oscar=enable_oscar)
         self.adapter = InputAdapter(handler, self.input_source)
         self.chooser = p300.P300Chooser(self.nodes, self.adapter, flashes_per_tile=flashes)
         self.chooser.bridge.listeners.append(self._on_p300_decision)
@@ -209,14 +227,6 @@ class LiveEegInput:
         self._decide = QTimer(singleShot=True, interval=int((p300.TIME_POST + 0.5) * 1000))
         self._decide.timeout.connect(self._force_decision)
 
-        if self.simulated:
-            self.bursts: Optional[am.AlphaBursts] = am.AlphaBursts()
-            self.alpha = am.AlphaConfirm(handler, input_source=self.input_source,
-                                         bursts=self.bursts)
-        else:
-            self.bursts = None
-            self.alpha = am.AlphaConfirm(handler, input_source=self.input_source,
-                                         pipeline=self.nodes.pipeline, upstream=self.nodes.eeg)
         handler.live_eeg_confirm_armed = bool(arm_live_confirm)
 
         self.eyes = SimulatedEyes(lambda: self.bursts)

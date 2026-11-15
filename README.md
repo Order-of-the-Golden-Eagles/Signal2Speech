@@ -71,6 +71,60 @@ keyboard / simulator ─────┘
 - **One selection contract** for every input. Rounds, late or duplicate signals, and cancels are handled in one place ([selection contract](docs/architecture/selection-contract.md)).
 - **One Python process**, fully offline: PySide6 for the screens, offline OS speech, and bundled NASA and EPA data. CI runs the tests on Windows, macOS, and Linux.
 
+<details><summary><b>The real g.Pype graph</b> behind <code>--input live</code>, generated from the code (#166)</summary>
+
+<!-- BEGIN generated pipeline diagram: app (hybridblack). python -m signal2speech.evidence.diagram --write -->
+```mermaid
+flowchart LR
+    n1(["p300_source: HybridBlack<br/><small>250 Hz, 8 EEG channels, OSCAR on</small>"])
+    n2["p300_bandpass: Bandpass<br/><small>1–30 Hz</small>"]
+    n3["p300_trigger_1: Trigger<br/><small>100 ms before to 700 ms after code 1</small>"]
+    n4(["p300_flash: Marker"])
+    n5["p300_scorer_1: P300Scorer<br/><small>LinearDiscriminantAnalysis, shrinkage auto</small>"]
+    n6[["p300_scores_1: Collector<br/><small>hands its data to our Python code</small>"]]
+    n7["p300_trigger_2: Trigger<br/><small>100 ms before to 700 ms after code 2</small>"]
+    n8["p300_scorer_2: P300Scorer<br/><small>LinearDiscriminantAnalysis, shrinkage auto</small>"]
+    n9[["p300_scores_2: Collector<br/><small>hands its data to our Python code</small>"]]
+    n10["p300_cal_trigger_101: Trigger<br/><small>100 ms before to 700 ms after code 101</small>"]
+    n11[["p300_cal_epochs_101: Collector<br/><small>hands its data to our Python code</small>"]]
+    n12["p300_cal_trigger_100: Trigger<br/><small>100 ms before to 700 ms after code 100</small>"]
+    n13[["p300_cal_epochs_100: Collector<br/><small>hands its data to our Python code</small>"]]
+    n14["ChannelSelector<br/><small>channels 6, 7, 8</small>"]
+    n15["FFT<br/><small>250 samples, 90% overlap</small>"]
+    n16["BandPower<br/><small>alpha 8–13 Hz</small>"]
+    n17["ChannelMean"]
+    n18[["alpha_power: _Tap"]]
+    n19["Threshold<br/><small>above the calibrated level for 10 frames</small>"]
+    n20[["alpha_state: _Tap"]]
+    n1 --> n2
+    n2 --> n3
+    n2 --> n7
+    n2 --> n10
+    n2 --> n12
+    n2 --> n14
+    n3 --> n5
+    n4 -->|trigger| n3
+    n4 -->|trigger| n7
+    n4 -->|trigger| n10
+    n4 -->|trigger| n12
+    n5 --> n6
+    n7 --> n8
+    n8 --> n9
+    n10 --> n11
+    n12 --> n13
+    n14 --> n15
+    n15 --> n16
+    n16 --> n17
+    n17 --> n18
+    n17 --> n19
+    n19 --> n20
+```
+<!-- END generated pipeline diagram -->
+
+Every mode, live and simulated: [our g.Pype pipelines](docs/architecture/pipelines.md).
+
+</details>
+
 A plain-language walkthrough is in [How Signal2Speech works](docs/architecture/README.md).
 
 ## For reviewers: reproduce our numbers on g.tec data

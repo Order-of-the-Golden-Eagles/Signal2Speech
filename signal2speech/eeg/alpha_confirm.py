@@ -266,7 +266,7 @@ class AlphaConfirm(QObject):
         mean = ChannelMean(expect_rate=self.frame_rate)
         self.threshold = gp.Threshold(level=UNCALIBRATED_LEVEL, release=UNCALIBRATED_LEVEL,
                                       dwell=self.dwell)
-        self._power_tap, self._state_tap = _Tap(), _Tap()
+        self._power_tap, self._state_tap = _Tap(name="alpha_power"), _Tap(name="alpha_state")
         self._power_tap.on_rows = self._on_power_rows
         self._state_tap.on_rows = self._on_state_rows
         for a, b in ((upstream, select), (select, fft), (fft, power), (power, mean),
@@ -426,6 +426,18 @@ class AlphaConfirm(QObject):
 
 
 # ── Standalone runs ──────────────────────────────────────────
+def standalone_source(kind: str, burst_uv: float = 8.0):
+    """``(source node, AlphaBursts or None, input label)`` for the standalone alpha switch.
+
+    ``hybrid-black`` is the Unicorn with OSCAR (Live EEG). ``generator`` is simulated EEG with
+    alpha bursts. The pipeline diagram (#166) builds from this too.
+    """
+    if kind == "hybrid-black":
+        return gp.HybridBlack(enable_oscar=True), None, InputSources.LIVE_EEG
+    return (gp.Generator(sampling_rate=SAMPLING_RATE, channel_count=8, noise_amplitude=10.0),
+            AlphaBursts(amplitude_uv=burst_uv), InputSources.SIMULATED)
+
+
 def _prompt(text: str) -> None:
     print(f">>> {text}", flush=True)
 
@@ -529,12 +541,7 @@ def main(argv=None) -> int:
 
     app = QCoreApplication.instance() or QCoreApplication(sys.argv[:1])
     handler = SelectionHandler(PrintSink())
-    if args.source == "hybrid-black":
-        source, bursts, label = gp.HybridBlack(enable_oscar=True), None, InputSources.LIVE_EEG
-    else:
-        bursts = AlphaBursts(amplitude_uv=args.burst_uv)
-        source, label = gp.Generator(sampling_rate=SAMPLING_RATE, channel_count=8,
-                                     noise_amplitude=10.0), InputSources.SIMULATED
+    source, bursts, label = standalone_source(args.source, args.burst_uv)
     ac = AlphaConfirm(handler, input_source=label, source=source, bursts=bursts,
                       dwell_s=args.dwell_s, settle_s=args.settle_s)
     print(f"input: {label}", flush=True)
