@@ -266,7 +266,7 @@ class AlphaConfirm(QObject):
         mean = ChannelMean(expect_rate=self.frame_rate)
         self.threshold = gp.Threshold(level=UNCALIBRATED_LEVEL, release=UNCALIBRATED_LEVEL,
                                       dwell=self.dwell)
-        self._power_tap, self._state_tap = _Tap(), _Tap()
+        self._power_tap, self._state_tap = _Tap(name="alpha_power"), _Tap(name="alpha_state")
         self._power_tap.on_rows = self._on_power_rows
         self._state_tap.on_rows = self._on_state_rows
         for a, b in ((upstream, select), (select, fft), (fft, power), (power, mean),
@@ -426,27 +426,50 @@ class AlphaConfirm(QObject):
 
 
 # ── Standalone runs ──────────────────────────────────────────
+def standalone_source(kind: str, burst_uv: float = 8.0):
+    """``(source node, AlphaBursts or None, input label)`` for the standalone alpha switch.
+
+    ``hybrid-black`` is the Unicorn with OSCAR (Live EEG). ``generator`` is simulated EEG with
+    alpha bursts. The pipeline diagram (#166) builds from this too.
+    """
+    if kind == "hybrid-black":
+        return gp.HybridBlack(enable_oscar=True), None, InputSources.LIVE_EEG
+    return (gp.Generator(sampling_rate=SAMPLING_RATE, channel_count=8, noise_amplitude=10.0),
+            AlphaBursts(amplitude_uv=burst_uv), InputSources.SIMULATED)
+
+
 def _prompt(text: str) -> None:
     print(f">>> {text}", flush=True)
 
 
+
 def measure(ac: AlphaConfirm, calib_s: float, rest_s: float, closures: int,
-            closure_s: float = 2.0, gap_s: float = 3.0, min_ratio: float = 2.0) -> dict:
-    """Calibrate, count false triggers at rest, then time ``closures`` deliberate closures."""
+            closure_s: float = 2.0, gap_s: float = 3.0, min_ratio: float = 2.0,
+            prompt: Optional[Callable[[str], None]] = None,
+            tick: Optional[Callable[[], None]] = None) -> dict:
+    """Calibrate, count false triggers at rest, then time ``closures`` deliberate closures.
+
+    ``prompt`` shows each instruction (default: print it). ``tick`` runs while it waits and may
+    raise to abort, so the app can show the prompts on screen and stay responsive (#172)."""
     sim = ac.bursts
+    say = prompt or _prompt
+
+    def ac_collect(seconds: float):
+        return ac.collect(seconds, tick)
+
     report = {"input": ac.input_source, "settle_s": ac.settle_s, "dwell_rows": ac.dwell}
 
-    _prompt(f"Calibration: keep your eyes OPEN and relaxed for {calib_s:g} s")
+    say(f"Calibration: keep your eyes OPEN and relaxed for {calib_s:g} s")
     if sim:
         sim.open_eyes()
-    ac.collect(1.0)                                   # let the 1 s FFT window fill
-    open_vals = ac.collect(calib_s)
-    _prompt(f"Calibration: CLOSE your eyes for {calib_s:g} s")
+    ac_collect(1.0)                                   # let the 1 s FFT window fill
+    open_vals = ac_collect(calib_s)
+    say(f"Calibration: CLOSE your eyes for {calib_s:g} s")
     if sim:
         sim.close_eyes()
-    ac.collect(1.0)
-    closed_vals = ac.collect(calib_s)
-    _prompt("Open your eyes")
+    ac_collect(1.0)
+    closed_vals = ac_collect(calib_s)
+    say("Open your eyes")
     if sim:
         sim.open_eyes()
     try:
@@ -455,25 +478,25 @@ def measure(ac: AlphaConfirm, calib_s: float, rest_s: float, closures: int,
         report["error"] = str(err)
         return report
     report["calibration"] = {**asdict(cal), "ratio": round(cal.ratio, 2)}
-    ac.collect(max(gap_s, 1.5))                       # settle back to open
+    ac_collect(max(gap_s, 1.5))                       # settle back to open
 
-    _prompt(f"Rest: keep your eyes OPEN for {rest_s:g} s (counting false triggers)")
+    say(f"Rest: keep your eyes OPEN for {rest_s:g} s (counting false triggers)")
     before = ac.edge_count
-    ac.collect(rest_s)
+    ac_collect(rest_s)
     report["rest_s"] = rest_s
     report["false_triggers"] = ac.edge_count - before
 
     latencies, per_closure = [], []
     for i in range(closures):
-        _prompt(f"Closure {i + 1}/{closures}: CLOSE your eyes now for {closure_s:g} s")
+        say(f"Closure {i + 1}/{closures}: CLOSE your eyes now for {closure_s:g} s")
         before, t0 = ac.edge_count, time.monotonic()
         if sim:
             sim.close_eyes()
-        ac.collect(closure_s)
-        _prompt("Open")
+        ac_collect(closure_s)
+        say("Open")
         if sim:
             sim.open_eyes()
-        ac.collect(gap_s)
+        ac_collect(gap_s)
         new = ac.edges_since(before)
         per_closure.append(len(new))
         if new:
@@ -518,12 +541,7 @@ def main(argv=None) -> int:
 
     app = QCoreApplication.instance() or QCoreApplication(sys.argv[:1])
     handler = SelectionHandler(PrintSink())
-    if args.source == "hybrid-black":
-        source, bursts, label = gp.HybridBlack(enable_oscar=True), None, InputSources.LIVE_EEG
-    else:
-        bursts = AlphaBursts(amplitude_uv=args.burst_uv)
-        source, label = gp.Generator(sampling_rate=SAMPLING_RATE, channel_count=8,
-                                     noise_amplitude=10.0), InputSources.SIMULATED
+    source, bursts, label = standalone_source(args.source, args.burst_uv)
     ac = AlphaConfirm(handler, input_source=label, source=source, bursts=bursts,
                       dwell_s=args.dwell_s, settle_s=args.settle_s)
     print(f"input: {label}", flush=True)

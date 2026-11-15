@@ -4,6 +4,8 @@ Signal2Speech helps someone answer without speaking or typing. A conversation pa
 
 **AI Answering** supplies possible replies. **OpenOrbit** is a feature that can show NASA imagery alongside EPA air-quality readings. Both use the same controls.
 
+**The g.Pype pipelines themselves** are drawn from the running code in [pipelines.md](pipelines.md) (#166): the app with live EEG, and the evidence view, the P300 chooser, and the eye-closure switch, each live and simulated. The simulated app runs two pipelines, so it's drawn as the simulated chooser plus the simulated switch.
+
 ## Follow one answer
 
 1. A judge asks, “Which county’s AQI rose more between June 26 and June 28, 2023?”

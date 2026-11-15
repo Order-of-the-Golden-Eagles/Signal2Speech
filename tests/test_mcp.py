@@ -63,6 +63,7 @@ def test_every_tool_answers_from_the_pipeline_and_labels_simulated(running):
     g = call(s, "pipeline_graph")
     assert g["p300_calibrated"] and {b["name"] for b in g["branches"]} >= {
         "P300 choose", "P300 evidence", "alpha confirm", "quality"}
+    assert g["mermaid"].startswith("flowchart LR") and "SyntheticP300" in g["mermaid"]   # #166
 
 
 def test_results_are_summaries_not_raw_eeg(running):

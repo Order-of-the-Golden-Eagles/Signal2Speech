@@ -2,6 +2,7 @@
 
     python -m signal2speech.app --input keyboard|simulated [--sim 2,1] [--mute]
     python -m signal2speech.app --input live          # Unicorn; key 1 confirms until #23
+    python -m signal2speech.app --input pieeg --pieeg live   # keys choose, PiEEG eyes confirm (#172)
 
 One flow: Choose -> Preview (no output) -> Confirm (one map action + one spoken line) or
 Cancel (nothing). Every input goes InputAdapter -> SelectionHandler. Only AppSink.execute
@@ -16,6 +17,9 @@ Dependencies still missing on main are labelled, never faked:
 - Speech lives in signal2speech/speech/ (bundled OpenOrbit clip, else the offline OS voice).
 - #103 live EEG: --input live runs signal2speech.eeg.app_live.LiveEegInput. Eye-closure
   confirm stays disarmed (key 1 confirms) until #23 passes (--arm-live-confirm).
+- #172 PiEEG confirm: --input pieeg keeps the keyboard choosing and takes the eye-closure confirm
+  from a PiEEG board over LSL (signal2speech.eeg.app_live.PiEEGConfirm), armed only after the
+  #150 check passes in this session.
 - #48 recorded replay: refused with a clear message.
 """
 from __future__ import annotations
@@ -38,6 +42,7 @@ from signal2speech.core import (ActionIds, Choice, ConfirmedAction, EegClassMap,
                                 InputSources, Outcome, Round, RoundKind, SelectionEvent,
                                 SelectionHandler, TargetIds)
 from signal2speech.speech import MutedSpeaker, OfflineSpeaker, Speaker
+from signal2speech.speech.neural import PiperVoice
 from signal2speech.ui import INPUT_LABELS, KeyHelpOverlay, SelectionWindow
 from signal2speech.ui import theme as T
 from signal2speech.ui.conversation import KINDS, ConversationView
@@ -76,6 +81,31 @@ class Transcript:
             self.widget.appendPlainText(line)
         if self.echo:
             print(line, flush=True)
+
+
+
+#: The size the window opens at when the screen has room for it.
+PREFERRED_SIZE = (1700, 900)
+#: Room left for the title bar and window borders, which sit outside the size we set.
+FRAME_ALLOWANCE = (16, 48)
+
+
+def fit_to_screen(widget, preferred=PREFERRED_SIZE, available=None) -> tuple:
+    """Size ``widget`` to ``preferred``, or smaller if the screen can't hold it, and keep it on
+    screen. A 1920 x 1080 laptop at 125 % scaling offers only 1536 x 864 minus the taskbar, so a
+    fixed 1700 x 900 hung off the right and bottom edges. Returns the (width, height) used."""
+    if available is None:
+        screen = widget.screen() or QApplication.primaryScreen()
+        available = screen.availableGeometry() if screen is not None else None
+    if available is None:
+        widget.resize(*preferred)
+        return tuple(preferred)
+    w = max(1, min(preferred[0], available.width() - FRAME_ALLOWANCE[0]))
+    h = max(1, min(preferred[1], available.height() - FRAME_ALLOWANCE[1]))
+    widget.resize(w, h)
+    widget.move(available.x() + (available.width() - FRAME_ALLOWANCE[0] - w) // 2 + FRAME_ALLOWANCE[0] // 2,
+                available.y() + max(0, (available.height() - FRAME_ALLOWANCE[1] - h) // 2))
+    return (w, h)
 
 
 class AppSink:
@@ -272,9 +302,13 @@ class App:
                  confirm_timeout_ms: int = CONFIRM_TIMEOUT_MS,
                  p300: bool = False, arm_live_confirm: bool = False,
                  live_options: Optional[dict] = None,
+                 pieeg: Optional[dict] = None,
                  clock: Callable[[], float] = time.monotonic, cues: bool = False,
                  attract: bool = False, attract_idle_ms: Optional[int] = None,
                  help_by_eyes: bool = False, practice_s: Optional[float] = None):
+        if pieeg is not None and input_source != InputSources.KEYBOARD:
+            raise ValueError("--input pieeg chooses by keyboard: the board gives the eyes-closed "
+                             "confirm only (#172)")
         if input_source in BLOCKED_INPUTS:
             raise ValueError(BLOCKED_INPUTS[input_source])
         if input_source not in (InputSources.KEYBOARD, InputSources.SIMULATED,
@@ -295,7 +329,8 @@ class App:
         self.log = Transcript(self.transcript_view, echo=echo)
         self.view = view if view is not None else load_view()
         if speaker is None:
-            speaker = MutedSpeaker(self.log) if mute else OfflineSpeaker(self.log)
+            speaker = (MutedSpeaker(self.log) if mute
+                       else OfflineSpeaker(self.log, neural=PiperVoice.find()))
         self.speaker = speaker
         self.sink = AppSink(self.view, speaker, self.log, clock=clock)
         self.sink.on_timing = self._show_timing
@@ -314,6 +349,9 @@ class App:
         h = self.handler
         h.on_round_opened.append(self._log_round)
         h.on_preview.append(lambda c: self.log(f"preview (no output): \"{c.spoken_text or c.label}\""))
+        prepare = getattr(self.speaker, "prepare", None)     # make the audio while it's previewed
+        if prepare is not None:
+            h.on_preview.append(lambda c: prepare(c.spoken_text) if c.spoken_text else None)
         h.on_cleared.append(lambda r: self.log(f"cleared ({r}): no output"))
         h.on_handled.append(self._log_outcome)
         h.on_round_opened.append(self._talk_round)          # #176, same events as the log
@@ -341,6 +379,12 @@ class App:
             if alpha is not None and hasattr(alpha, "progress"):
                 # #175: the ring follows the alpha switch (queued: emitted on a g.Pype thread).
                 alpha.progress.connect(self.window.set_eye_progress, Qt.ConnectionType.QueuedConnection)
+        elif pieeg is not None:
+            # #172: keys choose; a PiEEG board's eye closure confirms, after this session's check.
+            # PiEEGConfirm builds its alpha switch during the check and hooks the #175 ring then.
+            from signal2speech.eeg.app_live import PiEEGConfirm
+            self.sim = PiEEGConfirm(h, self.window, self.log, **pieeg)
+            sim_label = self.sim.connection_label()
         elif input_source == InputSources.SIMULATED:
             self.sim, sim_label = make_simulated_input(h, self.window, sim_script or [2, 1],
                                                        self.log, confirm_delay_ms)
@@ -367,7 +411,9 @@ class App:
         h.on_round_opened.append(lambda _r: self._set_reveal(False))
 
         self.root = QWidget()
-        self.root.setWindowTitle(f"Signal2Speech · {INPUT_LABELS[input_source]}")
+        self.root.setWindowTitle(f"Signal2Speech · {self.input_summary()}")
+        if hasattr(self.sim, "on_label"):              # #172: the check changes the label
+            self.sim.on_label = lambda text: self.root.setWindowTitle(f"Signal2Speech · {text}")
         self.root.setStyleSheet(f"background:{T.BG};")
         right = QVBoxLayout()
         self.panel_title = QLabel("Conversation   ·   F2: developer log")
@@ -384,7 +430,7 @@ class App:
         row.addLayout(right, 2)
         self._row = row
         self.revealing = False
-        self.root.resize(1700, 900)
+        fit_to_screen(self.root)
 
         # #196: practice round. No handler round is open while it runs, so nothing can output.
         from signal2speech.practice import PRACTICE_S, PracticeRound
@@ -438,7 +484,9 @@ class App:
                 ("F1", "Show or hide this help")]
         if hasattr(self.sim, "set_next"):
             rows.insert(3, ("Ctrl+1 / Ctrl+2", "Pick for the simulated decoder"))
-        self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {INPUT_LABELS[input_source]}")
+        help_input = ("keyboard chooses, PiEEG eye closure confirms" if pieeg is not None
+                      else INPUT_LABELS[input_source])
+        self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {help_input}")
         for seq, fn in (("F1", self.help.toggle), ("F11", self.toggle_fullscreen),
                         ("F2", self.toggle_log), ("P", self.start_practice),
                         ("Ctrl+=", lambda: self.step_text(1)), ("Ctrl++", lambda: self.step_text(1)),
@@ -446,7 +494,7 @@ class App:
             s3 = QShortcut(QKeySequence(seq), self.root)
             s3.setAutoRepeat(False)
             s3.activated.connect(fn)
-        self.log(f"input: {INPUT_LABELS[input_source]}" + (f" ({sim_label})" if sim_label else ""))
+        self.log(f"input: {self.input_summary()}" + (f" ({sim_label})" if sim_label else ""))
         self.log(f"speech: {getattr(self.speaker, 'backend', type(self.speaker).__name__)}")
         # #193: attract mode. Off by default (tests, AI demo); main() turns it on.
         self.attract = None
@@ -536,6 +584,12 @@ class App:
         self.help_banner.adjustSize()
         self.help_banner.move(max(0, (r.width() - self.help_banner.width()) // 2),
                               max(0, (r.height() - self.help_banner.height()) // 2))
+
+    def input_summary(self) -> str:
+        """The input as judges should read it. With a PiEEG confirm (#172), both inputs."""
+        if hasattr(self.sim, "strip_text"):
+            return self.sim.strip_text()
+        return INPUT_LABELS[self.input_source]
 
     def toggle_log(self) -> None:
         """F2: swap the readable conversation and the developer log (#176)."""
@@ -685,7 +739,7 @@ class App:
             commit = ""
         lines = [f"# Signal2Speech session · {self.started_at}", "",
                  f"- **Commit:** `{commit or 'unknown'}`",
-                 f"- **Input:** {INPUT_LABELS[self.input_source]}",
+                 f"- **Input:** {self.input_summary()}",
                  f"- **Connection:** {self.window.connection_label.text().removeprefix('Connection: ')}"
                  if self.window.connection_label.isVisibleTo(self.window) else "- **Connection:** n/a",
                  f"- **Speech:** {getattr(self.speaker, 'backend', type(self.speaker).__name__)}",
@@ -757,7 +811,7 @@ def _timeout_seconds(text: str) -> float:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python -m signal2speech.app")
     p.add_argument("--input", default=InputSources.KEYBOARD,
-                   choices=["keyboard", "simulated", "recorded", "live"])
+                   choices=["keyboard", "simulated", "recorded", "live", "pieeg"])
     p.add_argument("--sim", default="2,1", help="simulated classes in order, e.g. '2,1' "
                                                 "(choose target-2, then confirm)")
     p.add_argument("--keys", default="", help="keyboard presses after start, e.g. '2,1'")
@@ -785,6 +839,20 @@ def main(argv=None) -> int:
                    help="a long eye closure outside a Confirm round also says the help phrase (#197)")
     p.add_argument("--text-scale", type=float, default=1.0,
                    help="start at this text size, 0.8 to 1.6 (#195); Ctrl+= / Ctrl+- / Ctrl+0 change it")
+    g = p.add_argument_group("PiEEG eye-closure confirm (--input pieeg, #172)")
+    g.add_argument("--pieeg", choices=["live", "simulated", "recorded"],
+                   help="what is publishing the board's LSL stream: a real board on a person, "
+                        "a simulator, or a replayed recording. Required: LSL can't prove it")
+    g.add_argument("--pieeg-self-test", action="store_true",
+                   help="publish our own simulated 16-pin stream (no board), labelled Simulated")
+    g.add_argument("--stream", default=None, help="LSL stream name (PiEEG: Octopus16)")
+    g.add_argument("--any-host", action="store_true",
+                   help="accept the stream from another computer (default: this computer only)")
+    g.add_argument("--channels", default="auto",
+                   help="'auto' picks the pins that respond; or 1-based pins, e.g. 3,7")
+    g.add_argument("--probe-s", type=float, default=8.0, help="seconds per eye state in the channel check")
+    g.add_argument("--rest-s", type=float, default=20.0, help="eyes-open false-trigger window")
+    g.add_argument("--closures", type=int, default=3, help="deliberate closures in the check")
     p.add_argument("--screenshot", type=Path, help="save a PNG after the first confirm and exit")
     p.add_argument("--smoke", nargs="?", const="dev", choices=["dev", "judging"],
                    help="hardware-free smoke check, exit 0/1 (#41); 'judging' fails on any SKIP")
@@ -792,7 +860,40 @@ def main(argv=None) -> int:
     if args.smoke:
         from signal2speech.diagnostics import run_smoke
         return run_smoke(args.smoke)
-    source = InputSources.LIVE_EEG if args.input == "live" else args.input
+    pieeg = None
+    pieeg_only = {"--pieeg": args.pieeg is not None, "--pieeg-self-test": args.pieeg_self_test,
+                  "--stream": args.stream is not None, "--any-host": args.any_host,
+                  "--channels": args.channels != "auto", "--probe-s": args.probe_s != 8.0,
+                  "--rest-s": args.rest_s != 20.0, "--closures": args.closures != 3}
+    if args.input != "pieeg" and any(pieeg_only.values()):
+        given = ", ".join(k for k, v in pieeg_only.items() if v)
+        print(f"{given}: only for --input pieeg", file=sys.stderr)
+        return 2
+    if args.input == "pieeg":
+        if not (args.pieeg or args.pieeg_self_test):
+            print("--input pieeg: say what is publishing the stream with --pieeg live, simulated, "
+                  "or recorded (or use --pieeg-self-test)", file=sys.stderr)
+            return 2
+        if args.pieeg_self_test and args.pieeg == "live":
+            print("--pieeg-self-test is a simulator: it can't be labelled live", file=sys.stderr)
+            return 2
+        if args.arm_live_confirm:
+            print("--arm-live-confirm doesn't apply to --input pieeg: the #150 check in this "
+                  "session decides", file=sys.stderr)
+            return 2
+        if args.p300:
+            print("--p300 doesn't apply to --input pieeg: keys choose, the board only confirms",
+                  file=sys.stderr)
+            return 2
+        if args.closures < 2:
+            print("--closures: the #150 check needs at least 2", file=sys.stderr)
+            return 2
+        pieeg = {"stream_is": args.pieeg or "simulated", "self_test": args.pieeg_self_test,
+                 "stream": args.stream, "any_host": args.any_host, "channels": args.channels,
+                 "probe_s": args.probe_s, "alpha_calib_s": args.alpha_calib_s,
+                 "rest_s": args.rest_s, "closures": args.closures}
+    source = {"live": InputSources.LIVE_EEG, "pieeg": InputSources.KEYBOARD}.get(args.input,
+                                                                                  args.input)
     if source in BLOCKED_INPUTS:
         print(BLOCKED_INPUTS[source], file=sys.stderr)
         return 2
@@ -802,7 +903,12 @@ def main(argv=None) -> int:
     if any(s not in (1, 2) for s in script):
         print(f"--sim takes 1s and 2s, e.g. 2,1; got {args.sim!r}", file=sys.stderr)
         return 2
-    live_path = source == InputSources.LIVE_EEG or (source == InputSources.SIMULATED and args.p300)
+    live_path = (source == InputSources.LIVE_EEG or pieeg is not None
+                 or (source == InputSources.SIMULATED and args.p300))
+
+    def setup_help() -> str:
+        from signal2speech.eeg.app_live import PAIRING_HELP, PIEEG_HELP
+        return PIEEG_HELP if pieeg is not None else PAIRING_HELP
     try:
         T.set_scale(args.text_scale)
         app = App(source, sim_script=script, mute=args.mute, cues=not args.no_cues,
@@ -811,12 +917,12 @@ def main(argv=None) -> int:
                   confirm_timeout_ms=int(args.confirm_timeout * 1000),
                   p300=args.p300, arm_live_confirm=args.arm_live_confirm,
                   live_options={"calibration_sequences": args.calibration,
-                                "alpha_calib_s": args.alpha_calib_s})
+                                "alpha_calib_s": args.alpha_calib_s},
+                  pieeg=pieeg)
     except Exception as err:
         if not live_path:
             raise
-        from signal2speech.eeg.app_live import PAIRING_HELP   # driver or pipeline setup failed
-        print(f"Couldn't set up the EEG pipeline: {type(err).__name__}: {err}\n{PAIRING_HELP}",
+        print(f"Couldn't set up the EEG pipeline: {type(err).__name__}: {err}\n{setup_help()}",
               file=sys.stderr)
         return 3
     qapp.aboutToQuit.connect(app.close)
@@ -827,8 +933,7 @@ def main(argv=None) -> int:
         try:
             app.sim.start()
         except Exception as err:               # g.Pype raises various errors for a missing device
-            from signal2speech.eeg.app_live import PAIRING_HELP
-            print(f"{type(err).__name__}: {err}\n{PAIRING_HELP}", file=sys.stderr)
+            print(f"{type(err).__name__}: {err}\n{setup_help()}", file=sys.stderr)
             app.close()
             return 3
         try:

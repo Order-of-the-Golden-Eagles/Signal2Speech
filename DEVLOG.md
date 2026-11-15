@@ -551,12 +551,25 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Eye-closure confirm is still off on a real headset and key 1 confirms instead. That still needs one wearer run (#23, #103)
 - Docs only. Nothing new was run
 
+## 11/15/26 - 1:05 AM - MagicJester2764 - #172 PiEEG eye closure confirms in the real app ([PR #191](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/191))
+- A teammate can now run the real app with a PiEEG board's eye closure as the confirm: keys pick the answer, closing the eyes for two seconds says it, and the map changes once
+    - `python -m signal2speech.app --input pieeg --pieeg live` (no board: `--pieeg-self-test`)
+- Eye confirm turns on only after the board check from #150 passes on screen in that same session. If it fails, holding key 1 confirms instead
+- You have to say what is sending the signal (`--pieeg live`, `simulated` or `recorded`), because the stream itself can't prove it, so a simulator can never show up as Live EEG
+- The bottom strip names both inputs, for example "Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)"
+- Verified on our simulated 16-pin stream, end to end in the app and in `tests/test_app_pieeg.py`. Not yet tried with a real board on a person, which is the library session (step 7 in the hardware doc)
 ## 11/15/26 - 12:32 AM - Long Le - #175 Preview screen with a confirm ring ([PR #189](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/189))
 - The "Say this?" screen now shows what will happen ("This will be said aloud" or "This will show the map and say"), the exact words as a big quotation, and a ring that fills toward the confirm
 - Nothing is spoken until the ring is full. On the keyboard, hold 1 for 2 seconds (a tap no longer confirms). With EEG, the ring follows the eye-closure signal and empties if the eyes open early. After confirming, a "✓ Spoken" state shows until the next question
 - The alpha switch got a read-only progress signal for the ring, and its decision logic didn't change. Scripted simulated input fills the same ring
 - Checked with tests for each ring state (filling, emptying on early release, completing exactly once) and in screenshots. The live eye-closure ring needs g.Pype, so it hasn't been seen on this Mac
 
+## 11/15/26 - 1:46 AM - Vasanth Anbukumar - #199 The backup voice now speaks every reply, not just the first ([PR #201](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/201))
+- If the main voice isn't available on a machine, the app's backup voice (`pyttsx3`) used to speak the first confirmed reply and silently skip every one after it. It now speaks all of them
+    - Each reply is spoken from its own short-lived helper process, which also means the window no longer freezes while it talks
+- Why it wasn't noticed: the judging laptop uses the main voice (Qt's Windows voice), which was never affected. Checked there: three replies in a row all spoke, each starting within a quarter of a second
+- How it was found: the voice-guided board session (#150) used the same library for its spoken cues, and the second and third cues were silent
+- Measured on the judging laptop: before the fix the backup spoke for 2.9 s, then 0.1 s and 0.1 s. After it: 2.7 s, 2.3 s, 2.2 s. A new test checks there is one helper per reply
 ## 11/15/26 - 1:15 AM - Long Le - #176 #177 Readable conversation and sound cues ([PR #192](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/192))
 - The panel under the map now reads like a conversation: Options (and where they came from), Previewed, Said aloud or Showed the map and said, or Nothing was said, each with the input that caused it
     - Press `F2` to swap to the developer log; the session report in `logs/` keeps both
@@ -580,3 +593,26 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The library run isn't affected either way: on the judging laptop the session uses Windows' own voice, which always spoke every cue
 - If no voice works at all, the cue is still printed and the session carries on
 - Verified on the judging laptop by switching the Windows voice off: three cues in a row spoke for 2.3 s, 2.1 s and 2.2 s. Two new tests. Not tried on a real Mac or Linux machine
+
+## 11/15/26 - 2:32 AM - MagicJester2764 - #166 Pipeline diagrams drawn from the code ([PR #208](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/208))
+- Anyone can show a judge the exact g.Pype graph we run, for the app with live EEG, the evidence view, the P300 chooser, and the eye-closure switch
+    - `python -m signal2speech.evidence.diagram`, or read [pipelines.md](docs/architecture/pipelines.md). The README has the live app's graph
+- Nothing is drawn by hand. Each diagram is built by the same code the app uses, then read back from g.Pype's own record of nodes and connections. A test fails if someone changes a pipeline and forgets `--write`
+- The AI assistant's `pipeline_graph` tool (#110) now returns the same drawing
+- Checked offline with no headset: the live diagrams build the Unicorn's graph without opening the device. GitHub renders Mermaid, but I haven't looked at it on the rendered page yet
+## 11/15/26 - 2:27 AM - Vasanth Anbukumar - #204 The app window now fits the judging laptop's screen ([PR #205](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/205))
+- The app used to open at a fixed 1700 × 900 and hang off the right and bottom of the judging laptop's screen. It now opens inside whatever screen it's on
+    - The laptop is 1920 × 1080 at 125 % scaling, which leaves only 1536 × 864 for windows
+    - Screens with more room still get the usual 1700 × 900
+- Found while rehearsing the PiEEG board in the real app (`python -m signal2speech.app --input pieeg --pieeg-self-test --keys 2`): the simulated board's eye closure confirmed and the map changed, but the window didn't fit
+- Verified on the judging laptop's real display: the window with its title bar is 1520 × 846, fully on screen. One new test. `--fullscreen` and F11 are unchanged
+
+## 11/15/26 - 2:38 AM - Vasanth Anbukumar - #206 The wearer now has a natural-sounding voice, still offline ([PR #207](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/207))
+- The app can speak with a natural neural voice (Piper) instead of Windows' robotic one. It runs on the laptop with no network, so the Wi-Fi-off demo is unchanged
+    - Set up once per machine: `pip install piper-tts` and download one voice file into `voices/`. The steps are in `docs/text-to-speech/README.md`. The judging laptop is set up
+    - Without Piper or the voice file, the app speaks exactly as it did before
+- No wait after confirming: the app starts making the audio while the reply is still a preview. Measured on the judging laptop, speech starts 0.15 s after the confirm
+- Abbreviations are said properly: "AQI" is spoken as "air quality index", and ones we don't know are spelled out letter by letter. The screen still shows the original text
+- Licences to know about: Piper is GPL-3.0, so we run it as a separate program. The voice we chose is for non-commercial use with credit. The 63 MB voice file is not in the repo
+- Lines with numbers in them are spoken 25 % slower, so the figures are easy to catch
+- Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux

@@ -404,6 +404,7 @@ The board is on the library's first floor. Take the judging laptop there.
 | 4 | In PiEEG's starter folder: `python python_quickstart.py --lsl`. Leave it running. | LED turns solid. A line every second with `SPS`, `Lost`, and `Good Pins: n/16`. Adjust the puck until most pins are good. |
 | 5 | **First-run check**, in our repo: `python -m signal2speech.eeg.lsl_source --input live --check` | `device: PiEEG Octopus 16, 16 channels`, the measured sample rate, a contact line per pin, and `READY`. No prompts. Takes about 10 seconds. |
 | 6 | **The voice-guided session:** `python -m signal2speech.eeg.board_session --input live --consent` | The voice takes over. About 5 minutes (`--quick`: about 3). |
+| 7 | **In the real app (#172):** `python -m signal2speech.app --input pieeg --pieeg live`. Close step 6 first: both read the same stream. | The same check, prompted on screen. Then key 2 previews "Compare counties", a two-second eye closure confirms, and the map changes and the line is spoken once. The strip says `Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)`. This is the footage to record. |
 
 **What the session does.** The wearer only listens. Each instruction is spoken, then a beep starts the timed part, so timing never depends on reading speed. A low beep means "do it now", a high beep means "stop", and a double beep means "registered". Raw data is recorded from the first second and saved after every phase.
 

@@ -383,3 +383,21 @@ def test_report_drops_lines_that_look_like_samples(qapp, tmp_path):
     app.events.append(f"21:00:00 {raw}")
     text = app.report_text()
     assert raw not in text and "looked like raw samples" in text
+
+
+def test_window_opens_inside_the_screen_it_is_on(qapp):
+    """1920 x 1080 at 125 % scaling leaves 1536 x 824 above the taskbar. The window used to open
+    at a fixed 1700 x 900 and hang off the right and bottom edges."""
+    from PySide6.QtCore import QRect
+    from PySide6.QtWidgets import QWidget
+    from signal2speech.app import FRAME_ALLOWANCE, PREFERRED_SIZE, fit_to_screen
+
+    w = QWidget()
+    small = QRect(0, 0, 1536, 824)
+    assert fit_to_screen(w, available=small) == (1536 - FRAME_ALLOWANCE[0], 824 - FRAME_ALLOWANCE[1])
+    assert w.x() >= 0 and w.y() >= 0
+    assert w.x() + w.width() <= small.width() and w.y() + w.height() + FRAME_ALLOWANCE[1] <= small.height()
+
+    big = QRect(100, 50, 2560, 1400)                           # a second monitor, offset
+    assert fit_to_screen(w, available=big) == PREFERRED_SIZE   # roomy screens keep the usual size
+    assert big.contains(w.geometry())
