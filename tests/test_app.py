@@ -411,8 +411,9 @@ def test_long_status_text_wraps_instead_of_widening_the_window(qapp):
     app.root.show()
     app.ask()
     before = app.root.minimumSizeHint().width()
-    app.window.set_input_text("Choose: Keyboard · Confirm: hold 1 · Simulated (self-test LSL "
-                              "stream): eye check not run yet", InputSources.KEYBOARD)
+    app.window.set_two_inputs("Choose: Keyboard", InputSources.KEYBOARD,       # the real PiEEG path
+                              "Confirm: hold 1 · Simulated (self-test LSL stream): eye check not "
+                              "run yet", InputSources.KEYBOARD)
     app.window.prompt.setText("Eye-closure confirm ON: Simulated (self-test LSL stream) passed the check")
     assert app.root.minimumSizeHint().width() <= before
     app.close()
@@ -462,7 +463,16 @@ def test_strip_sentence_is_never_clipped_at_1280x720(qapp, source):
         app.window.press_target(press)
         for _ in range(10):
             qapp.processEvents()
-        text = label.text().split("  ⏱ ")[0]
-        assert label.fontMetrics().horizontalAdvance(text) <= label.width(), (text, label.width())
+        if label.wordWrap():                       # own line: the whole text, timing note included
+            assert label.height() >= label.heightForWidth(label.width()), label.text()
+        else:
+            text = label.text()
+            assert label.fontMetrics().horizontalAdvance(text) <= label.width(), (text, label.width())
+    # The connection state never shows a word cut in half: it fits, or ends in "…".
+    conn = app.window.connection_label
+    if app.window.has_connection:
+        assert conn.toolTip().startswith("Connection: ")
+        shown = conn.text()
+        assert shown == conn.fullText() or shown.endswith("…"), shown
     app.close()
     app.root.close()

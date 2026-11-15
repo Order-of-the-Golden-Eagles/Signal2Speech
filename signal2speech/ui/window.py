@@ -24,7 +24,6 @@ from . import theme as P
 
 INPUT_LABELS = {InputSources.KEYBOARD: "Keyboard", InputSources.SIMULATED: "Simulated",
                 InputSources.RECORDED: "Recorded", InputSources.LIVE_EEG: "Live EEG"}
-_INPUT_COLORS = P.INPUT_COLORS
 
 # What judges read in the strip (#179): one plain sentence per outcome. The exact outcome name,
 # event and round go to the developer log and the tooltip. tests/ check every Outcome is here.
@@ -260,6 +259,41 @@ class Tile(QLabel):
         p.end()
 
 
+class ElidedLabel(QLabel):
+    """Shows as much of its text as fits, ending in "…", never a word cut in half (#179)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._full = ""
+
+    def setText(self, text: str) -> None:
+        self._full = text
+        self._elide()
+
+    def fullText(self) -> str:
+        return self._full
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._elide()
+
+    def _elide(self) -> None:
+        width = self.contentsRect().width()
+        shown = self._full if width <= 0 else self.fontMetrics().elidedText(
+            self._full, Qt.TextElideMode.ElideRight, width)
+        super().setText(shown)
+
+    def minimumSizeHint(self):
+        hint = super().minimumSizeHint()
+        hint.setWidth(self.fontMetrics().horizontalAdvance("● …") + 4)
+        return hint
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        hint.setWidth(self.fontMetrics().horizontalAdvance(self._full) + 4)
+        return hint
+
+
 class WrapWhenLong(QLabel):
     """A label that wraps only when its text is long. Short text keeps the height it always had;
     long text wraps instead of forcing the window wider than the screen."""
@@ -360,6 +394,7 @@ class SelectionWindow(QMainWindow):
         self._strip_rows = (srow, scol)
         self._two_inputs = False           # PiEEG: the sentence always has its own line
         self._connection_on = False        # an EEG input has a connection to show
+        self._narrow = False               # a map reveal is on screen
         # Two inputs, a device name and a status make a long line (PiEEG, #172). Then it wraps,
         # so the window never has to grow past the screen to fit it.
         self.input_label = WrapWhenLong(limit=60)
@@ -368,7 +403,8 @@ class SelectionWindow(QMainWindow):
         self.confirm_badge = WrapWhenLong(limit=60)
         self.confirm_badge.setProperty("class", "strip")
         self.confirm_badge.setVisible(False)
-        self.connection_label = self._strip_label()
+        self.connection_label = ElidedLabel()
+        self.connection_label.setProperty("class", "strip")
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()
         for badge in (self.input_label, self.confirm_badge):     # a pill, never a full-width bar
@@ -384,15 +420,12 @@ class SelectionWindow(QMainWindow):
         # The last outcome can be long; let it clip instead of forcing the window wide.
         # The transcript and the tooltip keep the full text.
         self.outcome_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        # The connection text can be long ("scripted, no g.Pype (...)"); let it clip too.
-        # The input label never clips: it's what keeps simulated input from looking live.
-        self.connection_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         # A sentence reads best in the body font, not the strip's monospace (#179).
         self.outcome_label.setProperty("class", "")
         self.outcome_label.setObjectName("stripSentence")
         # The connection gets what it needs up to a cap; the sentence gets the rest.
         self.connection_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-        self.connection_label.setMaximumWidth(P.px(150))
+        self.connection_label.setMaximumWidth(P.px(self.CONNECTION_MAX_PX))
         srow.addWidget(self.outcome_label, 1)
         srow.addWidget(self.connection_label)
         srow.addStretch()                  # keeps a lone badge on the left, not centred
@@ -440,14 +473,7 @@ class SelectionWindow(QMainWindow):
         self.input_label.setStyleSheet(badge_style(source))
         self.confirm_badge.setVisible(False)
         self._two_inputs = False
-        self._sentence_on_own_line(False)
-
-    def set_input_text(self, text: str, color_source: str) -> None:
-        """One badge with custom text, in ``color_source``'s colour."""
-        self.input_label.setText(text)
-        self.input_label.setToolTip(text)
-        self.input_label.setStyleSheet(badge_style(color_source))
-        self.confirm_badge.setVisible(False)
+        self._sentence_on_own_line(self._narrow)
 
     def set_two_inputs(self, choose_text: str, choose_source: str,
                        confirm_text: str, confirm_source: str) -> None:
@@ -466,6 +492,7 @@ class SelectionWindow(QMainWindow):
     def _narrow_strip(self, narrow: bool) -> None:
         """During a map reveal the selection side is narrow: give the sentence its own line and
         drop the connection until the next question (#179). The reveal has the height for it."""
+        self._narrow = narrow
         self._sentence_on_own_line(narrow or self._two_inputs)
         self.connection_label.setVisible(self._connection_on and not narrow)
 
@@ -478,15 +505,22 @@ class SelectionWindow(QMainWindow):
         elif not own and not in_row:
             scol.removeWidget(self.outcome_label)
             srow.insertWidget(srow.indexOf(self.connection_label), self.outcome_label, 1)
+        # On its own line it may wrap (a timing note after a confirm); beside the badge it's
+        # one line, kept short by SENTENCE_MAX.
+        self.outcome_label.setWordWrap(own)
+
+    @property
+    def has_connection(self) -> bool:
+        """An EEG input reported a connection (keyboard has none)."""
+        return self._connection_on
 
     def set_connection(self, state: str) -> None:
-        """A short state in the strip (the part before the first " · "); the full text is in the
-        tooltip and the session report (#179)."""
+        """A short state in the strip (the part before the first " · ", shortened with "…" if it
+        still doesn't fit); the full text is in the tooltip and the session report (#179)."""
         self.connection_label.setText(f"● {state.split(' · ')[0]}")
         self.connection_label.setToolTip(f"Connection: {state}")
         self._connection_on = state != "n/a"
-        # Keyboard has no connection to report; hide "n/a" so small screens keep room (#94).
-        self.connection_label.setVisible(state != "n/a")
+        self.connection_label.setVisible(self._connection_on and not self._narrow)
 
     def _set_round_text(self, rnd: Optional[Round]) -> None:
         self.round_label.setText(f"Round: {rnd.id} ({rnd.kind.value})" if rnd else "Round: —")
@@ -631,10 +665,12 @@ class SelectionWindow(QMainWindow):
 
     # ── Helpers ──────────────────────────────────────────────
     PREVIEW_MAX_PX = P.PREVIEW        # before the text scale (#195)
+    CONNECTION_MAX_PX = 150           # the strip's connection state, before the text scale
 
     def apply_text_scale(self) -> None:
         """Re-style after theme.set_scale (#195). Tiles and preview refit; flashing is untouched."""
         self.setStyleSheet(P.window_qss())
+        self.connection_label.setMaximumWidth(P.px(self.CONNECTION_MAX_PX))   # #179
         for tile in self.tiles.values():
             tile._fit()
             tile.update()
@@ -644,6 +680,8 @@ class SelectionWindow(QMainWindow):
         """Append e.g. "map 3 ms · speech 180 ms" to the last outcome in the strip (#130)."""
         base = self.outcome_label.text().split("  ⏱ ")[0]
         self.outcome_label.setText(f"{base}  ⏱ {note}")
+        tip = self.outcome_label.toolTip().split("  ⏱ ")[0]
+        self.outcome_label.setToolTip(f"{tip}  ⏱ {note}")
 
     def set_countdown(self, seconds) -> None:
         """Show "Cancels in N s" under the preview, or hide it with None."""

@@ -748,7 +748,7 @@ class App:
                  f"- **Commit:** `{commit or 'unknown'}`",
                  f"- **Input:** {self.input_summary()}",
                  f"- **Connection:** {self.window.connection_label.toolTip().removeprefix('Connection: ')}"
-                 if self.window.connection_label.isVisibleTo(self.window) else "- **Connection:** n/a",
+                 if self.window.has_connection else "- **Connection:** n/a",
                  f"- **Speech:** {getattr(self.speaker, 'backend', type(self.speaker).__name__)}",
                  "", "## Counts", "",
                  "| Previewed | Confirmed | Cancelled | Cleared (cancel, disconnect, timeout) | Rejected |",

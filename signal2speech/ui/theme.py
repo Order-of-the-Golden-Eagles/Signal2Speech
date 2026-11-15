@@ -32,10 +32,12 @@ TILE_DISABLED_BG, TILE_DISABLED_TEXT, TILE_DISABLED_BORDER = "#11151a", QUIET, "
 # Back-compat names from palette.py (#135)
 TILE_EMPTY_BG, TILE_EMPTY_BORDER = TILE_DISABLED_BG, TILE_DISABLED_BORDER
 
+# Text in an input's colour on the dark background (#179): the same hue as its badge below,
+# lighter so it reads on dark. Keyboard slate, Simulated amber, Recorded blue, Live EEG green.
 INPUT_COLORS = {
-    InputSources.KEYBOARD: "#3b82f6",
+    InputSources.KEYBOARD: "#94a3b8",
     InputSources.SIMULATED: "#f59e0b",
-    InputSources.RECORDED: "#c084fc",
+    InputSources.RECORDED: "#7fb2e5",
     InputSources.LIVE_EEG: "#22c55e",
 }
 
@@ -165,7 +167,7 @@ TEXT_PAIRS = [
     ("panel title", MUTED, BG, BODY, True),
     ("text size toast", TEXT, RAISED, HEADING, True),
     ("help phrase banner", ON_ACCENT, ACCENT, TITLE, True),
-    ("attract banner", ON_ACCENT, INPUT_COLORS[InputSources.SIMULATED], HEADING, True),
+    ("attract banner", BADGE_TEXT[InputSources.SIMULATED], BADGE_COLORS[InputSources.SIMULATED], HEADING, True),
     ("attract caption", TEXT, BG, BODY, False),
     ("button", TILE_TEXT, RAISED, BODY, True),
     ("help text", TEXT, HELP_BG, 26, False),

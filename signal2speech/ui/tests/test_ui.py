@@ -153,6 +153,8 @@ def test_badges_use_one_colour_per_input_and_only_live_is_green(ui):
     assert w.confirm_badge.isVisibleTo(w) and f"background:{live}" in w.confirm_badge.styleSheet()
     w.set_input_source(InputSources.SIMULATED)
     assert not w.confirm_badge.isVisibleTo(w)
+    # Text in an input's colour uses the badge's hue family: same input, same colour family.
+    assert P.INPUT_COLORS[InputSources.LIVE_EEG] != P.INPUT_COLORS[InputSources.SIMULATED]
 
 
 def test_keyboard_adapter_required(app):
