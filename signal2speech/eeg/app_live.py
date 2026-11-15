@@ -213,12 +213,21 @@ class LiveEegInput:
         self._reflashing = False
         self._last_attended: Optional[str] = None
         self._start_hung = False
+        #: Called with "close" and "open" during the eye check, so a wearer with their eyes shut
+        #: hears when to open them. The app sets it to a low and a high beep.
+        self.eye_cue: Optional[Callable[[str], None]] = None
+        #: Shown under the tiles when a round opens and the script has nothing for it.
+        self.idle_hint = "Simulated script finished: press 1 or 2"
         self.p300_calibration: dict = {}
         self.alpha_calibration: Optional[am.Calibration] = None
 
         self.nodes, self.alpha, self.bursts = build_live_graph(
             handler, source, self.input_source, placeholder=placeholder, enable_oscar=enable_oscar,
             recorded=recorded)
+        # A display-only tap on the filtered EEG, for the app's small "Brain Activity" graph. It
+        # reads the same 1-30 Hz signal the chooser cuts its epochs from and changes nothing.
+        self.trace_tap = am._Tap(name="brain_activity_display")
+        self.nodes.pipeline.connect(self.nodes.eeg, self.trace_tap)
         self.adapter = InputAdapter(handler, self.input_source)
         self.chooser = p300.P300Chooser(self.nodes, self.adapter, flashes_per_tile=flashes)
         self.chooser.bridge.listeners.append(self._on_p300_decision)
@@ -250,7 +259,7 @@ class LiveEegInput:
 
     # ── Labels ───────────────────────────────────────────────
     def connection_label(self) -> str:
-        parts = [f"recorded responses from {self.nodes.synth.responses.name} · simulated eye closure"
+        parts = [f"{self.nodes.synth.responses.short_name} · simulated eye closure"
                  if self.recorded else
                  "g.Pype Generator + synthetic P300 · alpha bursts" if self.simulated else
                  f"Unicorn Hybrid Black · {'OSCAR on' if self.enable_oscar else 'OSCAR off'}"]
@@ -363,9 +372,11 @@ class LiveEegInput:
             for i in range(n):
                 attended = TILES[i % 2]
                 if self.recorded:
-                    w.prompt.setText(f"Calibration {i + 1}/{n} on recorded EEG: the attended tile "
-                                     f"is “{labels[attended]}”")
-                    w.hint.setText("Recorded data. Nobody needs to look at the screen.")
+                    # The words a wearer would see, with the card they'd look at marked.
+                    w.prompt.setText(f"Calibration {i + 1}/{n}: look at “{labels[attended]}” "
+                                     "and silently count its flashes")
+                    w.hint.setText(WALKTHROUGH_HINT)
+                    self._mark_gaze(attended)
                 else:
                     w.prompt.setText(f"Calibration {i + 1}/{n}: look at “{labels[attended]}” "
                                      "and silently count its flashes")
@@ -377,6 +388,7 @@ class LiveEegInput:
                     (w.flasher.flash_ms + w.flasher.isi_ms) / 1000 + 2
                 if not wait(budget, until=lambda: self._sequence_done):
                     self.log("calibration: a flash sequence didn't finish")
+                self._mark_gaze(None)
                 wait(0.4)                                    # keep sequences apart
             wait(p300.TIME_POST + 0.5)                       # last epochs arrive
             model = self.chooser.finish_calibration()
@@ -409,14 +421,18 @@ class LiveEegInput:
                 self.bursts.open_eyes()
             collect(1.0)
             open_vals = collect(s)
-            w.prompt.setText(f"Now CLOSE your eyes for {s:g} s. We'll say when to open them.")
+            heard = self.eye_cue is not None
+            w.prompt.setText(f"Now CLOSE your eyes for {s:g} s (low beep). A high beep says when to open them."
+                             if heard else f"Now CLOSE your eyes for {s:g} s. We'll say when to open them.")
+            self._eye_cue("close")
             if self.bursts:
                 self.bursts.close_eyes()
             collect(1.0)
             closed_vals = collect(s)
             if self.bursts:
                 self.bursts.open_eyes()
-            w.prompt.setText("Open your eyes.")
+            w.prompt.setText("Open your eyes  (high beep)" if heard else "Open your eyes.")
+            self._eye_cue("open")
             self.alpha_calibration = self.alpha.calibrate(open_vals, closed_vals)
             collect(1.5)                                     # alpha decays below release
         except CalibrationAborted:
@@ -428,6 +444,15 @@ class LiveEegInput:
         self.log(f"Alpha switch calibrated: ratio {self.alpha_calibration.ratio:.1f}")
         return True
 
+    def _eye_cue(self, kind: str) -> None:
+        if self.eye_cue is None:
+            return
+        self.log(f"eye check cue: {kind}")
+        try:
+            self.eye_cue(kind)
+        except Exception as err:                         # a missing sound device must not stop calibration
+            self.log(f"eye check cue failed: {type(err).__name__}: {err}")
+
     # ── Flash hooks ──────────────────────────────────────────
     def _sequence_started(self) -> None:
         if self._calibrating:
@@ -438,13 +463,14 @@ class LiveEegInput:
                 attended = self._last_attended
             elif not self.script:                        # script spent: keys take over
                 self.window.flasher.stop()
-                self.window.hint.setText("Simulated script finished: press 1 or 2")
+                self.window.hint.setText(self.idle_hint)
                 return
             else:
                 attended = TILES[self.script.popleft() - 1]   # tile the synthetic brain attends
             self._last_attended = attended
         self._reflashing = False
         self._got_decision = False
+        self._mark_gaze(attended)
         self.chooser.begin_sequence(attended_for_synthetic=attended)
 
     def _sequence_finished(self) -> None:
@@ -455,6 +481,10 @@ class LiveEegInput:
 
     def _on_p300_decision(self, _cls, _target, _outcome) -> None:
         self._got_decision = True
+        self._mark_gaze(None)
+
+    def _mark_gaze(self, attended: Optional[str]) -> None:
+        """Walkthrough only (see RecordedEegInput): show which card the wearer would look at."""
 
     def _force_decision(self) -> None:
         if self._got_decision:
@@ -490,6 +520,12 @@ class LiveEegInput:
         self.eyes.open_now()
 
 
+#: Shown under the tiles all through the walkthrough, so nobody takes it for a live session.
+WALKTHROUGH_HINT = "Walkthrough on recorded g.tec EEG: nobody is wearing a headset"
+#: On the card the wearer would be looking at.
+GAZE_NOTE = "\U0001F441  The wearer looks here"
+
+
 class RecordedEegInput(LiveEegInput):
     """Recorded human EEG chooses the tile; a simulated eye closure confirms (#104).
 
@@ -501,13 +537,51 @@ class RecordedEegInput(LiveEegInput):
     """
 
     def __init__(self, handler, window, log: Callable[[str], None], *,
-                 responses: p300.RecordedResponses, soa_s: float = p300.RECORDED_SOA_S, **kwargs):
+                 responses: p300.RecordedResponses, soa_s: float = p300.RECORDED_SOA_S,
+                 narrator: Optional[Callable[[str], None]] = None, **kwargs):
+        self.narrator = narrator                   # speaks the walkthrough's guidance lines
+        self.mark_gaze = True                      # outline the card the wearer would look at
         super().__init__(handler, window, log, source="recorded", recorded=responses,
                          soa_s=soa_s, **kwargs)
         self.responses = responses
 
     def strip_text(self) -> str:
         return "Choose: Recorded (g.tec dataset, re-mapped to our tiles) · Confirm: Simulated"
+
+    # ── The walkthrough: the session as a headset wearer would go through it ──
+    def _mark_gaze(self, attended: Optional[str]) -> None:
+        """Outline the card the wearer would be looking at, and say so on it. On a real headset
+        nothing marks it: the wearer simply looks. Here nobody is wearing one, so the audience
+        needs to see where the attention is. That choice is the scripted part, and the strip says
+        the EEG is recorded."""
+        for target, tile in self.window.tiles.items():
+            on = self.mark_gaze and attended is not None and target == attended
+            tile.highlight = on
+            tile.note = GAZE_NOTE if on else None
+            tile.update()
+        if attended is not None and not self._calibrating:
+            self.window.hint.setText("The wearer looks at one reply and counts its flashes   ·   "
+                                     + WALKTHROUGH_HINT)
+
+    def calibrate(self, labels: Optional[dict] = None) -> Optional[bool]:
+        self.narrate("This is a walkthrough on recorded brain data. Nobody is wearing a headset. "
+                     "First, calibration: the wearer looks at one card and counts its flashes.")
+        ok = super().calibrate(labels)
+        if ok is not None:
+            self.narrate("Calibration is done. Now a question." if ok else
+                         "Calibration did not finish. The keys still work.")
+        return ok
+
+    def _calibrate_alpha(self, wait) -> bool:
+        self._mark_gaze(None)
+        self.narrate("Next, the eye check. Eyes open, then closed.")
+        return super()._calibrate_alpha(wait)
+
+    def narrate(self, text: str) -> None:
+        """Say one line of guidance, if the app gave us a voice. Never the wearer's reply."""
+        self.log(f"walkthrough: {text}")
+        if self.narrator is not None:
+            self.narrator(text)
 
     def usage(self) -> dict:
         """How many recorded responses were played, for the session report."""

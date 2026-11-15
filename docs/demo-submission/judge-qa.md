@@ -45,10 +45,36 @@ A platform. Every input source emits the same small selection event: source, rou
 Yes. Python, g.Pype and Qt only. GitHub Actions runs the full `pytest` suite on Windows, macOS and Linux for every PR (#37). The live headset path has only been planned on Windows so far.
 
 **How production-ready is it?** *(production-ready prototype)*
-A versioned event contract, a pinned lock file, a full `pytest` suite (124 passing at the time of writing) on three operating systems, honest input labels on screen, an offline demo, and raw EEG kept out of git. Not production: there's no clinical validation, live accuracy is unmeasured, and calibration is per wearer.
+A versioned event contract, a pinned lock file, a full `pytest` suite (124 passing at the time of writing) on three operating systems, honest input labels on screen, a demo whose only online part is the AI reply suggestions (saved phrases without a connection), and raw EEG kept out of git. Not production: there's no clinical validation, live accuracy is unmeasured, and calibration is per wearer.
 
 **How hard is it to get started?** *(low entry barrier)*
 Clone, install the lock file, and run `python -m signal2speech.app --input simulated`. There's no headset, licence or internet needed to try the full flow. g.Pype's `Generator` stands in for the brain.
+
+## The questions we will get on 11/15 (no headset)
+
+**Is this live?**
+No. The headset was lost in transit. The brain data is real human EEG that g.tec recorded on their amplifier, and the strip says Recorded. The eye-closure confirm at the table is simulated, and the strip says that too.
+
+**Then what is actually happening when the tiles flash?**
+Each flash is answered with one real single-flash brain response from g.tec's dataset: a response to an attended stimulus if the flashed tile is the scripted "wanted" one, a response to an ignored stimulus otherwise. The g.Pype pipeline and our classifier see only the EEG and have to work out which tile got the attended responses. `signal2speech/eeg/p300.py` (`RecordedP300`), `signal2speech/eeg/app_live.py` (`RecordedEegInput`).
+
+**So the user's choice is faked?**
+Which tile counts as "wanted" is scripted, and we say so: the recorded person was using g.tec's speller, not our app. What isn't scripted is the classification. It runs on noisy single responses and can pick wrong. If it misses in front of you, that's a real miss.
+
+**How good is the classifier on real data?**
+On g.tec's five recorded subjects, picking the attended item out of two: 94 % from one flash, 97 % from two, 99 % from three, 100 % from five. Tested on a separate stretch of each recording from the one it trained on. With the labels scrambled, the same code scores 42–46 %, which is chance. `python -m signal2speech.evidence.dataset <folder> --curve` reproduces it.
+
+**Why should we believe it would work on a live headset?**
+The live path is the same code: `RecordedEegInput` is `LiveEegInput` with a different sample source. It has never run on a Unicorn, and we don't claim it has. The recorded data uses a different electrode layout from the Unicorn's, so the classifier calibrates on whatever it's given.
+
+**Did you try any real hardware?**
+Yes. We borrowed a PiEEG Octopus 16 and tested it on two people overnight. It connected and recorded well, but with clean contact it showed no eyes-closed alpha and no response to a flickering square. Our best explanation is that its reference pin sits within 2 cm of its signal pins, which cancels a brain rhythm before it's measured. We kept ten recordings and wrote up the numbers in `docs/eeg-hardware/README.md`. We'd rather show you that than a shaky live trick.
+
+**Why do the pictures start on June 24 when the air-quality numbers start on June 26?**
+They cover different things, and the screen says so. The images run from June 24 because that is the last day the ground was visible: June 25, 26 and 27 were overcast on every NASA satellite we checked. The EPA air-quality numbers we hold are for June 26 and June 28, so the table and the spoken line compare those two days.
+
+**Why didn't you use a blink or a jaw clench as the switch?**
+Because those are eye and muscle signals, not EEG, and we didn't want to call them brain control. We did measure them at the back of the head: both were too faint to use as a switch there.
 
 ## Other questions
 
@@ -65,7 +91,7 @@ P300 is good for choosing among flashing options. The alpha switch is a delibera
 The handler drops the pending preview and speaks nothing. We switch to the keyboard, and the strip says Keyboard.
 
 **Why OpenOrbit?**
-It shows the same controls driving something other than speech: a NASA satellite image and EPA air-quality data for a real event, June 26 to 28, 2023 in southeast Michigan. *Status: the map view is in PR #65. Until it merges, `main` shows a labelled stand-in.*
+It shows the same controls driving something other than speech: a NASA satellite image and EPA air-quality data for a real event, June 26 to 28, 2023 in southeast Michigan. *Status: on `main`.*
 
 ## Science questions (Beyond the Horizon, #153)
 

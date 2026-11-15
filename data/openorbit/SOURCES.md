@@ -25,6 +25,9 @@ Context from the same file: the smoke arrived on June 27 (Washtenaw 214, Wayne 1
 | File | Date | What it shows |
 | --- | --- | --- |
 | [`modis_2023-06-26.jpg`](modis_2023-06-26.jpg) | June 26, 2023 | **Mostly cloud cover.** Aqua was also cloudy that day (checked), so the "before" view shows little ground. The AQI rows carry the before/after comparison. |
+| [`modis_2023-06-24.jpg`](modis_2023-06-24.jpg) | June 24, 2023 | Broken cloud with the ground and the lakes visible. First frame of the day-by-day sequence: the last day the surface can be seen before the smoke. |
+| [`modis_2023-06-25.jpg`](modis_2023-06-25.jpg) | June 25, 2023 | Overcast. Shown as it was, labelled "cloud". |
+| [`modis_2023-06-27.jpg`](modis_2023-06-27.jpg) | June 27, 2023 | Overcast. Shown as it was, labelled "cloud". Aqua and VIIRS were also overcast on June 25 to 27 (checked on 2026-11-15). |
 | [`modis_2023-06-28.jpg`](modis_2023-06-28.jpg) | June 28, 2023 | Gray wildfire-smoke haze over southeast Michigan. The Detroit River and Lake St. Clair are visible on the right. |
 
 **Bounds check:** NASA's GIBS `Coastlines` layer, requested with the same bbox and size and drawn over the June 28 image, traces Lake St. Clair, the St. Clair delta, the Detroit River islands, and the Lake Erie shore.

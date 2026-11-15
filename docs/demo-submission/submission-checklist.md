@@ -56,7 +56,7 @@ Why this wording: an ordinary reply is the model's own text, so the prompt keeps
 
 ### Paste-ready story
 
-Fact-checked against `main` at `da6e00d` (see the table after the story).
+Fact-checked against `main` at `da6e00d` (see the table after the story). **Updated 11/15, 7:45 AM:** recorded g.tec EEG now drives the app (#104), the accuracy figures are measured (#151), the voice is new (#206), and the test count is over 500. The rows added at the end of the table cover those. Paste this version into Devpost for the final.
 
 **Inspiration**
 People who can't speak or type still have things to say. Most assistive tools either take a long time to spell a sentence or put words in the user's mouth. We wanted a brain-computer interface where the person stays in control: the app suggests, and the wearer decides exactly what gets said.
@@ -69,22 +69,24 @@ Communication without speech or movement, with consent built in. Every answer is
 
 **How we built it**
 - **Signal processing:** g.tec's g.Pype (Python) for the Unicorn Hybrid Black. It provides OSCAR artifact removal, filtering, flash-locked epochs, and an LDA classifier for the P300. A separate alpha-band threshold, from eyes closed for two seconds, is the confirm switch. It's a different brain signal from the choice, and a confirm only counts in its own, separate step after the preview. Both run on one headset connection.
-- **One selection contract:** keyboard, simulated signals, recorded sessions, and live EEG all feed the same small state machine (choose → preview → confirm), which rejects stale, duplicate, and late inputs.
-- **App:** one offline Python process with a PySide6 interface, offline speech, and bundled NASA and EPA data.
+- **Real brain data without a headset:** g.tec's own P300 Speller recordings, made on a g.tec amplifier, drive the app's choice. Each tile flash is answered with one real recorded brain response, and the same pipeline and classifier a live headset would use calibrate on them and pick the tile. On those recordings our classifier picks the right tile out of two 94 % of the time from a single flash and 100 % from five, tested on stretches of data it never trained on.
+- **One selection contract:** keyboard, simulated signals, recorded EEG, and live EEG all feed the same small state machine (choose → preview → confirm), which rejects stale, duplicate, and late inputs.
+- **App:** one Python process with a PySide6 interface, a natural-sounding voice that runs on the laptop, and bundled NASA and EPA data. Reply suggestions come from Claude over the internet, with saved phrases as the fallback when there is no connection.
 - **Evidence view:** live scopes, the frequency spectrum, and the averaged target vs. non-target brain response, so judges can see the signal and not just the result.
 - **AI Answering:** Claude suggests two short replies from our verified facts. Map answers speak our own fixed lines, with numbers from the dataset, not the model's words. The wearer still previews and confirms.
-- **Engineering:** over 400 automated tests, CI on Windows, macOS, and Linux for every code change, and git hooks that block secrets and raw EEG.
+- **Engineering:** over 500 automated tests, CI on Windows, macOS, and Linux for every code change, and git hooks that block secrets and raw EEG.
 
 **Challenges we ran into**
 - We switched from Unity/C# to Python and g.Pype mid-hackathon to get a visible, cross-platform signal pipeline.
-- Our headset was lost in transit, so the judged demo runs on simulated brain signals through the real pipeline. Every screen labels its input (Keyboard, Simulated, Recorded, Live EEG). The live path is built: `python -m signal2speech.app --input live` calibrates and runs the demo on a Unicorn. Until a wearer run checks the eye-closure confirm, a key press confirms instead.
+- Our headset was lost in transit, so nobody wears one at the judged demo. We didn't want to show only a simulation, so the app's choice is made from real human EEG that g.tec recorded. Which tile counts as "looked at" is scripted, because the recorded person was using g.tec's speller and not our app, and the screen says Recorded. The eye-closure confirm at the table is simulated and labelled Simulated. Every screen labels its input (Keyboard, Simulated, Recorded, Live EEG). The live path is built: `python -m signal2speech.app --input live` calibrates and runs the demo on a Unicorn. It has never run on a headset, and we don't claim it has.
 - Flash timing: the P300 needs the marker to line up with the real on-screen flash within milliseconds. We built a tool to measure it, and measured 0.03 ms of jitter on the judging laptop.
 - Four people were merging fast, so we used CI on every pull request, auto-merge, and a shared contract so the tracks didn't collide.
 
 **Accomplishments that we're proud of**
 - A complete choose → preview → confirm flow where a confirmed answer produces exactly one spoken line and one map action.
 - A guided calibration session with on-screen and spoken cues, so one person can run it alone.
-- Honest labelling: nothing simulated is ever presented as live.
+- Real recorded human EEG choosing the tile through the live pipeline, with a classifier that can and sometimes does get it wrong.
+- Honest labelling: nothing simulated or recorded is ever presented as live.
 
 **What we learned**
 How P300 and alpha signals work in practice, why stimulus timing matters, how to build real-time pipelines in g.Pype, and that a small shared contract with tests lets a team work in parallel without breaking each other.
@@ -103,6 +105,12 @@ Verify on a real wearer with the Unicorn, add more than two choices per round, s
 | "Required CI" | ✅ Now true: the `main` ruleset requires a pull request, linear history, and the four `ci` jobs (Windows, Ubuntu, macOS on py3.12, Ubuntu py3.13). The story says "CI on every pull request", which holds either way. | repo ruleset `main` |
 | Grounded replies, Sonnet 5.5 | ✅ #116 merged 11/14. The prompt carries only the verified facts, and map answers speak fixed lines (the comparison from the dataset, the satellite line from the contract). An ordinary reply is still model text, so the story and the AI answer don't claim it can't invent numbers. | #116, `signal2speech/ai/replies.py` |
 | Spoken calibration cues | ✅ In the guided live run | `signal2speech/eeg/live.py` (#78) |
+| Recorded g.tec EEG drives the app's choice | ✅ `python -m signal2speech.app --input recorded`. Each flash is answered with one real recorded response; the live path's pipeline and classifier decide. Run on the judging laptop: 4 scripted exchanges, 4 right. | #104 (PR #214), `docs/integration/README.md` |
+| "94 % from a single flash and 100 % from five" | ✅ Mean over g.tec's five subjects, two-way choice, cross-validated on separate blocks of time. Scrambled labels give 42–46 %. Offline, not our wearer: the story says "on those recordings". | #151 (PR #218), `python -m signal2speech.evidence.dataset <folder> --curve` |
+| "Which tile is looked at is scripted" | ✅ Stated in the story, on the strip ("re-mapped to our tiles"), and in the stage script | `RecordedEegInput.strip_text` |
+| Natural-sounding offline voice | ✅ Piper, on the judging laptop. Machines without it fall back to the operating system's voice. Non-commercial voice licence, noted in the docs. | #206 (PR #207) |
+| Over 500 automated tests | ✅ 503 passed and 1 skipped on the judging laptop at `f544beb` | local full run, 11/15 |
+| No mention of the PiEEG board | ✅ Deliberate. It gave no usable EEG on two people, so it isn't in the story or the video. The findings are in the repo for anyone who asks. | `docs/eeg-hardware/README.md` |
 | Headset lost in transit | Team statement (Vasanth). Not something the repo can check. | #105 plan |
 
 ## Before the final

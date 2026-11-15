@@ -2,6 +2,55 @@
 
 The table demo, second by second. It follows one judge question from the question card to the spoken answer, then shows the brain evidence behind it.
 
+## Judging day, 11/15: no headset (use this, not the tracks below)
+
+**What changed.** The g.tec Unicorn was lost in transit, and the PiEEG board we borrowed gave no usable EEG on two people ([findings](../eeg-hardware/README.md#pieeg-octopus-16-on-real-people-no-usable-eeg-2026-11-15)). Nobody wears a headset at the table. The brain signal we show is **g.tec's recorded human EEG**, driving the app through the same pipeline a live headset would use. Everything below this section was written for a live wearer and is kept for reference.
+
+**The one sentence.** "Our headset was lost, so we run g.tec's real brain recordings through the exact pipeline a live headset would use. Plug in a Unicorn and the same code runs."
+
+### Start it before the judge arrives
+
+Setup takes about 70 seconds and is silent, so do it between judges, never in front of one.
+
+```
+python -m signal2speech.app --input recorded --sim 2,1,1,1,2,1,1,1 --fullscreen
+```
+
+- `--sim` is the script: pick tile 2 and confirm, pick tile 1 and confirm, and so on. Eight numbers give four exchanges, about 15 seconds each.
+- Wait for `Calibration done: P300 ready · eye-closure confirm ready`, then the first question appears.
+- **It opens with the two cards alone,** which then settle on the left while the map panel fades in. `--no-intro` skips that.
+- **It runs as a walkthrough.** The card the wearer would be looking at is outlined and marked "The wearer looks here", and three guidance lines are spoken during setup, starting with "This is a walkthrough on recorded brain data. Nobody is wearing a headset." Decide before the judge arrives whether you want them: `--no-gaze-mark` and `--no-narration` turn them off. With the mark on, say out loud that it shows the scripted attention, not the classifier's answer.
+- **Don't touch keys 1 or 2 while the tiles flash.** A key press picks at once and beats the recorded data to it.
+- After the script runs out, keys take over (1 or 2 to choose, hold 1 to confirm, hold 2 to cancel). Restart the app for the next judge.
+- One launch has enough recorded responses for 20 choices before any is replayed. Restarting resets that.
+- On the judging laptop the dataset is found by itself. Elsewhere add `--recording path/to/S4.mat`.
+
+**If recorded mode won't start** (dataset missing, a crash): `python -m signal2speech.app --input simulated --p300 --sim 2,1 --fullscreen`, and say "simulated" instead of "recorded" everywhere below. **If that fails too:** `--input keyboard`, and say so.
+
+### Two minutes, second by second
+
+| Time | Says | On screen |
+| --- | --- | --- |
+| **0:00–0:10** | "Signal2Speech is a voice for someone who can't speak or move. They pick a reply by looking at it, confirm by closing their eyes, and the app says it for them." | Two tiles: **Show the satellite view** and **Compare counties** |
+| **0:10–0:25** | "Our headset was lost in transit. So the brain data you're about to see is real human EEG that g.tec recorded on their own amplifier. Look at the strip: it says Recorded, re-mapped to our tiles." Point at the strip. | Strip: `Choose: Recorded (g.tec dataset, re-mapped to our tiles) · Confirm: Simulated` |
+| **0:25–0:40** | "Each time a tile flashes, we play in one real brain response. If it's the tile the user wants, it's a response recorded while that person was paying attention. Our classifier isn't told which is which. It has to work it out." | Tiles flash for about 5 seconds, then one is picked |
+| **0:40–0:50** | "It picked Compare counties. That's only a preview. Nothing has been said yet, so a wrong pick costs nothing." | *Say this?* with the exact words and the confirm ring |
+| **0:50–1:00** | "Confirming uses a second, different signal: closing your eyes for two seconds. Here that part is simulated, and the screen says so." | Ring fills, map appears |
+| **1:00–1:20** | Let the app speak. Then: "One confirm, one map change, one spoken line. NASA satellite imagery and EPA air-quality data, and the numbers in the sentence come from the data." | Before-and-after smoke images, county table |
+| **1:20–1:45** | "How do we know the classifier is really reading brain signals? On g.tec's recordings it picks the right tile 94 % of the time from a single flash and 100 % from five, tested on data it never saw. Scramble the labels and it drops to chance." | Optional: the chart in `docs/eeg-hardware/README.md`, or `python -m signal2speech.evidence --source dataset <S4.mat>` |
+| **1:45–2:00** | "What's real: the EEG, the g.Pype pipeline, the classifier. What's scripted: which tile counts as looked-at, because that person was using g.tec's speller, not our app. Questions?" | |
+
+### Say it straight
+
+- **Never say "live"** about anything at the table. Say "recorded" for the brain data and "simulated" for the eye closure.
+- **Never say "the user chose".** Say "the classifier picked", because the intent is scripted.
+- If the classifier picks the wrong tile, say so: "That's a real miss. It works from noisy single responses." Then hold 2 to cancel and let it go again. A miss is honest evidence the data isn't faked.
+- If a judge asks to try it: they can use the keys. They can't drive it with their brain, and we say that.
+
+---
+
+## The original plan, for a live wearer (reference only)
+
 **Status on 2026-11-14 (`main` after #47 and #37 merged)**
 
 | Piece | Status | What to run today |
@@ -34,7 +83,7 @@ Assign the roles at the first rehearsal and write the names here.
 - S: question card in hand, stopwatch at 0:00.
 - W: seated, headset on, eyes on the screen, impedance or signal quality checked in the evidence view.
 - If the headset isn't ready in 30 seconds, switch to Track K before the judge sits down. Don't debug in front of the judge.
-- O: the build is the frozen `judging-final` (or `judging-draft`), `python -m signal2speech.app --smoke=judging` passed, Wi-Fi is off, and the fallback folder from [judging-build.md](../devops/judging-build.md#offline-safe-fallback-copy) is ready.
+- O: the build is the frozen `judging-final` (or `judging-draft`), `python -m signal2speech.app --smoke=judging` passed, Wi-Fi is on (Claude's reply suggestions need it; without it the app offers saved phrases), and the fallback folder from [judging-build.md](../devops/judging-build.md#offline-safe-fallback-copy) is ready.
 
 ## Second by second
 

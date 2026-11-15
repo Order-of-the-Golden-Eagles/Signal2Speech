@@ -7,13 +7,12 @@
     "amplitude": 180
   },
   "clips": {
-    "show_satellite": {
-      "file": "show_satellite.wav",
-      "text": "This is the June 28, 2023 NASA MODIS view of southeast Michigan under wildfire smoke."
-    },
     "compare_air_quality": {
       "file": "compare_air_quality.wav",
       "text": "Washtenaw's AQI rose 186 points. Wayne's rose 168 points."
     }
+  },
+  "retired": {
+    "show_satellite.wav": "Says the old one-image line. The satellite view now plays June 24 to 28 and its line is spoken by the app's voice."
   }
 }

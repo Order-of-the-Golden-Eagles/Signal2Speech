@@ -73,6 +73,8 @@ def test_each_recorded_response_is_used_once_before_any_is_repeated():
         p300.build_pipeline("recorded")
 
 
+@pytest.mark.skipif(bool(os.environ.get("CI")),
+                    reason="passes, but the interpreter then crashes at exit on CI runners (#224); runs locally")
 def test_recorded_responses_choose_the_tile_and_the_app_labels_it(qapp):
     """The whole path: recorded responses -> g.Pype pipeline -> calibration -> a pick -> preview
     -> simulated eye closure -> one map action and one spoken line. Labels say what did what."""
@@ -83,6 +85,10 @@ def test_recorded_responses_choose_the_tile_and_the_app_labels_it(qapp):
     app.handler.on_handled.append(lambda e, o: log.append((e, o)))
     try:
         assert isinstance(app.sim, app_live.RecordedEegInput)
+        said, gaze = [], []
+        app.sim.narrator = said.append                                 # the walkthrough's guidance
+        real_mark = app.sim._mark_gaze
+        app.sim._mark_gaze = lambda attended: (gaze.append(attended), real_mark(attended))[1]
         assert app.window.flash_enabled                                # the tiles must flash
         assert "Recorded (g.tec dataset, re-mapped to our tiles)" in app.input_summary()
         assert "Confirm: Simulated" in app.input_summary()
@@ -98,6 +104,11 @@ def test_recorded_responses_choose_the_tile_and_the_app_labels_it(qapp):
                             (Outcome.Confirmed, InputSources.SIMULATED, T1)]     # simulated eyes confirmed
         f = app.window.flasher
         assert f.flash_ms + f.isi_ms == int(p300.RECORDED_SOA_S * 1000)            # slower flashes
+        # The walkthrough: it says what it is, marks the card a wearer would look at while it
+        # flashes, and clears the mark afterwards.
+        assert "Nobody is wearing a headset" in said[0] and len(said) == 3
+        assert T1 in gaze and T2 in gaze and gaze[-1] is None
+        assert not any(t.highlight or t.note for t in app.window.tiles.values())
         used = app.sim.usage()
         assert used["target_responses"] > 0 and used["nontarget_responses"] > 0 and used["played_twice"] == 0
     finally:
@@ -119,3 +130,32 @@ def test_real_gtec_recording_loads_as_responses():
     # that difference is the human P300 the classifier works from.
     diff = r.pools[True].mean(axis=0) - r.pools[False].mean(axis=0)
     assert np.abs(diff[int(0.2 * p300.RATE):int(0.6 * p300.RATE)]).max() > 3.0
+
+
+@pytest.mark.skipif(bool(os.environ.get("CI")), reason="builds a g.Pype pipeline; see the exit crash on CI (#224)")
+def test_phrase_demo_lets_recorded_data_answer_only_a_question_that_was_asked(qapp):
+    """In the phrase selection demo, recorded EEG picks a reply for each typed question, and
+    never starts choosing by itself between questions."""
+    from signal2speech.ai.__main__ import AnsweringDemo
+
+    demo = AnsweringDemo(InputSources.RECORDED, provider_kind="stub", speaker=FakeSpeaker(), view=FakeView(),
+                         echo=False, recording=made_up_recording())
+    try:
+        sim = demo.app.sim
+        assert isinstance(sim, app_live.RecordedEegInput) and list(sim.script) == []
+        assert "Type a question" in sim.idle_hint
+        saved = demo.suggester.saved.current("waiting for a question")
+        armed = []
+        real_ask = demo.app.ask
+        demo.app.ask = lambda: (armed.append(list(sim.script)), real_ask())[1]
+        demo._show(saved)                                   # nobody asked: nothing for the data to answer
+        assert armed[-1] == []
+        demo.attend(2)                                      # the operator: the wearer looks at reply 2
+        demo._asked = True
+        demo._show(saved)
+        assert armed[-1] == [2, 1] and demo.next_pick == 1  # one look, one confirm, then it alternates
+        demo._show(saved)                                   # replies changed without a new question
+        assert armed[-1] != [1, 1]
+    finally:
+        demo.app.close()
+        demo.root.close()
