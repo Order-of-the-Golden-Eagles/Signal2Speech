@@ -70,13 +70,30 @@ def test_view_starts_blank_and_switches_modes(qapp):
     from signal2speech.openorbit.view import BLANK_HINT
     view = OpenOrbitView()
     assert view.data_error is None
-    assert view.mode == "blank" and visible_texts(view) == [BLANK_HINT]
+    assert view.mode == "blank" and BLANK_HINT in visible_texts(view)
     view.show_satellite()
     assert view.mode == "satellite"
     view.compare_air_quality()
     assert view.mode == "compare"
     view.reset()
-    assert view.mode == "blank" and visible_texts(view) == [BLANK_HINT]
+    assert view.mode == "blank" and BLANK_HINT in visible_texts(view)
+
+
+def test_idle_panel_shows_a_dimmed_region_and_no_results(qapp):
+    """#182: before any confirm the panel isn't an empty box, but it must not look like a reveal."""
+    from signal2speech.openorbit import OpenOrbitView
+    from signal2speech.openorbit.view import BLANK_HINT, IDLE_OPACITY
+    view = OpenOrbitView()
+    texts = visible_texts(view)
+    assert BLANK_HINT in texts and any("southeast Michigan" in t for t in texts)
+    assert any("NASA" in t for t in texts)                                # attribution stays visible
+    ds = view.dataset
+    numbers = {str(v) for c in ds.changes for v in (c.before, c.after)}
+    assert not any(n in t for t in texts for n in numbers)                # no AQI values before a confirm
+    assert not any("Biggest jump" in t or "Highest" in t for t in texts)
+    assert view.idle_image.graphicsEffect().opacity() == IDLE_OPACITY and IDLE_OPACITY <= 0.4
+    missing = OpenOrbitView(data_root=Path("no-such-folder"))             # no data: the plain hint only
+    assert visible_texts(missing) == [BLANK_HINT]
 
 
 def test_missing_data_shows_a_labelled_panel_instead_of_crashing(qapp, tmp_path):
