@@ -43,3 +43,27 @@ def draw_icon(p: QPainter, kind: str, box: QRectF, colour: str) -> None:
         p.drawLine(QPointF(x + s * .2, y + s * .2), QPointF(x + s * .8, y + s * .8))
         p.drawLine(QPointF(x + s * .8, y + s * .2), QPointF(x + s * .2, y + s * .8))
     p.restore()
+
+
+#: The emoji shown for each icon name. The names stay, so nothing else has to change.
+EMOJI = {"satellite": "\U0001F6F0\uFE0F", "chart": "\U0001F4CA", "speech": "\U0001F4AC",
+         "check": "\u2705", "cross": "\u274C"}
+#: Fonts with colour emoji, by platform. Qt falls back to whatever the system has.
+EMOJI_FONTS = ["Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji"]
+
+
+def draw_emoji(p: QPainter, kind: str, box: QRectF) -> bool:
+    """Draw the emoji for `kind` inside `box`. False (and nothing drawn) for an unknown kind."""
+    from PySide6.QtGui import QFont
+
+    emoji = EMOJI.get(kind)
+    if emoji is None:
+        return False
+    p.save()
+    font = QFont(p.font())
+    font.setFamilies(EMOJI_FONTS)
+    font.setPixelSize(max(8, int(min(box.width(), box.height()) * 0.82)))
+    p.setFont(font)
+    p.drawText(box, int(Qt.AlignmentFlag.AlignCenter), emoji)
+    p.restore()
+    return True

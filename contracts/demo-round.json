@@ -1,7 +1,7 @@
 {
   "comment": "Choice round the OpenOrbit demo opens. Confirmation rounds are always target-1 = confirm, target-2 = cancel.",
   "choices": [
-    {"targetId":"target-1","actionId":"show_satellite","label":"Show the satellite view","spokenText":"This is the June 28, 2023 NASA MODIS view of southeast Michigan under wildfire smoke."},
+    {"targetId":"target-1","actionId":"show_satellite","label":"Show the satellite view","spokenText":"NASA satellite images from June 24 to June 28, 2023: clear ground, then cloud, then wildfire smoke over southeast Michigan."},
     {"targetId":"target-2","actionId":"compare_air_quality","label":"Compare counties","spokenText":"Washtenaw's AQI rose 186 points. Wayne's rose 168 points."}
   ]
 }

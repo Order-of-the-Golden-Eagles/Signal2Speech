@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Callable, List, Optional, Protocol
 
 from PySide6.QtCore import QObject, Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QPlainTextEdit, QVBoxLayout,
                                QWidget)
 
@@ -52,6 +52,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 MAP_ACTIONS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
 CONFIRM_TIMEOUT_MS = 15_000   # longer than alpha calibration's ~1.5 s closure plus reading time
+
+#: Width shared between the tiles (left) and the map with the latest line (right). The map and
+#: its NASA images are what a judge should see, so the right side gets most of it.
+CHOOSE_SPLIT = (2, 3)
+REVEAL_SPLIT = (2, 3)     # the same on a reveal: columns that change width make the screen jump
+#: Height of the one-line conversation box, before the text scale.
+CONVERSATION_HEIGHT = 132      # the label line plus a reply that wraps onto two lines
+PANEL_TITLE = (f"<span style='color:{T.ACTION_TINT[ActionIds.SHOW_SATELLITE]}'>OpenOrbit</span>"
+               " &nbsp;·&nbsp; NASA and EPA data"
+               f" &nbsp;·&nbsp; <span style='color:{T.QUIET}'>F2: developer log</span>")
 
 BLOCKED_INPUTS: dict = {}     # every input is wired in: recorded runs since #104
 
@@ -382,8 +392,12 @@ class App:
                 raise ValueError("recorded input needs a recording: pass recording=<S4.mat>")
             responses = (recording if isinstance(recording, p300_mod.RecordedResponses)
                          else p300_mod.RecordedResponses.from_gtec(recording))
+            from signal2speech.speech.speaker import ENGLISH_LINE
+            # Guidance lines for the walkthrough, in the app's voice. Off in tests and with --mute.
+            narrator = (lambda text: self.speaker.say(text, ENGLISH_LINE)) if own_voice else None
             self.sim = RecordedEegInput(h, self.window, self.log, responses=responses,
-                                        script=sim_script or [2, 1], **(live_options or {}))
+                                        script=sim_script or [2, 1], narrator=narrator,
+                                        **(live_options or {}))
             sim_label = self.sim.connection_label()
             self.window.set_input_text(self.sim.strip_text(), InputSources.RECORDED)
             alpha = getattr(self.sim, "alpha", None)
@@ -441,24 +455,47 @@ class App:
         h.on_round_opened.append(lambda _r: self._set_reveal(False))
 
         self.root = QWidget()
+        ui_font = QFont()
+        ui_font.setFamilies(T.FONT_FAMILIES)           # one clean family across the whole app
+        QApplication.instance().setFont(ui_font)
         self.root.setWindowTitle(f"Signal2Speech · {self.input_summary()}")
         if hasattr(self.sim, "on_label"):              # #172: the check changes the label
             self.sim.on_label = lambda text: self.root.setWindowTitle(f"Signal2Speech · {text}")
         self.root.setStyleSheet(f"background:{T.BG};")
         right = QVBoxLayout()
-        self.panel_title = QLabel("Conversation   ·   F2: developer log")
+        self.panel_title = QLabel(PANEL_TITLE)
+        self.panel_title.setTextFormat(Qt.TextFormat.RichText)
         self.panel_title.setWordWrap(True)
         right.addWidget(self.panel_title)
         if isinstance(self.view, QWidget):
-            right.addWidget(self.view, 3)
-        right.addWidget(self.conversation, 2)
+            right.addWidget(self.view, 1)
+        # The map gets the height. The conversation shows only the latest line; the developer
+        # log (F2) and the session report keep everything.
+        self.conversation.latest_only = True
+        self.conversation.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.conversation.setFixedHeight(T.px(CONVERSATION_HEIGHT))
+        right.addWidget(self.conversation, 0)
         right.addWidget(self.transcript_view, 2)
         self.transcript_view.setVisible(False)
-        row = QHBoxLayout(self.root)
+        right.setContentsMargins(0, 12, 0, 12)        # the panels don't touch the window's edges
+        row = QHBoxLayout()
         row.setContentsMargins(0, 0, 16, 0)
-        row.addWidget(self.window, 3)
-        row.addLayout(right, 2)
+        row.addWidget(self.window, CHOOSE_SPLIT[0])
+        row.addLayout(right, CHOOSE_SPLIT[1])
         self._row = row
+        # The status strip spans the whole window. Inside the left column it was squeezed to a
+        # third of the width whenever the map was revealed, and its text was cut off ("Last: Co").
+        outer = QVBoxLayout(self.root)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        outer.addLayout(row, 1)
+        strip = self.window.strip
+        strip.setParent(self.root)
+        outer.addWidget(strip)
+        strip.setStyleSheet(self.window.styleSheet())  # it left the window that styled it
+        inner = self.window.centralWidget().layout()   # keep the hint line clear of the strip
+        m = inner.contentsMargins()
+        inner.setContentsMargins(m.left(), m.top(), m.right(), max(m.bottom(), 10))
         self.revealing = False
         fit_to_screen(self.root)
 
@@ -647,6 +684,7 @@ class App:
 
     def apply_text_scale(self) -> None:
         self.window.apply_text_scale()
+        self.window.strip.setStyleSheet(self.window.styleSheet())
         self.conversation.restyle()
         self.help.restyle()
         self._restyle_overlays()
@@ -686,8 +724,7 @@ class App:
         show_log = not self.transcript_view.isVisibleTo(self.root)
         self.transcript_view.setVisible(show_log)
         self.conversation.setVisible(not show_log)
-        self.panel_title.setText("Developer log   ·   F2: conversation" if show_log
-                                 else "Conversation   ·   F2: developer log")
+        self.panel_title.setText("Developer log   ·   F2: back" if show_log else PANEL_TITLE)
 
     def add_question(self, text: str) -> None:
         """The conversation partner's question, shown before the options it produced."""
@@ -773,8 +810,8 @@ class App:
         for tile in self.window.tiles.values():
             tile.setVisible(not on)
         self.window.hint.setVisible(not on)
-        self._row.setStretch(0, 1 if on else 3)
-        self._row.setStretch(1, 3 if on else 2)
+        self._row.setStretch(0, REVEAL_SPLIT[0] if on else CHOOSE_SPLIT[0])
+        self._row.setStretch(1, REVEAL_SPLIT[1] if on else CHOOSE_SPLIT[1])
 
     def _stop_confirm_timeout(self) -> None:
         self._confirm_timer.stop()
@@ -933,6 +970,12 @@ def main(argv=None) -> int:
                    help="live/--p300: seconds of eyes open, then closed, for the alpha switch")
     p.add_argument("--practice", action="store_true",
                    help="start with the 30 s practice round (#196); P starts it any time")
+    p.add_argument("--no-gaze-mark", action="store_true",
+                   help="--input recorded: don't outline the card the wearer would be looking at")
+    p.add_argument("--no-narration", action="store_true",
+                   help="--input recorded: don't speak the walkthrough's guidance lines")
+    p.add_argument("--no-intro", action="store_true",
+                   help="skip the opening animation of the two cards")
     p.add_argument("--no-attract", action="store_true",
                    help="don't loop the simulated demo after 60 s idle (#193)")
     p.add_argument("--help-by-eyes", action="store_true",
@@ -1009,6 +1052,9 @@ def main(argv=None) -> int:
         return 2
 
     qapp = QApplication.instance() or QApplication(sys.argv[:1])
+    if args.screenshot:
+        from signal2speech.ui import fade
+        fade.ENABLED = False                       # a picture taken mid-fade would be wrong
     script = [int(s) for s in args.sim.split(",") if s.strip()]
     if any(s not in (1, 2) for s in script):
         print(f"--sim takes 1s and 2s, e.g. 2,1; got {args.sim!r}", file=sys.stderr)
@@ -1038,11 +1084,26 @@ def main(argv=None) -> int:
         print(f"Couldn't set up the EEG pipeline: {type(err).__name__}: {err}\n{setup_help()}",
               file=sys.stderr)
         return 3
+    if source == InputSources.RECORDED:
+        app.sim.mark_gaze = not args.no_gaze_mark
+        if args.no_narration:
+            app.sim.narrator = None
     qapp.aboutToQuit.connect(app.close)
     if not args.no_report:
         qapp.aboutToQuit.connect(lambda: print(f"session report: {app.write_report()}", flush=True))
+    def opening() -> None:
+        """The two cards alone, then they settle on the left and the panels fade in."""
+        if args.screenshot or args.keys or args.no_intro:
+            return
+        from signal2speech.ui.intro import play_intro
+        qapp.processEvents()                       # the tiles need their final places first
+        play_intro(app.root, app.window, app.choices,
+                   reveal=[w for w in (app.view, app.conversation, app.window.strip)
+                           if isinstance(w, QWidget)])
+
     if hasattr(app.sim, "calibrate"):          # #103: open the stream and calibrate first
         app.root.showFullScreen() if args.fullscreen else app.root.show()
+        opening()
         try:
             app.sim.start()
         except Exception as err:               # g.Pype raises various errors for a missing device
@@ -1078,6 +1139,8 @@ def main(argv=None) -> int:
         guards.append(guard)
 
     app.root.showFullScreen() if args.fullscreen else app.root.show()
+    if not hasattr(app.sim, "calibrate"):
+        opening()
     if not (args.practice and app.start_practice()):
         app.ask()
     keymap = {"1": TargetIds.TARGET_1, "2": TargetIds.TARGET_2}
