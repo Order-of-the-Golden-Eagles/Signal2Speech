@@ -378,6 +378,34 @@ Offline results on 2026-11-14 (1–30 Hz band-pass, 100 ms bins, shrinkage LDA, 
 
 Each subject has 150 target and 1,050 non-target flashes over about 4 minutes. These show our pipeline finds a real P300 in real human EEG. They are **not** a result for our wearer or our two-tile layout. The dataset's files state no licence; it's provided by g.tec for this hackathon, so cite g.tec and don't redistribute it.
 
+## PiEEG Octopus 16 on real people: no usable EEG (2026-11-15)
+
+**Result: the board connects, streams and records well, but we could not measure a brain signal with it.** It is not part of the demo. g.tec's recorded data ([above](#recorded-human-p300-from-gtecs-dataset-142)) is the real EEG we show. Everything below this section about the board describes tools that work on simulated streams only.
+
+We borrowed two boards and tested on two people, with consent, on the judging laptop. Ten labelled recordings are kept privately under `recordings/` (never committed).
+
+| What we looked for | Kind of signal | Where | Clean recordings | Result |
+| --- | --- | --- | --- | --- |
+| Eyes-closed alpha | EEG | Back of head (Oz) | 2, one per person | Not there: closed vs open ×0.96 and ×0.87, no 10 Hz peak. A usable switch needs ×2 or more |
+| Flicker response at 10 and 15 Hz | EEG | Back of head | 1 | Not there: power at the flicker rate ranked 75th of 111 nearby frequencies |
+| Jaw clench | Muscle | Back of head | 1 | Visible but too faint: ×1.5, and no threshold caught all five without false triggers |
+| Hard double blink | Eye movement | Back of head | 1 | Faint (×1.4–1.7), 0 of 5 caught |
+| Hard double blink | Eye movement | Neck | 1 | Not there, and the contact was poor |
+| Blink | Eye movement | Forehead | Not run | Would probably work, but it is not EEG, so we stopped |
+
+**What "clean" means.** A seated, still puck reads 8–12 µV per pin (1–45 Hz). We only counted recordings at that level. Hair under the pins or a tilted puck reads 40–300 µV, and several earlier attempts were thrown out for that.
+
+**Why, as far as we can tell.** PiEEG's documentation puts the reference pin in the same 20 mm cluster as the 16 signal pins. A brain rhythm is nearly the same across 2 cm of scalp, so subtracting a reference that close cancels most of it, and what is left is below the board's own noise (about 1 µV²/Hz at 10 Hz). We did not prove this: it is the explanation that fits two people, two kinds of EEG signal and good contact. The microvolt scale and the reference position are taken from PiEEG's code and documentation, not measured by us.
+
+**What did work, and is worth knowing.**
+- Connecting and streaming: 250 samples per second, no lost samples, for 40 minutes on the second board.
+- The voice-guided session, the on-screen eye check and the recorder all ran on a real person. Both full sessions stopped at calibration with a clear reason, which is what they should do with no signal.
+- **Do not pair the board in Windows' Bluetooth settings.** A paired board is connected and dropped by Windows within a second, over and over. Remove it under Settings → Bluetooth & devices and it connects at once. This cost us fifteen minutes.
+- PiEEG's `python_quickstart.py --lsl` exits quietly when the link drops. `python -m signal2speech.eeg.pieeg_keepalive` runs the same decoder in a loop: it reconnects, keeps the LSL stream up, uses a 30 s connect timeout (the default 10 s timed out once in a room with about 300 Bluetooth devices), and says how long each connection lasted.
+- The puck must sit flat. If one edge lifts, the pins on the other side go noisy together.
+
+**How we label it.** Never "live EEG" for anything from this board. The app's `--input pieeg` mode and the board session are verified on simulated streams only.
+
 ## Devices and channels (#150)
 
 g.tec's g.Pype is the whole pipeline. The program works out which amplifier it's reading (`signal2speech/eeg/devices.py`) and uses the right channels for the eyes-closed confirm, which needs the back of the head.
