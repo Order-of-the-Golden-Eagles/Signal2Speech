@@ -26,8 +26,9 @@ python tests/soak/soak.py --minutes 5 --windowed --mute          # a quick check
 - **Pass needs all of these:**
   - **0 double outputs:** every `Confirmed` has exactly one map action and one spoken line, and no output appears on a cancelled or timed-out round.
   - **0 unplanned app exits and 0 Python tracebacks.**
-  - **Memory stable:** the app's RSS, sampled every minute with psutil, grows less than +50 MB or +15% (whichever is larger) after start-up.
-  - **The kill test:** with `--kill-at`, the app is killed on purpose once, and the launcher must start a new one. The report gives both times: when the new process appeared, and when it was logging again.
+  - **Memory stable:** the RSS of each app process, sampled every minute with psutil, grows less than +50 MB or +15% (whichever is larger), judged from 90 s after that process started. On Windows it samples the real interpreter, not the venv's `python.exe` stub.
+  - **Keeps going at the same speed:** a round finishes at least every 180 s, and the median selection time in the last 10 minutes is at most 1.5× the first 10.
+  - **The kill test:** with `--kill-at`, the app is killed on purpose once, and the launcher must start a new one. A requested kill that never happened is a FAIL. Ctrl+C still writes the report, marked as stopped early. The report gives both times: when the new process appeared, and when it was logging again.
 - **Report:** `logs/soak-<time>.md` has the verdict, the exact command, the machine, round counts, crashes, memory start vs end, and the median selection time (Choose round opens → preview) and confirm → map time, first 10 minutes vs last 10. Paste it into #165. `logs/` stays out of git.
 - **Tests:** `tests/test_soak.py` pins the pass/fail parsing (double outputs, cancels with output, restarts, a run cut mid-confirm) without starting the app.
 
