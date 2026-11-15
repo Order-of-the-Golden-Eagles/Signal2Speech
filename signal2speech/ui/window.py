@@ -225,6 +225,7 @@ class SelectionWindow(QMainWindow):
         col.setSpacing(P.M)
 
         self.prompt = QLabel("Waiting for a round", objectName="prompt")
+        self.prompt.setWordWrap(True)      # a long prompt wraps; it must never widen the window
         col.addWidget(self.prompt)
         # #175: the consent screen. What will happen, the exact words, and the confirm ring.
         self.preview_box = QWidget()
@@ -269,6 +270,9 @@ class SelectionWindow(QMainWindow):
         srow.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
         srow.setSpacing(P.L)
         self.input_label = self._strip_label()
+        # Two inputs and a device name make a long line (PiEEG, #172). It wraps, so the window
+        # never has to grow past the screen to fit it.
+        self.input_label.setWordWrap(True)
         self.connection_label = self._strip_label()
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()

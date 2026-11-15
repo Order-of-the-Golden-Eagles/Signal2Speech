@@ -137,7 +137,8 @@ class OfflineSpeaker(QObject):
             self.log(f"speech: natural voice, {self.backend}"
                      + (f" (waited {self._waited_ms} ms)" if self._waited_ms else ""))
             return
-        self.log("speech: the natural voice couldn't make this line, using the standard voice")
+        self.log("speech: the natural voice couldn't make this line "
+                 f"({made.why or 'not ready in time'}), using the standard voice")
         self._say_without_neural(made.text, clip)
 
     def _play_wav(self, wav: Path) -> None:
