@@ -8,6 +8,8 @@ Updated 2026-11-15 for the judging-day build.
 
 Signal2Speech is a voice for people who can't speak or type. A partner asks a question. The app offers two replies. The wearer picks one by looking at it, sees exactly what will be said, and confirms by closing their eyes for two seconds. Only then does the app speak. It runs offline on one laptop.
 
+**What is main and what is an example.** The product is the conversation: any question in, two suggested replies, one chosen by brain signal and spoken. The NASA air-quality question is one example inside the same app. It shows the app can also do something on screen, not only speak. Lead with the conversation and bring up NASA second.
+
 **Say this early, every time:** our headset didn't arrive, so today the brain data is real human EEG that g.tec recorded on their own amplifier. It runs through the same pipeline and classifier a live headset would use. Nobody is wearing a headset at our table.
 
 ## What is real and what is not
@@ -24,7 +26,7 @@ This is the question judges care about most. Learn this table.
 | Live EEG from a headset | Built and tested on simulated input. Never run on a person | "Not yet run live" |
 | The PiEEG board | Tested on two people, no usable signal. Not in the demo | Only if asked |
 
-The app's bottom row of pills always names the input: **Keyboard**, **Simulated**, **Recorded**, or **Live EEG**. Never say "live". Never say "the user chose" about a recorded run.
+The app's bottom row of pills always names the input: **Keyboard**, **Simulated**, **Recorded**, or **Live EEG**. Say "live" only when that pill reads **Live EEG**, which needs the headset on a person. Never say "the user chose" about a recorded run.
 
 ## The app, and how to run it
 
@@ -38,15 +40,18 @@ It is one app. The main screen is the question box and two replies. The NASA air
 
 With the headset: the brain signal chooses, and holding key 1 confirms. Add `--arm-live-confirm` so closing the eyes confirms, but only after the guided check (`python -m signal2speech.eeg.live --source hybridblack`) says it is safe for that wearer. If a judge wears it, they need the one-minute calibration first. The headset path has passed on simulated signals only, so don't promise an accuracy.
 
-The older stand-alone runs still work:
+**Using it, step by step**
 
-Both need about 90 seconds of setup after launch. Start them before the judge arrives. Run one at a time, because both talk.
+1. Start it and wait. With recorded data or a headset it calibrates first, about 90 seconds. Start it before the judge arrives.
+2. Type a question in the yellow box and press Enter. Two replies appear on the cards.
+3. The cards flash. The brain signal picks one (or press 1 or 2 with keys).
+4. A preview shows the exact words. Closing the eyes for two seconds confirms (or hold 1). Hold 2 to cancel.
+5. The app speaks the reply, and the conversation on the right keeps the history.
+6. For the NASA example, click **Example: NASA air quality**. The map replaces the conversation until the next question.
 
-| Demo | Command | What happens |
-| --- | --- | --- |
-| NASA question | `python -m signal2speech.app --input recorded --sim 2,1,1,1,2,1,1,1` | Calibration, then four questions by themselves. The cards flash, the recorded data picks, the map plays and one line is spoken. |
-| Phrase selection | `python -m signal2speech.ai --input recorded` | Type any question and press Enter. Two replies flash, the recorded data picks one, it is spoken after the confirm. Ctrl+1 or Ctrl+2 sets which reply the scripted wearer looks at next. |
-| Fallback, no dataset | `python -m signal2speech.app --input keyboard` | Press 1 or 2 to pick, hold 1 to confirm, hold 2 to cancel. Label: Keyboard. |
+With recorded data, Ctrl+1 or Ctrl+2 sets which reply the scripted wearer looks at next, and the app waits for a question before it picks. With a headset, the cards flash as soon as calibration ends, starting with Yes and No, so tell the wearer to look at a card only when they mean it. Nothing is spoken without a confirm.
+
+The NASA question also runs alone, as before: `python -m signal2speech.app --input recorded --sim 2,1,1,1,2,1,1,1` (four questions by themselves), or `--input keyboard` with no dataset.
 
 On the judging laptop, prefix with `./.venv/Scripts/python.exe` in place of `python`. If anything misbehaves, close the window and start again. Full run of show: [stage script](demo-submission/stage-script.md).
 
@@ -85,7 +90,7 @@ Longer answers are in [judge Q&A](demo-submission/judge-qa.md). The short ones:
 - **"What does the AI do?"** It suggests two replies to a typed question (Claude, with saved phrases as the offline fallback). It never decides. The wearer previews and confirms the exact words. The EEG decoding is not AI-generated: it is a standard classifier in our g.Pype pipeline. Details: [AI answering](ai-answering/README.md).
 - **"How fast is it?"** About five seconds of flashing to choose, two seconds to confirm. After the confirm the map and voice respond in well under a second.
 - **"What about privacy?"** Everything runs offline except the optional reply suggestions. Raw EEG is saved only with the wearer's consent and never leaves the laptop or goes in the repo. Details: [security and privacy](security-privacy/README.md).
-- **"Why NASA data?"** It is a concrete question with a checkable answer, and it shows the app doing something, not only speaking. NASA imagery shows the smoke from orbit. EPA data measures it on the ground.
+- **"Why NASA data?"** It is an example, not the product. It is a concrete question with a checkable answer, and it shows the app doing something, not only speaking. NASA imagery shows the smoke from orbit. EPA data measures it on the ground.
 - **"What did you use from g.tec?"** g.Pype for the whole signal pipeline, their P300 Speller dataset for the recorded EEG, and the Unicorn Hybrid Black as the target device.
 - **"What didn't work?"** The headset didn't arrive. A second board we tried gave no usable EEG on two people, and we wrote that up as a negative result ([findings](eeg-hardware/README.md#pieeg-octopus-16-on-real-people-no-usable-eeg-2026-11-15)). One reported audio dropout was never reproduced.
 - **"What's next?"** Run it live on a headset and measure it on people. Then more than two choices, and stopping the flashes early once the classifier is sure.
