@@ -21,7 +21,8 @@ from signal2speech.app import App
 from signal2speech.core import InputSources, Outcome, TargetIds
 
 from .qt import AsyncSuggester, QuestionPanel
-from .replies import TIMEOUT_S, ReplySet, ReplySuggester, make_provider
+from .replies import (TIMEOUT_S, ReplySet, ReplySuggester, make_provider,
+                      saved_phrases_from_file)
 
 
 class AnsweringDemo:
@@ -33,7 +34,7 @@ class AnsweringDemo:
         self.provider_note = provider_note or ""
         # view=None gives the real OpenOrbit view, so map suggestions (#106) reveal the map.
         self.app = App(input_source, view=view, speaker=speaker, mute=mute, echo=echo)
-        self.suggester = ReplySuggester(provider)
+        self.suggester = ReplySuggester(provider, saved_phrases_from_file())   # #134
         self.async_ = AsyncSuggester(self.suggester, deadline_s, parent=self.app.window)
         self.panel = QuestionPanel()
         self.question = ""
@@ -55,6 +56,7 @@ class AnsweringDemo:
         # After a confirm the app reopens a round: offer saved phrases, not the spoken pair.
         self.app.handler.on_handled.append(self._after_handled)
         self.app.log(f"replies provider: {self.provider_note}")
+        self.app.log(f"saved phrases: {self.suggester.saved.source}")
 
     def start(self) -> None:
         self._show(self.suggester.saved.current("waiting for a question"))

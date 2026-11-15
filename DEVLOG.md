@@ -340,6 +340,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Only the tests that really need g.Pype are skipped. The rest of `test_diagnostics.py` and `test_recovery.py` still runs everywhere, and CI still runs all of them on Windows, macOS, and Linux
 - Checked on macOS 12 without g.Pype: 183 passed, 0 failed, and the push hook passes again
 
+## 11/14/26 - 7:58 PM - Vasanth Anbukumar - #106 Grounded Claude replies and map actions ([PR #116](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/116))
+- AI Answering now uses `claude-sonnet-5-5`, which answered in about 1.4–1.9 s, against 2–3 s for Opus. Low effort, the server-side fallback, the 8 s timeout, and saved phrases all stay the same
+- Claude now gets a "Verified facts" block built from the OpenOrbit data: the four EPA AQI rows, the changes, where EMU and Detroit are, and the sources. It's told to state only those facts and to say "I don't know" otherwise
+- Before, every model answered "Wayne" to "Which county's AQI rose more?". That was wrong: Washtenaw rose 186 points and Wayne rose 168. Claude now offers the Compare counties map action for it
+- A reply can now be a map action (compare counties or show the satellite view). The spoken line for those comes from the dataset and the demo contract, never from Claude's words, so the numbers always match the map
+- Checked with real calls: the AQI question, "Do you want water or juice?", and a question the data can't answer, which got an honest "I don't know". All 247 tests pass
+
 ## 11/14/26 - 8:01 PM - MagicJester2764 - #103 Live EEG inside the app ([PR #124](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/124))
 - The headset can now drive the real demo app: `python -m signal2speech.app --input live`
     - It calibrates on the app's own tiles first (look at the named tile, then eyes open and eyes closed), then the brain's response picks a tile and closing your eyes confirms
@@ -348,6 +355,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - With no headset, it now stops within about 15 seconds with pairing steps, instead of freezing forever (the headset library waits indefinitely when no device is there)
 - Rehearse the exact same path without the headset: `--input simulated --p300`. That run worked end to end (one preview, one eye-closure confirm, one spoken line). Nothing has been tried on a real wearer yet
 - After two code reviews: a failed calibration switches that part off and the on-screen hints say so (keys still work); closing the window, a busy headset, a missing driver, or a crash all exit cleanly and release the headset; if the brain gives no answer, the tiles flash again, then hand over to the keys
+
 ## 11/14/26 - 8:07 PM - Long Le - #5 AI demo shows the map for map suggestions ([PR #118](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/118))
 - When Claude suggests a map answer (from #106), the AI demo window now shows the map and speaks the line once, just like the main app
 - Why: the AI demo had no map on purpose, because replies used to be spoken words only. With #106, picking "Compare counties (shows the map)" would have spoken the line but shown nothing, and logged a BUG line
@@ -366,6 +374,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The hook itself now clears git's variables before running the tests, so no other test or tool can do the same thing
 - Verified by pushing through the real pre-push hook: the tests passed, and the repo's settings, history, and staged files were unchanged afterwards. A new test also checks this on every run, in both ways a hook can set git's variables
 - If you pushed with the hooks turned on, check your repo with the steps in `docs/MEMORY.md`
+
 ## 11/14/26 - 8:13 PM - Vasanth Anbukumar - #23 Plain-language prompts in the live-run guide ([PR #127](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/127))
 - The guided headset test (`python -m signal2speech.eeg.live --source hybridblack`) now speaks to the wearer in plain words: "WEARER: look at the tile with the YELLOW border… count it silently", "If YES, close your eyes for about 2 seconds"
 - Steps read as what's happening ("checking the signal", "learning how your brain reacts to the flashes", "learning your eyes-closed YES signal") instead of jargon
@@ -412,6 +421,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The report is ready to paste into the rehearsal log, so every practice run leaves evidence behind
 - Found and fixed two bugs while testing: the map time got overwritten in the strip, and closing the app could raise an error from the sound player. Tests use a fake clock. Not yet measured on the judging laptop
 
+## 11/14/26 - 9:20 PM - In Young Song - #138 PiEEG's simulator drives the eye-closure confirm ([PR #144](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/144))
+- PiEEG's own simulated EEG now runs through our g.Pype pipeline: a keyboard preview, then PiEEG's "eyes closed" alpha burst confirms it, and the map changes and the line is spoken once
+    - `python python_quickstart.py --sim --lsl` (PiEEG's starter), then `python -m signal2speech.eeg.pieeg_lsl --demo`. Setup is in `docs/eeg-hardware/pieeg.md`
+- Why: the Mind and Machine track is led by g.tec with PiEEG, and judging runs on simulation, so this shows PiEEG's tools and g.Pype working together. It's labelled Simulated (PiEEG) everywhere
+- PiEEG's simulators have no P300, so the choice is made by keyboard here. The P300 chooser stays on `--input simulated --p300`
+- Only the stream from this laptop is used, under a name unique to it, so another team's PiEEG simulator on the venue Wi-Fi can't drive our app
+- Verified on Windows with PiEEG's real starter: 250.0 Hz, calibration ratio 26.2, one confirm and one spoken line. The new tests use a fake stream and skip without `pylsl`, which isn't in the team install yet (Vasanth's call, #19). Not tried on the judging laptop, and not in the evidence view yet
+
 ## 11/14/26 - 9:26 PM - Long Le - #133 Crash-safe launcher for the judging table ([PR #145](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/145))
 - One command starts the demo fullscreen and brings it back by itself if it crashes: `python tools/demo_launcher.py --input keyboard`
     - Restarts after 1 s, then every 2 s, up to 5 times. Closing the window normally just ends it
@@ -426,3 +443,27 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - With the real headset it reports signal quality and the eye-closure signal. The P300 needs tiles on screen, so use the app or the evidence view for that
 - Still to do: record the 30-second clip for the video (#34), and try it with a real wearer
 - Code review follow-up: the evidence window closes when the assistant disconnects, a missing or busy headset fails cleanly instead of hanging, and the accuracy figure counts every sequence, including ones with no answer
+## 11/14/26 - 9:36 PM - Long Le - #132 Video title card, closing card, and diagram ([PR #147](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/147))
+- The submission video has its three graphics ready in `docs/demo-submission/media/`: a title card, a closing card with the repo link and AI-use note, and an architecture diagram for shot 9
+- They're drawn by a script, so changing a name or a line is one command: `python docs/demo-submission/make_graphics.py`
+- The diagram shows the real path: headset → g.Pype (OSCAR) → P300 to choose and alpha to confirm → selection contract → speech and map, with keyboard and simulator input going through the same contract
+- Checked by eye at full size, and a test makes sure all three stay 1920×1080, under 500 KB, and linked from the shot list
+
+## 11/14/26 - 9:36 PM - Vasanth Anbukumar - #142 Real recorded brain data in the evidence view ([PR #149](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/149))
+- Judges can now see a real human P300 even though our headset was lost in transit: `python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat`
+    - It plays g.tec's own hackathon recording (five people, 8 channels at 250 Hz like the Unicorn, but with different electrode positions: P3 and P4 where the Unicorn has C3 and C4) through our filters and averaging. The red target line pulls away from the blue non-target line around 300–500 ms within a minute
+    - The banner always says "RECORDED… recorded by g.tec, not our headset or wearer". It's never shown as live or as ours
+- `python -m signal2speech.evidence.dataset path/to/p300-speller` prints the numbers: a 7–11 µV target vs non-target difference in all five people, and our chooser's method classifies single flashes at 0.59–0.85 balanced accuracy (chance is 0.50)
+- The dataset stays out of git. The docs say where to download it; cite g.tec and don't redistribute it
+- Verified: the window on the judging laptop with subject S4, and tests that build a small fake file in the same format and check the flashes line up to the sample. Still not a result for our wearer or our two-tile layout
+
+## 11/14/26 - 9:47 PM - Long Le - #134 Saved phrases you can edit ([PR #148](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/148))
+- The offline saved phrases now come from `data/phrases.json`, so a user or caregiver can change them without touching code. One pair per line, and each pair is what the two tiles say
+- If the file is missing or has a mistake (a phrase too long, the same phrase twice, broken JSON), the app falls back to the built-in phrases and the transcript says exactly why
+- The file ships with the same six pairs as before, so nothing changes until someone edits it. Tests cover a good file, every kind of bad file, and no file
+
+## 11/14/26 - 9:57 PM - Long Le - #135 Colour-contrast check ([PR #154](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/154))
+- Every text colour in the app is now checked automatically against the WCAG readability standard, including the tiles, the flash, the preview, the countdown, every input label, and the help overlay
+- One colour failed: the purple "Recorded" input label was slightly too dark (4.4:1, needs 4.5). It's now a lighter purple (6.6:1). Nothing else changed visually
+- All colours now live in one file, `signal2speech/ui/palette.py`, and the test fails if someone adds a raw colour code elsewhere, so new colours get checked too
+- The ratios for every pair are listed in `docs/accessibility-ui/README.md`

@@ -39,7 +39,7 @@ We label every input honestly, in the app's bottom strip and in this table.
 | **Simulated** (g.Pype `Generator`) | ✅ The same flow driven by a real g.Pype pipeline. ✅ Evidence view with a synthetic P300. |
 | **Recorded** (g.Pype replay) | ✅ The evidence view replays a recorded session. Replay inside the app isn't built. |
 | **Live EEG** (Unicorn Hybrid Black) | 🔧 The P300 chooser, alpha switch, evidence view, and a guided live-run harness (`python -m signal2speech.eeg.live --source hybridblack`) are built and pass on simulated input. They **haven't run on a real wearer yet**. Live input inside the app stays switched off until that run proves it's safe ([#23](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/23)). |
-| **AI Answering** | ✅ Claude (`claude-opus-5-5`) suggests replies when an API key is in `.env`. Without a key, or offline, it uses clearly labelled practice replies or saved phrases. A real Claude reply hasn't been verified yet. |
+| **AI Answering** | ✅ Claude (`claude-sonnet-5-5`) suggests replies when an API key is in `.env`, grounded in the OpenOrbit data, and can offer a map action (compare counties or show the satellite view) whose spoken line comes from the dataset. Without a key, or offline, it uses clearly labelled practice replies or saved phrases. Real replies verified 11/14/26 (#106). |
 
 ## The demo question
 

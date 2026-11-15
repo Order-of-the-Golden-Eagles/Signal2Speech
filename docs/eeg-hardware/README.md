@@ -357,3 +357,23 @@ The alpha branch uses its own Generator with `AlphaBursts`, because the P300 Gen
 4. Record the result here and in #103.
 
 The app's 5-flash, 250 ms timing still needs #101's flash-timing check on the judging laptop's real display.
+
+## Recorded human P300 from g.tec's dataset (#142)
+
+Our headset was lost in transit, so the evidence view can also play **g.tec's own recording**: five healthy people using a row-column P300 speller with wet electrodes, 8 channels at 250 Hz. Its electrodes are Fz, Cz, P3, Pz, P4, PO7, PO8, Oz. That's the same channel count and rate as the Unicorn, but not the same positions or order (the Unicorn has C3 and C4 where this has P3 and P4), so the scope's CH1–CH8 follow the dataset's order. It runs through our filters, epoching, and averaging, and it's always labelled **Recorded (g.tec P300 Speller dataset)**. It isn't our wearer, our tiles, or live EEG.
+
+1. Download `p300-speller.rar` from the link under "Data Science" at [github.com/unicorn-bi/Hackathon](https://github.com/unicorn-bi/Hackathon) and unpack it **outside the repo**. On Windows: `tar -xf p300-speller.rar`. Never commit it.
+2. Show it: `python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat`. A folder works too and uses its first subject. The recording loops, and the averages sharpen for the first few minutes.
+3. Print the numbers: `python -m signal2speech.evidence.dataset path/to/p300-speller`
+
+Offline results on 2026-11-14 (1–30 Hz band-pass, 100 ms bins, shrinkage LDA, 5-fold cross-validation, single flashes, chance 0.50). This is the same method as our P300 chooser, run on g.tec's data:
+
+| Subject | Target − non-target peak | Single-flash balanced accuracy |
+| --- | --- | ---: |
+| S1 | −9.5 µV at 348 ms (Fz) | 0.75 |
+| S2 | +7.6 µV at 476 ms (P3) | 0.76 |
+| S3 | +6.9 µV at 256 ms (P3) | 0.59 |
+| S4 | −7.9 µV at 356 ms (Fz) | 0.85 |
+| S5 | −11.0 µV at 400 ms (PO7) | 0.75 |
+
+Each subject has 150 target and 1,050 non-target flashes over about 4 minutes. These show our pipeline finds a real P300 in real human EEG. They are **not** a result for our wearer or our two-tile layout. The dataset's files state no licence; it's provided by g.tec for this hackathon, so cite g.tec and don't redistribute it.

@@ -1,13 +1,17 @@
 """Reply suggestions for a typed question (#27). Pure Python, no Qt.
 
-Every reply set becomes two Choice(target, ActionIds.SPEAK_REPLY, text, text) for
-SelectionHandler.begin_choice_round. The tile shows the exact words that will be spoken.
+Every reply set becomes two Choices for SelectionHandler.begin_choice_round. A plain reply is
+Choice(target, ActionIds.SPEAK_REPLY, text, text), so the tile shows the exact words that will be
+spoken. Claude may instead suggest an app action (#106): show_satellite or compare_air_quality.
+Those choices take their label and spoken text from the OpenOrbit dataset and contract, never from
+model text, so the spoken numbers always match the map.
 Each set carries its origin ("Claude", "Stub", or "Saved phrases") so the screen can say where
 the words came from. Provider failures never raise to the UI: they fall back to saved phrases
 with a note.
 """
 from __future__ import annotations
 
+import functools
 import json
 import os
 import time
@@ -18,10 +22,14 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 from signal2speech.core import ActionIds, Choice, TargetIds
 
 ROOT = Path(__file__).resolve().parents[2]
-MODEL = "claude-opus-5-5"
+MODEL = "claude-sonnet-5-5"
 TIMEOUT_S = 8.0
 
 CLAUDE, STUB, SAVED = "Claude", "Stub", "Saved phrases"
+DEMO_ROUND = ROOT / "contracts" / "demo-round.json"
+REPLY_ACTIONS = (ActionIds.SPEAK_REPLY, ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY)
+ACTION_LABELS = {ActionIds.SHOW_SATELLITE: "Show the satellite view (shows the map)",
+                 ActionIds.COMPARE_AIR_QUALITY: "Compare counties (shows the map)"}
 
 SAVED_PHRASES: List[Tuple[str, str]] = [
     ("Yes.", "No."),
@@ -65,6 +73,81 @@ def validate(texts: Sequence[str], max_chars: int = 120) -> List[str]:
     return clean
 
 
+# ── OpenOrbit facts (#106) ───────────────────────────────────
+@dataclass(frozen=True)
+class OpenOrbitFacts:
+    block: str                     # "Verified facts" text for the system prompt
+    spoken: Dict[str, str]         # action id -> exact spoken text (dataset / contract)
+
+
+@functools.lru_cache(maxsize=None)
+def openorbit_facts() -> Optional[OpenOrbitFacts]:
+    """Build the facts block from data/openorbit/ and contracts/demo-round.json. None if either
+    is missing: Claude then gets no facts and app actions are refused."""
+    from signal2speech.openorbit.dataset import AFTER, BEFORE, load_dataset
+    try:
+        ds = load_dataset()
+        contract = json.loads(DEMO_ROUND.read_text(encoding="utf-8"))
+        show = next(c["spokenText"] for c in contract["choices"]
+                    if c["actionId"] == ActionIds.SHOW_SATELLITE)
+    except (OSError, ValueError, KeyError, StopIteration):
+        return None
+    lines = ["Verified facts (the only facts you may state):",
+             "Event: wildfire smoke reached southeast Michigan in late June 2023.",
+             f"Daily AQI by county from U.S. EPA AirData ({BEFORE} before the smoke, "
+             f"{AFTER} during it):"]
+    for c in ds.changes:
+        verb = "rose" if c.change >= 0 else "fell"
+        lines.append(f"- {c.county} County: {c.before} ({c.before_category}) on {BEFORE}, "
+                     f"{c.after} ({c.after_category}) on {AFTER}; {verb} {abs(c.change)} points.")
+    up, high = ds.largest_increase(), ds.highest_after()
+    lines.append(f"- Larger increase: {up.county} ({up.change:+d} points). "
+                 f"Higher AQI on {AFTER}: {high.county} ({high.after}).")
+    for pl in ds.places:
+        lines.append(f"- {pl.label} ({pl.short}) is in {pl.county} County.")
+    lines.append(f"- Satellite imagery: NASA GIBS / Worldview, MODIS ({ds.layer}), "
+                 f"for {BEFORE} and {AFTER}.")
+    lines.append("- Sources: NASA GIBS MODIS imagery; U.S. EPA AirData daily AQI by county.")
+    return OpenOrbitFacts("\n".join(lines), {ActionIds.SHOW_SATELLITE: show,
+                                              ActionIds.COMPARE_AIR_QUALITY: ds.spoken_comparison()})
+
+
+def build_choices(items: Sequence, max_chars: int = 120) -> Tuple[Choice, ...]:
+    """items: two plain strings, or two (text, action) pairs. An app action gets its label and
+    spoken text from OpenOrbit facts and the model text is dropped. Raises ProviderError."""
+    items = list(items)
+    if all(isinstance(i, str) for i in items):
+        return to_choices(validate(items, max_chars))
+    try:
+        pairs = [(i, ActionIds.SPEAK_REPLY) if isinstance(i, str) else (i[0], i[1])
+                 for i in items]
+    except (TypeError, IndexError):
+        raise ProviderError("provider returned malformed replies") from None
+    if len(pairs) != 2:
+        raise ProviderError("provider did not return two replies")
+    if any(a not in REPLY_ACTIONS for _, a in pairs):
+        raise ProviderError("provider suggested an unknown action")
+    out = []
+    for target, (text, action) in zip((TargetIds.TARGET_1, TargetIds.TARGET_2), pairs):
+        if action == ActionIds.SPEAK_REPLY:
+            text = " ".join(str(text).split())
+            if not text:
+                raise ProviderError("provider did not return two replies")
+            if len(text) > max_chars:
+                raise ProviderError("provider reply too long")
+            out.append(Choice(target, action, text, text))
+        else:
+            facts = openorbit_facts()
+            if facts is None:
+                raise ProviderError("OpenOrbit data missing for the suggested action")
+            out.append(Choice(target, action, ACTION_LABELS[action], facts.spoken[action]))
+    a, b = out
+    if a.action_id == b.action_id != ActionIds.SPEAK_REPLY or \
+            a.spoken_text.casefold() == b.spoken_text.casefold():
+        raise ProviderError("provider returned the same reply twice")
+    return a, b
+
+
 class SavedPhrases:
     """Offline pairs. next_page() cycles so judges can offer other saved phrases."""
 
@@ -80,6 +163,43 @@ class SavedPhrases:
         return self.current(note)
 
 
+# ── Editable saved phrases (#134) ────────────────────────────
+PHRASES_FILE = ROOT / "data" / "phrases.json"
+
+
+def load_saved_phrases(path: Path = PHRASES_FILE) -> Tuple[List[Tuple[str, str]], str]:
+    """Pairs from data/phrases.json if it's valid, else the built-in list. Never raises.
+
+    Returns (pairs, note); the note says where the phrases came from, or why the file was skipped.
+    """
+    builtin = list(SAVED_PHRASES)
+    if not path.is_file():
+        return builtin, f"built-in (no {path.name})"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return builtin, f"built-in ({path.name} unreadable: {type(e).__name__})"
+    raw = data.get("pairs") if isinstance(data, dict) else data
+    if not isinstance(raw, list) or not raw:
+        return builtin, f"built-in ({path.name} has no \"pairs\" list)"
+    pairs: List[Tuple[str, str]] = []
+    for i, pair in enumerate(raw, 1):
+        if not (isinstance(pair, list) and len(pair) == 2 and all(isinstance(t, str) for t in pair)):
+            return builtin, f"built-in ({path.name} pair {i} isn't two strings)"
+        try:
+            a, b = validate(pair)
+        except ProviderError as e:
+            return builtin, f"built-in ({path.name} pair {i}: {e.args[0].replace('provider ', '')})"
+        pairs.append((a, b))
+    return pairs, f"{path.name} ({len(pairs)} pairs)"
+
+
+def saved_phrases_from_file(path: Path = PHRASES_FILE) -> "SavedPhrases":
+    pairs, note = load_saved_phrases(path)
+    saved = SavedPhrases(pairs)
+    saved.source = note
+    return saved
+
 # ── Providers ────────────────────────────────────────────────
 SYSTEM_PROMPT = (
     "You write reply options for a person who can't speak or type. They answer a "
@@ -92,10 +212,31 @@ SYSTEM_PROMPT = (
     "the person knows, offer natural options such as a short answer and a request for a "
     "moment to think."
 )
+FACT_RULES = (
+    "Rules for facts: state facts only from the verified facts below. Never invent numbers, "
+    "dates, places, or comparisons. If a question needs facts that are not listed, offer "
+    "replies such as a short, honest \"I don't know\" and a request for a moment.\n\n"
+    "App actions: each reply has an action. Use \"speak_reply\" for ordinary replies; the app "
+    "speaks your words. Use \"compare_air_quality\" when a reply should answer with the county "
+    "AQI comparison, or \"show_satellite\" when it should show the satellite view of the "
+    "smoke. For those two the app shows the map and speaks its own verified line, so keep "
+    "that reply text to a short summary. The two replies must differ."
+)
+
+
+def system_prompt(facts: Optional[OpenOrbitFacts]) -> str:
+    """Byte-stable for a given dataset (no timestamps), so every call sends the same prompt."""
+    if facts is None:
+        return (SYSTEM_PROMPT + "\n\nNo verified facts are available. Never state facts or "
+                "numbers, and use \"speak_reply\" for both replies.")
+    return SYSTEM_PROMPT + "\n\n" + FACT_RULES + "\n\n" + facts.block
+
+
 REPLY_SCHEMA = {
     "type": "object",
-    "properties": {"reply_a": {"type": "string"}, "reply_b": {"type": "string"}},
-    "required": ["reply_a", "reply_b"],
+    "properties": {"reply_a": {"type": "string"}, "action_a": {"enum": list(REPLY_ACTIONS)},
+                   "reply_b": {"type": "string"}, "action_b": {"enum": list(REPLY_ACTIONS)}},
+    "required": ["reply_a", "action_a", "reply_b", "action_b"],
     "additionalProperties": False,
 }
 
@@ -112,8 +253,10 @@ class ClaudeProvider:
         self.model = model
         self.client = client or anthropic.Anthropic(api_key=api_key, timeout=timeout,
                                                     max_retries=0)
+        self.system = system_prompt(openorbit_facts())
 
-    def replies(self, question: str, avoid: Sequence[str] = ()) -> List[str]:
+    def replies(self, question: str, avoid: Sequence[str] = ()) -> List[Tuple[str, str]]:
+        """Two (text, action) pairs. ReplySuggester maps actions to app Choices."""
         a = self._anthropic
         content = f"Question: {question}"
         if avoid:
@@ -124,7 +267,7 @@ class ClaudeProvider:
                 max_tokens=4000,
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
-                system=SYSTEM_PROMPT,
+                system=self.system,
                 output_config={"effort": "low",
                                "format": {"type": "json_schema", "schema": REPLY_SCHEMA}},
                 messages=[{"role": "user", "content": content}],
@@ -146,7 +289,8 @@ class ClaudeProvider:
         text = next((b.text for b in resp.content if b.type == "text"), None)
         try:
             data = json.loads(text or "")
-            return [data["reply_a"], data["reply_b"]]
+            return [(data["reply_a"], data.get("action_a", ActionIds.SPEAK_REPLY)),
+                    (data["reply_b"], data.get("action_b", ActionIds.SPEAK_REPLY))]
         except (ValueError, KeyError, TypeError) as e:
             raise ProviderError("provider returned malformed replies") from e
 
@@ -223,9 +367,9 @@ class ReplySuggester:
         if self.provider is None:
             return self.saved.current("no provider")
         try:
-            texts = validate(self.provider.replies(question.strip(), avoid))
+            choices = build_choices(self.provider.replies(question.strip(), avoid))
         except ProviderError as e:
             return self.saved.current(str(e))
         except Exception as e:  # a provider bug must not take the demo down
             return self.saved.current(f"provider failed ({type(e).__name__})")
-        return ReplySet(to_choices(texts), self.provider.name)
+        return ReplySet(choices, self.provider.name)
