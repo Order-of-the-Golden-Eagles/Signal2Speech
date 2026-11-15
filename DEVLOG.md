@@ -533,6 +533,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Checked on our simulated 16-pin stream, on the judging laptop: with the real voice, at 244 samples per second, with slow uneven reactions, with almost no eyes-closed response (stops with a clear reason), and with the board dropping out (stops within 3 seconds). Measured there: about 19 seconds for a full pick-and-confirm from four choices
 - Not yet run on a real board or a real person
 
+## 11/15/26 - 6:30 AM - MagicJester2764 - #178 The question and the step you're on, at a glance ([PR #217](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/217))
+- A judge who walks up mid-demo now sees the partner's question in large type above the tiles, and a header with the project name and a 1-2-3-4 step bar: Choose, Preview, Confirm, Spoken
+- The steps follow the app's own events (a question opens, a preview shows, the confirm ring fills, the line is spoken), so they can't drift from what's really happening
+- In AI Answering the typed question shows instead of the demo question
+- Still fits the judging laptop's 1280 × 720 screen in every state. Checked offscreen with keyboard and simulated input; the text-size 1.6 check that fails on this Linux machine on main still fails here and passes in CI
+
 ## 11/15/26 - 11:59 PM - Long Le - #174 One visual design and redesigned tiles ([PR #185](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/185))
 - The app now has one visual design: `signal2speech/ui/theme.py` sets the colours, text sizes, spacing, and corners, and every screen we built uses it
 - The two choice tiles are redesigned: an icon, a clear title, a one-line "what happens" line, and the key as a small badge in the corner instead of "[1]" in the title. They have distinct idle, flashing, selected (green check after a confirm), and waiting states
@@ -639,11 +645,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
 
-## 11/15/26 - 6:30 AM - MagicJester2764 - #178 The question and the step you're on, at a glance ([PR #217](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/217))
-- A judge who walks up mid-demo now sees the partner's question in large type above the tiles, and a header with the project name and a 1-2-3-4 step bar: Choose, Preview, Confirm, Spoken
-- The steps follow the app's own events (a question opens, a preview shows, the confirm ring fills, the line is spoken), so they can't drift from what's really happening
-- In AI Answering the typed question shows instead of the demo question
-- Still fits the judging laptop's 1280 × 720 screen in every state. Checked offscreen with keyboard and simulated input; the text-size 1.6 check that fails on this Linux machine on main still fails here and passes in CI
 ## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
 - With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
     - Each tile flash is answered with one real recorded brain response. The same g.Pype pipeline and classifier as the live path calibrate on them and pick the tile
