@@ -76,7 +76,10 @@ def test_key_preview_then_confirm_sends_one_effect(ui):
     assert len(sink.actions) == 1
     # #174: the confirmed tile stays in its selected state; the other one waits.
     assert (w.tiles[T1].label, w.tiles[T1].state) == ("Confirm", "selected")
-    assert w.tiles[T2].state == "waiting" and not w.preview.isVisibleTo(w)
+    assert w.tiles[T2].state == "waiting"
+    # #175: a brief "Spoken" state keeps the confirmed words on screen until the next round.
+    assert w.preview.isVisibleTo(w) and w.preview_header.text() == "✓ Shown and spoken"
+    assert w.ring.model.completed
     assert "RejectedNoOpenRound" in w.outcome_label.text()
 
 
@@ -139,7 +142,10 @@ def test_flash_calls_on_flash_after_tile_lights(app):
                        rng=random.Random(1), on_sequence_started=lambda: done.append("start"),
                        on_sequence_finished=lambda: done.append("end"))
     s.start([T1, T2])
-    pump(app, 400)
+    end = time.monotonic() + 3.0          # wait for the sequence to finish, not a fixed time
+    while time.monotonic() < end and done != ["start", "end"]:
+        app.processEvents()
+        time.sleep(0.002)
     flashes = [t for kind, t in events if kind == "flash"]
     assert sorted(flashes) == [T1, T1, T1, T2, T2, T2]
     assert all(a != b for a, b in zip(flashes, flashes[1:]))   # no target twice in a row

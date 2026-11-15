@@ -96,6 +96,28 @@ Every text colour lives in `signal2speech/ui/theme.py` (`palette.py` is a back-c
 
 More after-shots: [flashing](media/174-after-2-flash.jpg), [selected](media/174-after-6-selected.jpg), [waiting](media/174-after-0-idle.jpg).
 
+## The preview screen and the confirm ring (#175)
+
+The preview is the consent screen. It shows:
+- **What will happen:** "This will be said aloud:" or "This will show the map and say:"
+- **The exact words**, as a large quotation
+- **The confirm ring**, beside the words
+- **The countdown** to automatic cancel, and the **Cancel** tile ("Nothing is said")
+
+**The ring** (`signal2speech/ui/confirm_ring.py`) fills toward a confirm, and **nothing is spoken or shown before it's full**:
+
+| Input | What fills the ring |
+| --- | --- |
+| Keyboard | **Holding 1 for 2 s.** Releasing early empties it. A tap no longer confirms (a tap still picks in a Choose round). |
+| Simulated (scripted) | A simulated eye closure: the ring fills over the confirm delay, then confirms |
+| Simulated or live alpha switch | The alpha switch's own progress: how far the latest band power is through its dwell, read through a Qt signal. The ring follows it and empties if the eyes open early. The alpha switch still makes the decision, so there's no double confirm. |
+
+After a confirm, a **"✓ Spoken"** (or "✓ Shown and spoken") state keeps the words and a green check on screen until the next question. Typing a 1 in a text field (the AI question box) is never treated as key 1.
+
+| Ready | Holding 1 | Spoken |
+| --- | --- | --- |
+| ![preview](media/175-preview.jpg) | ![holding](media/175-holding.jpg) | ![spoken](media/175-spoken.jpg) |
+
 ## Readable conversation (#176)
 
 The panel under the map is now a conversation that a judge can read, not the raw log (`signal2speech/ui/conversation.py`). Each entry has a time, a label, and the input that caused it (Keyboard, Simulated, Recorded, or Live EEG):

@@ -183,6 +183,11 @@ class InjectedSimulatedInput(QObject):
         self.classes = EegClassMap.default()
         self.script = list(script)
         self.log = log
+        self.window = window
+        self.confirm_delay_s = confirm_delay_ms / 1000
+        # #175: a scripted confirm is a simulated eye closure: it fills the same ring as a
+        # held key, and only a full ring confirms.
+        window.ring.handlers["simulated"] = self._decide
         self._timer = QTimer(self, singleShot=True, interval=confirm_delay_ms)
         self._timer.timeout.connect(self._decide)
         window.flasher.on_sequence_started = self.adapter.arm_capture
@@ -194,7 +199,10 @@ class InjectedSimulatedInput(QObject):
         self._timer.stop()
         if rnd.kind is RoundKind.CONFIRM:
             self.adapter.arm_capture()
-            self._timer.start()
+            if self.script and self.script[0] == 1:
+                self.window.ring.start_hold("simulated", self.confirm_delay_s)
+            else:
+                self._timer.start()
 
     def _decide(self) -> None:
         if not self.script:
@@ -219,6 +227,11 @@ def make_simulated_input(handler: SelectionHandler, window: SelectionWindow, scr
     decoder = SimulatedDecoder(handler, script, flasher=window.flasher,
                                confirm_s=confirm_delay_ms / 1000, parent=window)
     decoder.start()
+    # #175: a confirm pick waits for the preview's ring, like a held key or an eye closure.
+    def gate(release):
+        window.ring.handlers["simulated"] = release
+        window.ring.start_hold("simulated", confirm_delay_ms / 1000)
+    decoder.confirm_gate = gate
     return decoder, "g.Pype Generator stream"
 
 
@@ -294,6 +307,10 @@ class App:
                 script=sim_script or [2, 1], arm_live_confirm=arm_live_confirm,
                 **(live_options or {}))
             sim_label = self.sim.connection_label()
+            alpha = getattr(self.sim, "alpha", None)
+            if alpha is not None and hasattr(alpha, "progress"):
+                # #175: the ring follows the alpha switch (queued: emitted on a g.Pype thread).
+                alpha.progress.connect(self.window.set_eye_progress, Qt.ConnectionType.QueuedConnection)
         elif input_source == InputSources.SIMULATED:
             self.sim, sim_label = make_simulated_input(h, self.window, sim_script or [2, 1],
                                                        self.log, confirm_delay_ms)
@@ -348,7 +365,7 @@ class App:
                 s2.setAutoRepeat(False)
                 s2.activated.connect(lambda c=cls: self.sim.set_next(c))
         # Operator keys (#94). Neither touches the handler.
-        rows = [("1 / 2", "Pick a tile. At the preview, 1 confirms and 2 cancels."),
+        rows = [("1 / 2", "Pick a tile. At the preview, hold 1 for 2 s to confirm; 2 cancels."),
                 ("Esc", "Cancel and clear the screen"),
                 ("D", "Pretend the headset disconnected"),
                 ("F11", "Fullscreen on or off"),

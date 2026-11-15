@@ -64,7 +64,7 @@ ACTION_INFO = {
     ActionIds.SHOW_SATELLITE: ("satellite", "Shows the June 28 satellite image"),
     ActionIds.COMPARE_AIR_QUALITY: ("chart", "Compares county AQI, June 26 vs. 28"),
     ActionIds.SPEAK_REPLY: ("speech", "Says these exact words"),
-    ActionIds.CONFIRM: ("check", "Say it now"),
+    ActionIds.CONFIRM: ("check", "Hold 1, or close your eyes"),
     ActionIds.CANCEL: ("cross", "Nothing is said"),
 }
 
@@ -78,6 +78,7 @@ QLabel#prompt {{ font-size: {HEADING}px; font-weight: 600; color: {MUTED}; }}
 QLabel#preview {{ font-size: {PREVIEW}px; font-weight: 700; color: {ACCENT}; padding: {M}px;
                   background: {SURFACE}; border-left: 6px solid {ACCENT}; border-radius: {RADIUS_M}px; }}
 QLabel#hint {{ font-size: {BODY}px; color: {MUTED}; }}
+QLabel#previewHeader {{ font-size: {BODY}px; font-weight: 600; color: {MUTED}; }}
 QLabel#countdown {{ font-size: {BODY}px; color: {QUIET}; }}
 QFrame#strip {{ background: {STRIP_BG}; border-top: 2px solid {STRIP_BORDER}; }}
 QLabel.strip {{ font-size: {CAPTION + 2}px; font-family: {MONO}; color: {STRIP_TEXT}; }}
@@ -89,6 +90,10 @@ TEXT_PAIRS = [
     ("label text", TEXT, BG, BODY, False),
     ("prompt", MUTED, BG, HEADING, False),
     ("hint", MUTED, BG, BODY, False),
+    ("preview header", MUTED, BG, BODY, True),
+    ("ring label", MUTED, BG, CAPTION, False),
+    ("ring done", SUCCESS, BG, TITLE, True),
+    ("ring seconds", TEXT, BG, BODY, True),
     ("preview", ACCENT, SURFACE, TILE_TITLE_MIN, True),
     ("countdown", QUIET, BG, BODY, False),
     ("tile title", TILE_TEXT, TILE_BG, TILE_TITLE_MIN, True),
