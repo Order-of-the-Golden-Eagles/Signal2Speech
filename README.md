@@ -157,6 +157,7 @@ The same code reads a live g.tec Unicorn Hybrid Black (`--source hybridblack`), 
 
 ## For developers
 
+- **[Team briefing](docs/TEAM-BRIEFING.md): what we built, what is real, and answers to expect from judges**
 - [Engineering docs](docs/README.md), split by area, with the [shared memory](docs/MEMORY.md)
 - [DEVLOG](DEVLOG.md): plain-language notes on every finished issue
 - Tests: `pip install -e ".[dev]"`, then `pytest`. The repo's git hooks: `git config core.hooksPath .githooks`
