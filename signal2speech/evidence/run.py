@@ -19,6 +19,13 @@ def run(args: argparse.Namespace) -> int:
         kind = recording.configure_replay(run_dir, args.speed)
         label = InputLabel.RECORDED
         detail = f"Replaying {run_dir.name} (recorded from {kind.value})"
+    elif kind_arg == "dataset":
+        from . import dataset as gtec
+        session_data = gtec.load(args.source[1])
+        kind, label = SourceKind.GENERATOR, InputLabel.RECORDED
+        detail = (f"{gtec.LABEL_DETAIL}, subject {session_data.name}: {session_data.targets} "
+                  f"target and {session_data.nontargets} non-target flashes, "
+                  f"{session_data.seconds:.0f} s, looping")
     else:
         kind = SourceKind(kind_arg)
         label = None
@@ -47,12 +54,14 @@ def run(args: argparse.Namespace) -> int:
 
         def header(banner):
             return p300_mode.make_header(banner, box)
+    elif kind_arg == "dataset":
+        graph = build_evidence_graph(kind, label=label, oscar=False, dataset=session_data)
     else:
         graph = build_evidence_graph(kind, label=label, oscar=oscar)
     graph.detail = detail
 
     flasher = None
-    if kind_arg != "replay" and not args.no_flasher and ev is None:
+    if kind_arg not in ("replay", "dataset") and not args.no_flasher and ev is None:
         flasher = Flasher(graph.marker)
 
     from .app import run_window

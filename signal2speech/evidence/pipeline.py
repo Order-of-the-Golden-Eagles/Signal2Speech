@@ -138,7 +138,8 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
                          nontarget_code: int = NONTARGET_CODE,
                          time_pre: float = TIME_PRE,
                          time_post: float = TIME_POST,
-                         average_oscar: bool = False) -> EvidenceGraph:
+                         average_oscar: bool = False,
+                         dataset=None) -> EvidenceGraph:
     """Build the evidence pipeline without starting it or opening a window.
 
     Args:
@@ -160,6 +161,9 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
             trigger on.
         time_pre, time_post: Epoch window around each flash, in seconds.
         average_oscar: Cut epochs from the OSCAR branch when there is one.
+        dataset: A ``dataset.Session`` (g.tec's recorded P300 data, #142). The
+            Generator then only clocks the pipeline: the recorded EEG and its
+            flash codes replace its samples. Labelled Recorded.
 
     Returns:
         The graph. Call ``graph.pipeline.start()`` to run it.
@@ -168,12 +172,20 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
     if label is None:
         label = InputLabel.SIMULATED if kind is SourceKind.GENERATOR \
             else InputLabel.LIVE
+    if dataset is not None:
+        kind = SourceKind.GENERATOR          # the clock; its samples are replaced
+        label = InputLabel.RECORDED
+        synthetic_p300, synthetic_node = False, None
     if synthetic_p300 is None:
         synthetic_p300 = kind is SourceKind.GENERATOR
 
     oscar_branch = None
     in_source_oscar = False
-    if kind is SourceKind.GENERATOR:
+    if dataset is not None:
+        from .dataset import LABEL_DETAIL
+        oscar_note = (f"{LABEL_DETAIL}, subject {dataset.name}: recorded by g.tec, "
+                      "not our headset or wearer. OSCAR not applied")
+    elif kind is SourceKind.GENERATOR:
         oscar_note = "OSCAR unavailable: Generator input, no headset"
     elif not oscar:
         oscar_note = "OSCAR off"
@@ -201,6 +213,12 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
         p.connect(marker, mixed["in2"])
         raw = SyntheticP300(name="synthetic_p300")
         p.connect(mixed, raw)
+    elif dataset is not None:
+        from .dataset import make_player_nodes
+        raw, recorded_flashes = make_player_nodes(dataset)
+        p.connect(source, raw)
+        p.connect(source, recorded_flashes)
+        marker = recorded_flashes            # scopes and epochs use the recorded flashes
     else:
         raw = source
 

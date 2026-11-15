@@ -44,7 +44,7 @@ def test_clean_quit_does_not_restart(tmp_path):
     launcher, started, sleeps, _, log = make([0], tmp_path=tmp_path)
     assert launcher.run() == 0
     assert len(started) == 1 and sleeps == []
-    assert "closed normally" in log.read_text()
+    assert "closed normally" in log.read_text(encoding="utf-8")
 
 
 def test_crash_restarts_within_two_seconds_until_clean_quit(tmp_path):
@@ -52,7 +52,7 @@ def test_crash_restarts_within_two_seconds_until_clean_quit(tmp_path):
     assert launcher.run() == 0
     assert len(started) == 3 and launcher.exits == [1, -11, 0]
     assert sleeps == [1.0, 2.0] and all(s <= 2.0 for s in sleeps)
-    text = log.read_text()
+    text = log.read_text(encoding="utf-8")
     assert "code 1" in text and "code -11" in text and "Restart 2/5" in text
 
 
@@ -60,7 +60,7 @@ def test_gives_up_after_the_limit(tmp_path):
     launcher, started, sleeps, _, log = make([1] * 10, max_restarts=3, tmp_path=tmp_path)
     assert launcher.run() == 1
     assert len(started) == 4 and sleeps == [1.0, 2.0, 2.0]       # 1 start + 3 restarts
-    assert "Gave up after 3 restarts" in log.read_text()
+    assert "Gave up after 3 restarts" in log.read_text(encoding="utf-8")
 
 
 def test_ctrl_c_stops_the_app_without_restarting():

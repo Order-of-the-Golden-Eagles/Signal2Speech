@@ -13,6 +13,7 @@ SLOW = (
     "tests/test_evidence.py::test_generator_average_separates",  # evidence averaging (#48)
     "tests/test_alpha_confirm.py::test_generator_alpha_burst",   # alpha switch on g.Pype (#47)
     "tests/test_p300.py::test_realtime_generator_pipeline",      # P300 real-time path (#46)
+    "tests/test_evidence_dataset.py::test_realtime_recording",   # g.tec recording playback (#142)
     "tests/test_lsl_source.py::test_self_test_stream",            # LSL stream into the alpha switch (#150)
 )
 
