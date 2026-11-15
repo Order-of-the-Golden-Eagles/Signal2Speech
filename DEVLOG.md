@@ -602,7 +602,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Lines with numbers in them are spoken 25 % slower, so the figures are easy to catch
 - Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux
 
-## 11/15/26 - 2:57 AM - Vasanth Anbukumar - #150 The board session speaks with the natural voice, and repeats itself less (PR pending)
+## 11/15/26 - 2:57 AM - Vasanth Anbukumar - #150 The board session speaks with the natural voice, and repeats itself less ([PR #209](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/209))
 - The voice-guided board session (`python -m signal2speech.eeg.board_session`) now gives its instructions in the same natural voice as the app, when that voice is installed
     - `--standard-voice` goes back to the operating system's voice
     - A new line takes a second or two to make the first time and is kept afterwards, so do one dry run before the real session
