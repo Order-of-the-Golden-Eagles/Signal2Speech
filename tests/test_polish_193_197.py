@@ -114,6 +114,10 @@ def test_every_text_size_fits_1280x720_in_choose_preview_and_reveal(qapp, scale)
     app, _ = make(view=View(), reveal_ms=60000)
     app.apply_text_scale()
     app.root.show()
+    # Measure at the size being claimed. The window opens no larger than the screen it is on
+    # (#204), and CI's test screen is 800 x 800: a narrower window wraps the preview onto more
+    # lines, which is taller than it would be on a real 1280 x 720 screen.
+    app.root.resize(1280, 720)
     app.ask()
     sizes = [app.root.minimumSizeHint()]
     app.window.press_target(T2)

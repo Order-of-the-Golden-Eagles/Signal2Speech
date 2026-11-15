@@ -636,4 +636,5 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - When choosing between the two tiles, key 2 still picks at once. Esc is still an instant cancel for the operator
 - It works the same with a board connected: the eye closure confirms, and cancelling is a hold of key 2, Esc, or the timeout
 - The idle demo (#193) now stays off whenever a board is used, so it can't start over a wearer's 90-second eye check
+- The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch

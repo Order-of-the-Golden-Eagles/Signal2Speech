@@ -200,6 +200,7 @@ def test_window_fits_1280x720_in_every_state(qapp, source):
     app = App(source, view=WidgetView(), speaker=FakeSpeaker(), echo=False,
               reveal_ms=60000, confirm_delay_ms=600000)
     app.root.show()
+    app.root.resize(1280, 720)        # measure at the size claimed, not at the test screen's
     app.ask()
     sizes = [app.root.minimumSizeHint()]
     app.window.press_target(T2)
