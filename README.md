@@ -26,6 +26,7 @@ The same tools without the launcher (`python -m signal2speech --help` lists them
 | --- | --- |
 | The demo with keyboard input | `python -m signal2speech.app --input keyboard` |
 | Simulated brain signals through a real g.Pype pipeline | `python -m signal2speech.app --input simulated --sim 2,1` |
+| Recorded human EEG from g.tec's dataset chooses the tile (needs the dataset, see [For reviewers](#for-reviewers-reproduce-our-numbers-on-gtec-data)) | `python -m signal2speech.app --input recorded --recording path/to/S4.mat` |
 | Keys choose, a PiEEG board's eye closure confirms (no board: `--pieeg-self-test`) | `python -m signal2speech.app --input pieeg --pieeg live` |
 | AI reply suggestions for a typed question | `python -m signal2speech.ai` |
 | The g.Pype evidence view (scopes, OSCAR, averaged P300) | `python -m signal2speech.evidence --source generator` |
@@ -134,9 +135,12 @@ No hardware is needed. With g.tec's P300 Speller dataset (`S1.mat`–`S5.mat`, f
 ```
 python -m signal2speech.evidence.dataset path/to/p300-speller            # the numbers
 python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat   # the live view
+python -m signal2speech.app --input recorded --recording path/to/p300-speller/S4.mat   # it drives the app
 ```
 
 The first command prints, per subject, the target minus non-target peak and our classifier's cross-validated single-flash accuracy (1–30 Hz band-pass, 100 ms bins, shrinkage LDA, 5 folds). On the published files we get a 7–11 µV difference in all five subjects and 0.59–0.85 balanced accuracy, where chance is 0.50 ([full table](docs/eeg-hardware/README.md#recorded-human-p300-from-gtecs-dataset-142)). Any file in the same format (`fs`, `y` as samples × channels, `trig` with +1 for target and −1 for non-target) works. The second command plays the recording through the same g.Pype pipeline the app uses, labelled Recorded.
+
+The third command runs the whole app on that data. Every time one of our two tiles flashes, one real single-flash response from the recording is played into the pipeline: a response to an attended stimulus when the flashed tile is the scripted "attended" one, a response to an unattended stimulus otherwise. The same g.Pype pipeline and classifier as the live path then calibrate on those responses and pick the tile. The EEG and the classification are real. Which tile counts as attended is scripted, because the recorded person was looking at g.tec's speller and not at our tiles, so the app labels it `Recorded (g.tec dataset, re-mapped to our tiles)`. The confirm is a simulated eye closure and is labelled Simulated.
 
 The same code reads a live g.tec Unicorn Hybrid Black (`--source hybridblack`), and it picks the right channels for each device by itself ([devices and channels](docs/eeg-hardware/README.md#devices-and-channels-150)).
 

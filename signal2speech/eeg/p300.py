@@ -306,6 +306,114 @@ class SyntheticP300(gp.IONode):
         return {PORT_OUT: out}
 
 
+#: Flash spacing when recorded responses answer the flashes. At the usual 0.25 s, three or four
+#: recorded responses overlap and their background EEG adds up. Measured on g.tec's dataset: the
+#: right tile was picked 95 % of the time at 0.25 s and 100 % at 0.5 s (subject S4).
+RECORDED_SOA_S = 0.5
+
+
+class RecordedResponses:
+    """Real single-flash brain responses cut from a recording, handed out one per flash (#104).
+
+    ``target`` are responses to the stimulus the recorded person was attending, ``nontarget`` to
+    the others. Both are (trials, samples, channels) in microvolts, starting at the flash. Each is
+    used once, in a shuffled order; ``reused`` counts how many had to be played a second time.
+    """
+
+    def __init__(self, target: np.ndarray, nontarget: np.ndarray, name: str = "recording",
+                 seed: int = 0):
+        target, nontarget = np.asarray(target, float), np.asarray(nontarget, float)
+        if target.ndim != 3 or nontarget.ndim != 3 or not len(target) or not len(nontarget):
+            raise ValueError("need (trials, samples, channels) target and non-target responses")
+        if target.shape[2] != EEG_CHANNELS or nontarget.shape[2] != EEG_CHANNELS:
+            raise ValueError(f"responses need {EEG_CHANNELS} channels")
+        self.name = name
+        self.pools = {True: target, False: nontarget}
+        self._rng = random.Random(seed)
+        self._order = {True: [], False: []}
+        self.served = {True: 0, False: 0}
+        self.reused = 0
+        self._lock = threading.Lock()
+
+    @classmethod
+    def from_gtec(cls, path, seed: int = 0) -> "RecordedResponses":
+        """From one subject file of g.tec's P300 Speller dataset (``S4.mat``), band-passed
+        1-30 Hz and baseline-corrected the way the evidence report does it."""
+        from signal2speech.evidence import dataset
+
+        session = dataset.load(path)
+        if abs(session.fs - RATE) > 0.5:
+            raise ValueError(f"{session.name}: {session.fs:g} Hz, the pipeline runs at {RATE:g} Hz")
+        ep, labels, times = dataset.epochs(session, pre_s=TIME_PRE, post_s=TIME_POST)
+        post = ep[:, times >= 0, :]
+        return cls(post[labels == 1], post[labels == 0], name=f"g.tec P300 Speller dataset, {session.name}",
+                   seed=seed)
+
+    def next(self, target: bool) -> np.ndarray:
+        """The next unused response of that kind."""
+        with self._lock:
+            if not self._order[target]:
+                if self.served[target]:
+                    self.reused += len(self.pools[target])
+                self._order[target] = list(range(len(self.pools[target])))
+                self._rng.shuffle(self._order[target])
+            self.served[target] += 1
+            return self.pools[target][self._order[target].pop()]
+
+
+class RecordedP300(SyntheticP300):
+    """Answers every flash marker with one real recorded response (#104).
+
+    The output is the recorded EEG and nothing else: the Generator feeding this node only sets
+    the clock. A marker in ``target_codes`` gets a recorded response to an attended stimulus;
+    any other marker gets a recorded response to an unattended one. Which tile counts as
+    attended is scripted, because the recorded person was looking at g.tec's speller, not at
+    our tiles. What the classifier does with the responses is real.
+    """
+
+    def __init__(self, responses: RecordedResponses, **kwargs):
+        super().__init__(**kwargs)
+        self.responses = responses
+        self._queued: List[bool] = []      # flashes seen, waiting for a data row: target or not
+        self._playing: List[list] = []     # [response, next row]
+
+    def setup(self, data, port_context_in):
+        out = super().setup(data, port_context_in)
+        self._queued, self._playing = [], []
+        return out
+
+    def _note(self, value) -> None:
+        if value is None or value == 0:
+            return
+        self._queued.append(int(value) in self.target_codes)
+
+    def step(self, data):
+        frame = data.get(PORT_IN)
+        trig = data.get(self.PORT_TRIGGER)
+        rows = frame.shape[0] if frame is not None and getattr(frame, "ndim", 0) == 2 else 0
+        tarr = None if trig is None else np.asarray(trig).reshape(-1)
+        if rows == 0:
+            if tarr is not None and tarr.size:
+                self._note(tarr[0])
+            return None
+        out = np.zeros(frame.shape, dtype=Constants.DATA_TYPE)
+        for row in range(rows):
+            if tarr is not None:
+                if tarr.size == rows:
+                    self._note(tarr[row])
+                elif row == 0 and tarr.size:
+                    self._note(tarr[0])
+            while self._queued:
+                self._playing.append([self.responses.next(self._queued.pop(0)), 0])
+            for item in reversed(self._playing):
+                response, i = item
+                out[row, :response.shape[1]] += response[i]
+                item[1] += 1
+                if item[1] >= response.shape[0]:
+                    self._playing.remove(item)
+        return {PORT_OUT: out}
+
+
 def make_sequence(flashes_per_tile: int = FLASHES_PER_TILE, rng: Optional[random.Random] = None,
                   tiles: Sequence[str] = tuple(FLASH_CODES)) -> List[str]:
     """Shuffled flash order: each tile ``flashes_per_tile`` times, never 3 in a row."""
@@ -435,7 +543,8 @@ class P300Nodes:
 
 def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
                    enable_oscar: bool = True, synthetic_amplitude: float = 5.0,
-                   calibration: bool = True) -> P300Nodes:
+                   calibration: bool = True,
+                   recorded: Optional["RecordedResponses"] = None) -> P300Nodes:
     """Build (don't start) the realtime P300 pipeline.
 
     ``source`` is ``generator`` (simulated EEG with a synthetic P300) or ``hybridblack``
@@ -454,11 +563,21 @@ def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
         p.connect(src, synth)
         p.connect(marker, synth[SyntheticP300.PORT_TRIGGER])
         upstream = synth
+    elif source == "recorded":
+        if recorded is None:
+            raise ValueError("source 'recorded' needs RecordedResponses")
+        # The Generator only sets the clock: RecordedP300 replaces its output with recorded EEG.
+        src = gp.Generator(sampling_rate=RATE, channel_count=EEG_CHANNELS, signal_frequency=10,
+                           signal_amplitude=0, noise_amplitude=1, name="p300_source")
+        synth = RecordedP300(recorded, name="p300_recorded")
+        p.connect(src, synth)
+        p.connect(marker, synth[SyntheticP300.PORT_TRIGGER])
+        upstream = synth
     elif source == "hybridblack":
         src = gp.HybridBlack(enable_oscar=enable_oscar, name="p300_source")
         upstream = src
     else:
-        raise ValueError(f"Unknown source {source!r}: use generator or hybridblack")
+        raise ValueError(f"Unknown source {source!r}: use generator, recorded or hybridblack")
     bandpass = gp.Bandpass(f_lo=1, f_hi=30, name="p300_bandpass")
     p.connect(upstream, bandpass)
 

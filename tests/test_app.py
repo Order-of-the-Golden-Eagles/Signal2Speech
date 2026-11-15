@@ -127,11 +127,16 @@ def test_speak_reply_speaks_without_map():
     assert view.calls == [] and speaker.said == ["Yes, please."]
 
 
-@pytest.mark.parametrize("source", [InputSources.RECORDED])   # live is wired in by #103
-def test_unbuilt_inputs_are_refused(qapp, source):
-    with pytest.raises(ValueError, match="blocked"):
-        App(source, view=FakeView(), speaker=FakeSpeaker(), echo=False)
-    assert main(["--input", "recorded"]) == 2
+def test_recorded_input_needs_a_recording_and_says_where_to_get_one(qapp, tmp_path, capsys, monkeypatch):
+    """#104: recorded input is wired in, but the g.tec dataset is never in the repo."""
+    with pytest.raises(ValueError, match="needs a recording"):
+        App(InputSources.RECORDED, view=FakeView(), speaker=FakeSpeaker(), echo=False)
+    with pytest.raises(ValueError, match="Unknown input"):
+        App("telepathy", view=FakeView(), speaker=FakeSpeaker(), echo=False)
+    monkeypatch.delenv("SIGNAL2SPEECH_GTEC", raising=False)
+    assert main(["--input", "recorded", "--recording", str(tmp_path / "missing.mat")]) == 2
+    assert "unicorn-bi/Hackathon" in capsys.readouterr().err
+    assert main(["--input", "keyboard", "--recording", str(tmp_path / "x.mat")]) == 2
 
 
 def test_pending_view_is_labelled(qapp):
@@ -200,6 +205,7 @@ def test_window_fits_1280x720_in_every_state(qapp, source):
     app = App(source, view=WidgetView(), speaker=FakeSpeaker(), echo=False,
               reveal_ms=60000, confirm_delay_ms=600000)
     app.root.show()
+    app.root.resize(1280, 720)        # measure at the size claimed, not at the test screen's
     app.ask()
     sizes = [app.root.minimumSizeHint()]
     app.window.press_target(T2)
@@ -414,5 +420,35 @@ def test_long_status_text_wraps_instead_of_widening_the_window(qapp):
                               "stream): eye check not run yet", InputSources.KEYBOARD)
     app.window.prompt.setText("Eye-closure confirm ON: Simulated (self-test LSL stream) passed the check")
     assert app.root.minimumSizeHint().width() <= before
+    app.close()
+    app.root.close()
+
+
+def test_cancel_in_a_confirm_round_needs_a_hold_and_a_tap_does_nothing(qapp):
+    """Key 2 picks at once in a Choose round. In a Confirm round it must be held, like key 1."""
+    app = App(InputSources.KEYBOARD, view=WidgetView(), speaker=FakeSpeaker(), echo=False,
+              confirm_delay_ms=600000)
+    app.root.show()
+    from signal2speech.core import RoundKind
+    app.ask()
+    w = app.window
+    w.key_two(True); w.key_two(False)                          # Choose round: a tap picks tile 2
+    assert app.handler.current.kind is RoundKind.CONFIRM
+    confirm_round = app.handler.current.id
+
+    w.key_two(True); w.key_two(False)                          # Confirm round: a tap is not enough
+    assert app.handler.current is not None and app.handler.current.id == confirm_round
+    assert w.ring.model.progress == 0.0
+
+    w.key_two(True)
+    w.key_one(True); w.key_one(False)                          # the other key can't steal or end the hold
+    assert w.ring.model.holding and w.ring.model.source == "cancel"
+    w.ring.model._hold_start -= 10                             # the hold has lasted long enough
+    w.ring.model.tick()
+    assert app.handler.current is None or app.handler.current.id != confirm_round   # cancelled
+    assert not app.view.calls and not app.speaker.said         # nothing was shown or spoken
+    w.key_two(False)                                           # letting go afterwards is harmless
+    assert w._held_key is None
+    assert "hold 2" in w.confirm_hint()
     app.close()
     app.root.close()

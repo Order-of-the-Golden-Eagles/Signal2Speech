@@ -27,7 +27,7 @@ Add `--mute` for silent runs. `--confirm-timeout SECONDS` (default 15; 0 = never
   - **Simulated input (#21):** `--input simulated` uses `signal2speech.eeg.simulated.SimulatedDecoder`, a real g.Pype `Generator` stream, whenever it imports. Ctrl+1 and Ctrl+2 pick for a waiting sequence, and the stream closes on exit. If it can't import, the app injects scripted decisions through the same `arm_capture()` and `select_captured()` path. The connection label says why it fell back: "#21 SimulatedDecoder not merged" or "g.Pype not installed". Events are labelled `simulated` either way.
   - **Live input (#103):** `--input live` opens one Unicorn pipeline, calibrates on the app's own tiles, then runs the demo. The P300 chooses and the eye-closure switch confirms. See [EEG Hardware](../eeg-hardware/README.md#live-eeg-in-the-app-103).
   - **PiEEG eye-closure confirm (#172):** `--input pieeg` keeps the keyboard choosing and takes the confirm from a PiEEG board's eye closure. See [below](#pieeg-eye-closure-confirm-in-the-app-172).
-  - **Recorded input:** `--input recorded` still exits with a "blocked" message (#104). Record and replay work in the evidence view (#48).
+  - **Recorded input (#104):** `--input recorded --recording path/to/S4.mat` runs the app on recorded human EEG from g.tec's P300 Speller dataset. See [below](#recorded-human-eeg-chooses-the-tile-104).
 
 ## PiEEG eye-closure confirm in the app (#172)
 
@@ -50,6 +50,33 @@ python -m signal2speech.app --input pieeg --pieeg recorded      # a recorded ses
 - **Choose stays on the keyboard.** The simulated P300 chooser and g.tec's recorded data aren't combined with this confirm yet.
 - **Recorded:** `--pieeg recorded` labels any replay published over LSL as `Recorded (PiEEG Octopus 16)`. Recording a board session is #170.
 - **Not verified:** a real Octopus 16 on a person. Verified on our self-test stream (simulated) only.
+
+## Recorded human EEG chooses the tile (#104)
+
+With no headset at the table, the choice can still come from real brain data: g.tec's P300 Speller dataset, recorded on a g.tec amplifier.
+
+```
+python -m signal2speech.app --input recorded --recording path/to/p300-speller/S4.mat
+```
+
+- **What happens.** Each time one of our two tiles flashes, one real single-flash response from the recording is played into the pipeline. If the flashed tile is the scripted "attended" one, it is a response to a stimulus that person was attending. Otherwise it is a response to one they were ignoring. The pipeline's output is that recorded EEG and nothing else.
+- **What is real.** The EEG, the g.Pype pipeline, the calibration and the classifier. It is the live path's code (`LiveEegInput`, `P300Chooser`); `RecordedEegInput` and `p300.RecordedP300` only swap where the samples come from. The classifier works from noisy single responses and can pick the wrong tile.
+- **What is scripted.** Which tile counts as attended (`--sim 2,1`, as in simulated mode). The recorded person was looking at g.tec's speller, not at our tiles. The strip says `Choose: Recorded (g.tec dataset, re-mapped to our tiles) · Confirm: Simulated`, and the transcript marks the preview Recorded and the confirm Simulated. Never describe this as live, and never as "the wearer chose".
+- **Each response is played once.** They are drawn in a shuffled order without repeats. The session report counts how many were played and whether any had to be reused.
+- **Flashes are slower here: one every 0.5 s** (`p300.RECORDED_SOA_S`). At the usual 0.25 s, three or four recorded responses overlap and their background EEG adds up. Measured offline on the dataset with our classifier, five flashes per tile:
+
+  | Subject | Right tile at 0.25 s | Right tile at 0.5 s |
+  | --- | --- | --- |
+  | S1 | 88 % | 95 % |
+  | S2 | 90 % | 98 % |
+  | S3 | 80 % | 90 % |
+  | S4 | 95 % | 100 % |
+  | S5 | 87 % | 98 % |
+
+  Each figure is 60 choices (20 per run, three shuffles), with calibration and test responses kept apart.
+- **Setup time.** About 70 seconds before the first question: calibration on the recorded responses, then the simulated eye-closure check. `--calibration 6` shortens it.
+- **The dataset is not in the repo.** It is for Hack the Nest projects only. `--recording`, or the `SIGNAL2SPEECH_GTEC` variable, points at one subject file. Without it the app explains where to get it.
+- **Verified:** end to end on S4 on the judging laptop (the recorded responses picked the scripted tile, the simulated eye closure confirmed, one map action and one spoken line). The automated test uses a made-up recording, because CI has no dataset. **Not verified:** a long run of many choices in the app itself; the table above is offline.
 
 ## Rehearse without a headset: g.Pype simulated input (#21)
 

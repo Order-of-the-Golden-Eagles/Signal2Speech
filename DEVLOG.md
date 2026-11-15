@@ -578,6 +578,15 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The tones are generated in code, so there's no audio file to download or license
 - Verified with the keyboard and in headless tests with a fake sound player (11 new tests: wording for cancel, timeout, and disconnect; one cue per event; confirm cue before speech; exactly one speech). I haven't listened to the tones' volume on the judging laptop's speakers yet.
 
+## 11/15/26 - 1:48 AM - Long Le - #193 #194 #195 #196 #197 Attract mode, reply language, text size, practice round, help phrase ([PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203))
+- When the table sits idle for 60 s, a clearly labelled simulated demo now loops on its own. Any key stops it and returns to a clean first question.
+    - `--no-attract` turns it off; the loop never reaches the real session or its report counts
+- The AI demo can suggest and speak replies in another language. If no voice for that language is installed, it says so and stays in English.
+    - `python -m signal2speech.ai --reply-language es`, and `F3` switches back
+- `Ctrl+=` / `Ctrl+-` / `Ctrl+0` scale all text from 80% to 160%. Everything still fits a 1280×720 screen.
+- `P` (or `--practice`) runs a 30 s "look at tile 1 and count its flashes" warm-up that never sends anything
+- Holding `H` for 2 s says "I need help, please." from any screen, at most once every 10 s, without touching the current question. `--help-by-eyes` adds a long eye closure as a trigger, off by default.
+- Verified with the keyboard and the simulated input in 27 new headless tests (no false help triggers in 400 random key taps; attract stops with no leftover speech; practice uses no simulated picks). Not yet tried: the Spanish voice on Windows, the eye-closure help trigger on the headset, and practice feeding live calibration (needs #23).
 ## 11/15/26 - 1:53 AM - Vasanth Anbukumar - #199 The board session's spoken cues work off Windows too ([PR #202](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/202))
 - On macOS or Linux, the voice-guided board session (`python -m signal2speech.eeg.board_session`) would have spoken its first instruction and gone silent for the rest. It now speaks every cue
     - Same cause and same fix as the app's backup voice: each cue is spoken from its own short-lived helper process
@@ -627,3 +636,20 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - It goes through the same crash-safe launcher we'll use at the table, and kills the app once on purpose to prove it comes back
 - First full run (simulated input, dev machine, muted) passed: 169 confirms and 169 spoken lines with 0 doubles, 0 crashes, back within 1.1 s after the kill, selection time 3.1 s at the start and 3.2 s at the end
 - Still needed: the same hour on the judging laptop with Wi-Fi off and sound on (Part D of the judging laptop session). This was not live EEG
+## 11/15/26 - 3:58 AM - Vasanth Anbukumar - #210 Cancelling on the preview screen now needs a hold, like confirming
+- On the preview screen, key 2 must now be held for two seconds to cancel, the same as holding key 1 to confirm. A stray tap no longer throws away what the wearer just chose
+    - The ring fills while you hold and shows "Cancel". Letting go early empties it
+    - When choosing between the two tiles, key 2 still picks at once. Esc is still an instant cancel for the operator
+- It works the same with a board connected: the eye closure confirms, and cancelling is a hold of key 2, Esc, or the timeout
+- The idle demo (#193) now stays off whenever a board is used, so it can't start over a wearer's 90-second eye check
+- The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
+- Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
+
+## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
+- With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
+    - Each tile flash is answered with one real recorded brain response. The same g.Pype pipeline and classifier as the live path calibrate on them and pick the tile
+    - The dataset isn't in the repo. Without it, the app says where to get it
+- What's real and what isn't: the EEG and the classifier's pick are real. Which tile counts as "looked at" follows a script, because the recorded person was using g.tec's speller, not our app. The screen says "Recorded (g.tec dataset, re-mapped to our tiles)" and the confirm is labelled Simulated
+- Flashes are half a second apart in this mode. Faster than that, the recorded responses overlap and the classifier gets worse: measured offline, the right tile was picked 95 % of the time at the usual speed and 100 % at this one (best subject), and 90 to 100 % across all five subjects
+- Why now: the PiEEG board was tested on two people tonight and gave no usable EEG, so g.tec's data is the brain signal we can honestly show
+- Verified end to end on the judging laptop with subject S4: the recorded responses picked the scripted tile, then the map and the spoken line followed. Three new tests; the automated one uses a made-up recording because CI has no dataset. Not yet run for many choices in a row in the app

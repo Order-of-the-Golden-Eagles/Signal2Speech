@@ -54,6 +54,34 @@ CAPTION = 18              # strip, footers, small print
 TILE_TITLE_MIN = 32       # long tile and preview text shrinks no further (#95)
 MONO = "Menlo, Consolas, monospace"
 
+# ── Text size (#195) ─────────────────────────────────────────
+# Ctrl+= / Ctrl+- step SCALE through these; Ctrl+0 resets. Every text size on screen goes
+# through px(), so one factor scales the whole app. Fitted text still shrinks to its floor.
+SCALE_STEPS = (0.8, 0.9, 1.0, 1.15, 1.3, 1.45, 1.6)
+SCALE = 1.0
+
+
+def px(size: float) -> int:
+    """A type-scale size at the current text scale."""
+    return max(1, round(size * SCALE))
+
+
+def set_scale(factor: float) -> float:
+    global SCALE
+    SCALE = min(max(float(factor), SCALE_STEPS[0]), SCALE_STEPS[-1])
+    return SCALE
+
+
+def step_scale(direction: int) -> float:
+    """Move one step up (+1) or down (-1) from the current scale; 0 resets to 100%."""
+    if direction == 0:
+        return set_scale(1.0)
+    if direction > 0:
+        bigger = [s for s in SCALE_STEPS if s > SCALE + 1e-9]
+        return set_scale(bigger[0] if bigger else SCALE_STEPS[-1])
+    smaller = [s for s in SCALE_STEPS if s < SCALE - 1e-9]
+    return set_scale(smaller[-1] if smaller else SCALE_STEPS[0])
+
 # ── Spacing (px) and corner radius ───────────────────────────
 XS, S, M, L, XL = 4, 8, 16, 24, 32
 RADIUS_S, RADIUS_M, RADIUS_L = 8, 14, 20
@@ -74,14 +102,14 @@ def window_qss() -> str:
     return f"""
 QMainWindow, QWidget#root {{ background: {BG}; }}
 QLabel {{ color: {TEXT}; }}
-QLabel#prompt {{ font-size: {HEADING}px; font-weight: 600; color: {MUTED}; }}
-QLabel#preview {{ font-size: {PREVIEW}px; font-weight: 700; color: {ACCENT}; padding: {M}px;
+QLabel#prompt {{ font-size: {px(HEADING)}px; font-weight: 600; color: {MUTED}; }}
+QLabel#preview {{ font-size: {px(PREVIEW)}px; font-weight: 700; color: {ACCENT}; padding: {M}px;
                   background: {SURFACE}; border-left: 6px solid {ACCENT}; border-radius: {RADIUS_M}px; }}
-QLabel#hint {{ font-size: {BODY}px; color: {MUTED}; }}
-QLabel#previewHeader {{ font-size: {BODY}px; font-weight: 600; color: {MUTED}; }}
-QLabel#countdown {{ font-size: {BODY}px; color: {QUIET}; }}
+QLabel#hint {{ font-size: {px(BODY)}px; color: {MUTED}; }}
+QLabel#previewHeader {{ font-size: {px(BODY)}px; font-weight: 600; color: {MUTED}; }}
+QLabel#countdown {{ font-size: {px(BODY)}px; color: {QUIET}; }}
 QFrame#strip {{ background: {STRIP_BG}; border-top: 2px solid {STRIP_BORDER}; }}
-QLabel.strip {{ font-size: {CAPTION + 2}px; font-family: {MONO}; color: {STRIP_TEXT}; }}
+QLabel.strip {{ font-size: {px(CAPTION + 2)}px; font-family: {MONO}; color: {STRIP_TEXT}; }}
 """
 
 
@@ -114,6 +142,10 @@ TEXT_PAIRS = [
     ("conversation said", SUCCESS, SURFACE, BODY - 2, True),
     ("conversation nothing / time / input", QUIET, SURFACE, CAPTION - 2, False),
     ("panel title", MUTED, BG, BODY, True),
+    ("text size toast", TEXT, RAISED, HEADING, True),
+    ("help phrase banner", ON_ACCENT, ACCENT, TITLE, True),
+    ("attract banner", ON_ACCENT, INPUT_COLORS[InputSources.SIMULATED], HEADING, True),
+    ("attract caption", TEXT, BG, BODY, False),
     ("button", TILE_TEXT, RAISED, BODY, True),
     ("help text", TEXT, HELP_BG, 26, False),
     ("help keys", ACCENT, HELP_BG, 26, True),
