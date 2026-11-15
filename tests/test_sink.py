@@ -73,11 +73,23 @@ def test_offline_speaker_plays_bundled_clip_instead_of_voice(qapp, tmp_path, mon
 
     import PySide6.QtMultimedia as qm
     monkeypatch.setattr(qm, "QSoundEffect", FakeEffect)
+    # Qt's player is what every system but Windows uses; Windows plays through its own WAV player.
+    monkeypatch.setattr(OfflineSpeaker, "_play_wav_windows", lambda self, wav: False)
     sp = OfflineSpeaker(log.append, audio_dir=tmp_path, use_qt_tts=False)
     sp.say("Washtenaw's AQI rose 186 points.", "compare_air_quality")
     # QUrl.toLocalFile() uses forward slashes on Windows, so compare paths, not strings.
     assert [Path(p) for p in played] == [tmp_path / "compare_air_quality.wav"]
     assert any("speech: bundled" in l for l in log)
+
+
+def test_offline_speaker_uses_the_windows_player_when_it_is_there(qapp, tmp_path, monkeypatch):
+    """A clip goes to the Windows player first; Qt's is only the fallback (silent fresh lines, 11/15)."""
+    (tmp_path / "compare_air_quality.wav").write_bytes(b"RIFF")
+    log, played = [], []
+    monkeypatch.setattr(OfflineSpeaker, "_play_wav_windows", lambda self, wav: played.append(Path(wav)) or True)
+    sp = OfflineSpeaker(log.append, audio_dir=tmp_path, use_qt_tts=False)
+    sp.say("Washtenaw's AQI rose 186 points.", "compare_air_quality")
+    assert played == [tmp_path / "compare_air_quality.wav"] and sp._sound is None
 
 
 # ── Sink: one confirm -> one reveal + one utterance ──────────
