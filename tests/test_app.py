@@ -142,7 +142,7 @@ def test_pending_view_is_labelled(qapp):
 
 def test_main_keyboard_screenshot(qapp, tmp_path):
     out = tmp_path / "app.png"
-    assert main(["--keys", "2,1", "--mute", "--screenshot", str(out)]) == 0
+    assert main(["--keys", "2,1", "--mute", "--no-report", "--screenshot", str(out)]) == 0
     assert out.stat().st_size > 0
 
 
@@ -251,7 +251,7 @@ def test_connection_label_hides_for_keyboard_only(qapp):
 
 def test_main_fullscreen_flag(qapp, tmp_path):
     out = tmp_path / "full.png"
-    assert main(["--fullscreen", "--keys", "2,1", "--mute", "--screenshot", str(out)]) == 0
+    assert main(["--fullscreen", "--keys", "2,1", "--mute", "--no-report", "--screenshot", str(out)]) == 0
     assert out.stat().st_size > 0
 
 
@@ -298,3 +298,88 @@ def test_no_countdown_when_timeout_is_off(qapp):
     app.ask()
     app.window.press_target(T2)
     assert _countdown(app) is None
+
+
+# ── #130 timing and #131 session report ──────────────────────
+class Clock:
+    def __init__(self):
+        self.t = 100.0
+
+    def __call__(self):
+        return self.t
+
+
+class TimedView(FakeView):
+    def __init__(self, clock, map_s):
+        super().__init__()
+        self.clock, self.map_s = clock, map_s
+
+    def compare_air_quality(self):
+        self.clock.t += self.map_s
+        super().compare_air_quality()
+
+
+class StartingSpeaker(FakeSpeaker):
+    """Reports speech start after `delay_s`, like the real speaker's on_started hook."""
+
+    def __init__(self, clock, delay_s):
+        super().__init__()
+        self.clock, self.delay_s, self.on_started = clock, delay_s, None
+
+    def say(self, text, clip=None):
+        super().say(text, clip)
+        self.clock.t += self.delay_s
+        if self.on_started:
+            self.on_started()
+
+
+def test_confirm_to_map_and_speech_times_are_measured(qapp):
+    clock = Clock()
+    app = App(view=TimedView(clock, 0.004), speaker=StartingSpeaker(clock, 0.150),
+              echo=False, clock=clock)
+    app.ask()
+    app.window.press_target(T2)
+    assert app.sink.timings == []                               # preview: nothing measured
+    app.window.press_target(T1)
+    t = app.sink.timings[-1]
+    assert (t["action"], t["map_ms"], t["speech_ms"]) == (ActionIds.COMPARE_AIR_QUALITY, 4.0, 154.0)
+    assert "map 4 ms · speech 154 ms" in app.window.outcome_label.text()
+    assert sum("timing: confirm→map 4 ms" in l for l in app.log.lines) == 1
+    assert sum("timing: confirm→speech 154 ms" in l for l in app.log.lines) == 1
+
+
+def test_muted_speech_has_no_speech_time(qapp):
+    app = App(view=FakeView(), mute=True, echo=False)
+    app.ask()
+    app.window.press_target(T2)
+    app.window.press_target(T1)
+    assert app.sink.timings[-1]["speech_ms"] is None
+
+
+def test_session_report_counts_and_timings(qapp, tmp_path):
+    clock = Clock()
+    app = App(view=TimedView(clock, 0.003), speaker=StartingSpeaker(clock, 0.2), echo=False,
+              clock=clock)
+    app.ask()
+    app.window.press_target(T2)
+    app.window.press_target(T1)                                 # confirm
+    app.ask()
+    app.window.press_target(T1)
+    app.window.press_target(T2)                                 # cancel
+    app.handler.handle(SelectionEvent("keyboard", "r1", "k99", T1))   # stale -> rejected
+    path = app.write_report(tmp_path)
+    text = path.read_text()
+    assert path.name.startswith("session-") and path.suffix == ".md"
+    assert "| 2 | 1 | 1 | 1 | 1 |" in text                       # previews, confirms, cancels, cleared, rejected
+    assert "| 1 | compare_air_quality | keyboard | 3 ms | 203 ms |" in text
+    assert "**Input:** Keyboard" in text and "sk-ant" not in text
+
+
+def test_report_drops_lines_that_look_like_samples(qapp, tmp_path):
+    from signal2speech.app import _looks_like_samples
+    raw = ", ".join(f"{i * 0.1:.3f}" for i in range(30))
+    assert _looks_like_samples(raw) and not _looks_like_samples("confirm→map 3.0 ms")
+    app = App(view=FakeView(), speaker=FakeSpeaker(), echo=False)
+    app.events.append(f"21:00:00 {raw}")
+    text = app.report_text()
+    assert raw not in text and "looked like raw samples" in text
