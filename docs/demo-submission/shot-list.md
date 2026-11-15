@@ -13,11 +13,13 @@ Every shot that shows EEG carries an on-screen caption naming its source: **Live
 | 3 | 0:20–0:40 | Tiles flashing, close on the screen, with the wearer's face in picture-in-picture. | "Each flash of the tile the wearer is watching makes a P300, a small response about 300 milliseconds later. g.Pype cuts out each flash and an LDA classifier picks the tile." | Input label from the strip |
 | 4 | 0:40–0:50 | *Say this?* preview card. | "That's only a preview. Nothing is spoken yet." | — |
 | 5 | 0:50–1:02 | Wearer closes their eyes for about 2 s. The confirm lands. | "To confirm, the wearer closes their eyes. The alpha rhythm rises, which is a different brain signal from the P300." | Live EEG, Recorded, or **Keyboard confirm** if live alpha confirm in the app (#23) isn't ready |
-| 6 | 1:02–1:22 | Map switches to June 28. App speaks the line. | App audio: "Washtenaw's AQI rose 186 points. Wayne's rose 168 points." | NASA MODIS · EPA AirData (stand-in panel until #30) |
+| 6 | 1:02–1:22 | Map switches to June 28. App speaks the line. | App audio: "Washtenaw's AQI rose 186 points. Wayne's rose 168 points." | NASA MODIS · EPA AirData |
 | 7 | 1:22–1:50 | g.Pype evidence window. (a) OSCAR off/on panels during a blink, then the spectrum's 10 Hz peak rising with eyes closed (Live or Recorded). (b) Slow zoom onto the averaged target vs non-target plot. | (a) "OSCAR, g.tec's artifact removal, cleans out blinks in real time. When the wearer closes their eyes, their alpha rhythm jumps. That's the confirm signal." (b) "Averaging every flash brings out the P300 around 300 milliseconds." | Banner text for each part. (b) is **Simulated** until the #46 ↔ #48 seam lets the chooser's tiles drive the evidence markers. |
 | 8 | 1:50–2:05 | Cancel: pick a tile, then cancel at the preview. Empty output. | "Changed your mind? Cancel, and nothing is spoken." | — |
 | 9 | 2:05–2:25 | Diagram from [the architecture walkthrough](../architecture/README.md): device → g.Pype → selection contract → app. Then the CI matrix with three green OS checks. | "Every input speaks one selection contract: keyboard, simulator, P300, alpha switch, or any g.tec device through a g.Pype pipeline. It runs on Windows, macOS and Linux, and CI tests all three." | Platform, not a product |
 | 10 | 2:25–2:45 | Team of four at the table. Repo URL on screen. | "Built in one weekend by the Order of the Golden Eagles. Code, docs and the AI-use disclosure are in the repo." | Repo link · AI disclosure |
+
+**Alternate shot 8 (AI Answering, same length):** type a question in `python -m signal2speech.ai`. Two suggested replies appear (the panel says **Replies: Claude**, or **Stub** / **Saved phrases** without a key or offline). Pick one, preview it, confirm, and it's spoken once. Caption: **Keyboard**. Narration: "The same controls answer any typed question. The AI suggests, the wearer decides." Use it instead of the cancel shot if the AI demo is stronger on the day. The cancel then only appears at the table.
 
 ## Backup path: Recorded (g.Pype replay)
 
@@ -44,13 +46,4 @@ Use this if live capture fails or is too noisy to read. It's honest as long as e
 
 ## Submission fields (#34)
 
-| Field | Value | Done |
-| --- | --- | --- |
-| Public repo | https://github.com/Order-of-the-Golden-Eagles/Signal2Speech (check it's public) | ☐ |
-| Team | All four teammates added on Devpost | ☐ |
-| Tracks | Sponsor track(s) selected, including g.tec | ☐ |
-| AI disclosure | Claude (Anthropic) used for coding help and for reply suggestions in the app (the Stub provider when there's no key) | ☐ |
-| Video | Under 3:00, linked, plays without sign-in | ☐ |
-| Draft on Devpost and event app | By midnight Saturday | ☐ |
-| Final on Devpost | By Sunday noon ET | ☐ |
-| Separate g.tec submission | Nov. 30, if it applies. Track it in #13. | ☐ |
+The Devpost fields, the AI disclosure, the deadlines, and the draft and final status live in one place: [submission-checklist.md](submission-checklist.md). Update them there.
