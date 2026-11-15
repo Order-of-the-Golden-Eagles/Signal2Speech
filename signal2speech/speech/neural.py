@@ -50,9 +50,67 @@ def pace(text: str) -> float:
     return NUMBER_SLOWDOWN if re.search(r"\d", text) else 1.0
 
 
+_ONES = ("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+         "fifteen sixteen seventeen eighteen nineteen").split()
+_TENS = "twenty thirty forty fifty sixty seventy eighty ninety".split()
+_ORDINAL_ENDINGS = {"one": "first", "two": "second", "three": "third", "five": "fifth",
+                    "eight": "eighth", "nine": "ninth", "twelve": "twelfth"}
+_MONTHS = {"jan": "January", "feb": "February", "mar": "March", "apr": "April", "may": "May",
+           "jun": "June", "jul": "July", "aug": "August", "sep": "September", "sept": "September",
+           "oct": "October", "nov": "November", "dec": "December"}
+_DATE = re.compile(
+    r"\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|"
+    r"Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+"
+    r"(\d{1,2})(?:st|nd|rd|th)?(?!\d)(?:,?\s+(\d{4})(?!\d))?")
+
+
+def _two_digits(n: int) -> str:
+    if n < 20:
+        return _ONES[n]
+    return _TENS[n // 10 - 2] + ("-" + _ONES[n % 10] if n % 10 else "")
+
+
+def day_words(day: int) -> str:
+    """28 -> "twenty-eighth"."""
+    words = _two_digits(day)
+    head, _, last = words.rpartition("-")
+    if last in _ORDINAL_ENDINGS:
+        last = _ORDINAL_ENDINGS[last]
+    elif last.endswith("y"):
+        last = last[:-1] + "ieth"
+    else:
+        last += "th"
+    return f"{head}-{last}" if head else last
+
+
+def year_words(year: int) -> str:
+    """2023 -> "twenty twenty-three", 2005 -> "two thousand five", 1900 -> "nineteen hundred"."""
+    high, low = divmod(year, 100)
+    if year % 1000 < 10:
+        return _ONES[year // 1000] + " thousand" + (" " + _ONES[year % 1000] if year % 1000 else "")
+    if low == 0:
+        return _two_digits(high) + " hundred"
+    return _two_digits(high) + (" oh " + _ONES[low] if low < 10 else " " + _two_digits(low))
+
+
+def spoken_dates(text: str) -> str:
+    """"June 28, 2023" and "Jun 28" become "June twenty-eighth, twenty twenty-three" and
+    "June twenty-eighth". A number after a month that can't be a day is left alone."""
+    def swap(match: "re.Match[str]") -> str:
+        month, day, year = match.group(1), int(match.group(2)), match.group(3)
+        if not 1 <= day <= 31:
+            return match.group(0)
+        said = f"{_MONTHS[month[:4].lower() if month.lower().startswith('sept') else month[:3].lower()]} {day_words(day)}"
+        if year and 1000 <= int(year) <= 2999:
+            return f"{said}, {year_words(int(year))}"
+        return said + (match.group(0)[match.end(2) - match.start():] if year else "")
+    return _DATE.sub(swap, text)
+
+
 def spoken_form(text: str) -> str:
     """What the voice should be given so abbreviations sound right. The screen keeps the
-    original text. Known abbreviations are said in full ("AQI" becomes "air quality index").
+    original text. Dates are said as dates ("June 28, 2023" becomes "June twenty-eighth, twenty
+    twenty-three"). Known abbreviations are said in full ("AQI" becomes "air quality index").
     Unknown ones are spelled out with full stops ("PDF" becomes "P.D.F."), because a neural voice
     otherwise reads them as a word."""
     def swap(match: "re.Match[str]") -> str:
@@ -63,7 +121,7 @@ def spoken_form(text: str) -> str:
             return word
         dotted = ".".join(word) + "."
         return dotted[:-1] if text[match.end():match.end() + 1] == "." else dotted
-    return _ABBREVIATION.sub(swap, text)
+    return _ABBREVIATION.sub(swap, spoken_dates(text))
 
 
 def find_voice(voice_dir: Path = VOICE_DIR) -> Optional[Path]:
@@ -164,7 +222,7 @@ class PiperVoice:
     def request(self, text: str) -> Clip:
         """Start making ``text`` (or return the clip already made or under way)."""
         spoken = spoken_form(text)
-        scale = pace(spoken)
+        scale = pace(text)                         # dates are written out by now, but still figures
         key = hashlib.sha1(f"{self.name}\n{scale}\n{spoken}".encode("utf-8")).hexdigest()[:20]
         clip = self._clips.get(key)
         if clip is not None and clip.state() != "failed":

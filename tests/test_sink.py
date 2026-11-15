@@ -279,3 +279,19 @@ def test_lines_made_ahead_are_made_two_at_a_time_and_a_held_file_is_retried(tmp_
     monkeypatch.setattr(neural.os, "replace", held_once)
     assert clip.state() == "working"                                  # held: try again, don't fail
     assert clip.state() == "ready"
+
+
+def test_dates_are_spoken_as_dates():
+    from signal2speech.speech.neural import day_words, pace, spoken_form, year_words
+    assert spoken_form("June 28, 2023") == "June twenty-eighth, twenty twenty-three"
+    assert spoken_form("Jun 26 AQI was 32.") == "June twenty-sixth air quality index was 32."
+    assert spoken_form("On Sept. 1st 2005 and Dec 31") == "On September first, two thousand five and December thirty-first"
+    assert spoken_form("May 186 points") == "May 186 points"                 # not a day: left alone
+    assert spoken_form("It may 3 times") == "It may 3 times"                 # lower-case "may" is a verb
+    assert [day_words(d) for d in (1, 2, 3, 5, 8, 9, 12, 20, 21, 22, 23, 30, 31)] == [
+        "first", "second", "third", "fifth", "eighth", "ninth", "twelfth", "twentieth",
+        "twenty-first", "twenty-second", "twenty-third", "thirtieth", "thirty-first"]
+    assert [year_words(y) for y in (1999, 2000, 2007, 2010, 2023, 1900, 1905)] == [
+        "nineteen ninety-nine", "two thousand", "two thousand seven", "twenty ten",
+        "twenty twenty-three", "nineteen hundred", "nineteen oh five"]
+    assert pace("June 28, 2023") == 1.25                                     # still read slower

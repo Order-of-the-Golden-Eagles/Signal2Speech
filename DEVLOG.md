@@ -608,4 +608,5 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - A new line takes a second or two to make the first time and is kept afterwards, so do one dry run before the real session
 - Calibration says "eyes open" and "eyes closed" on the first round only. After that the beeps are enough, because the introduction already explains them
 - Fixed the voice briefly switching to the old one mid-session: too many lines were being made at once, so one arrived late. They're now made two at a time
-- Verified on the judging laptop with a full spoken dry run from a cold start on our simulated board: no cue fell back to the old voice, and every check passed. Three new tests. Not yet run on a real board
+- In the app and the session, dates are now read as dates: "June 28, 2023" is spoken as "June twenty-eighth, twenty twenty-three"
+- Verified on the judging laptop with a full spoken dry run from a cold start on our simulated board: no cue fell back to the old voice, and every check passed. Four new tests. Not yet run on a real board
