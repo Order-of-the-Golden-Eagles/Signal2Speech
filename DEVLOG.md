@@ -630,12 +630,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Fixed the app window growing past the screen during the eye check: a long status line forced it to 1841 wide on a 1536-wide screen. Long lines now wrap
 - Verified on the judging laptop: a full spoken dry run of the board session from a cold start with no cue falling back to the old voice, and the app in PiEEG mode on our simulated board staying 1520 wide. Seven new tests. Not yet run on a real board
 
-## 11/15/26 - 4:10 AM - MagicJester2764 - #165 Soak test for the judging hour ([PR #211](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/211))
-- Anyone can leave the demo running for an hour by itself and get a pass/fail report: no double outputs, no crashes, steady memory, same speed at the end as at the start
-    - `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` writes `logs/soak-<time>.md`
-- It goes through the same crash-safe launcher we'll use at the table, and kills the app once on purpose to prove it comes back
-- First full run (simulated input, dev machine, muted) passed: 169 confirms and 169 spoken lines with 0 doubles, 0 crashes, back within 1.1 s after the kill, selection time 3.1 s at the start and 3.2 s at the end
-- Still needed: the same hour on the judging laptop with Wi-Fi off and sound on (Part D of the judging laptop session). This was not live EEG
 ## 11/15/26 - 3:58 AM - Vasanth Anbukumar - #210 Cancelling on the preview screen now needs a hold, like confirming
 - On the preview screen, key 2 must now be held for two seconds to cancel, the same as holding key 1 to confirm. A stray tap no longer throws away what the wearer just chose
     - The ring fills while you hold and shows "Cancel". Letting go early empties it
@@ -645,6 +639,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
 
+## 11/15/26 - 4:10 AM - MagicJester2764 - #165 Soak test for the judging hour ([PR #211](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/211))
+- Anyone can leave the demo running for an hour by itself and get a pass/fail report: no double outputs, no crashes, steady memory, same speed at the end as at the start
+    - `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` writes `logs/soak-<time>.md`
+- It goes through the same crash-safe launcher we'll use at the table, and kills the app once on purpose to prove it comes back
+- First full run (simulated input, dev machine, muted) passed: 169 confirms and 169 spoken lines with 0 doubles, 0 crashes, back within 1.1 s after the kill, selection time 3.1 s at the start and 3.2 s at the end
+- Still needed: the same hour on the judging laptop with Wi-Fi off and sound on (Part D of the judging laptop session). This was not live EEG
 ## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
 - With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
     - Each tile flash is answered with one real recorded brain response. The same g.Pype pipeline and classifier as the live path calibrate on them and pick the tile
