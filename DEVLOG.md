@@ -648,7 +648,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why now: the PiEEG board was tested on two people tonight and gave no usable EEG, so g.tec's data is the brain signal we can honestly show
 - Verified end to end on the judging laptop with subject S4: the recorded responses picked the scripted tile, then the map and the spoken line followed. Three new tests; the automated one uses a made-up recording because CI has no dataset. Not yet run for many choices in a row in the app
 
-## 11/15/26 - 7:01 AM - Vasanth Anbukumar - #151 How many flashes our chooser needs, measured on real human EEG (PR pending)
+## 11/15/26 - 7:01 AM - Vasanth Anbukumar - #151 How many flashes our chooser needs, measured on real human EEG ([PR #218](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/218))
 - One command now shows how often our chooser picks the right tile out of two on g.tec's recorded data, by how many flashes it averages: `python -m signal2speech.evidence.dataset <folder> --curve`
     - Across the five recorded people: 94 % from one flash, 97 % from two, 99 % from three, 100 % from five
     - `--plot file.svg` saves the chart that's now in `docs/eeg-hardware/README.md`
