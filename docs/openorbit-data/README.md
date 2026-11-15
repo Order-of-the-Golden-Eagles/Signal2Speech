@@ -37,11 +37,28 @@ Windows 11, Python 3.12, and the pinned `requirements-lock.txt`.
 - **Merge check:** a test merge with `main`, #48, #21, and the `issue-5-ai` branch had no conflicts. `pytest` on the result: 102 passed, 2 skipped (the AI tests need the `anthropic` package).
 - **Still to do:** a real Wi-Fi-off run on the judging laptop. See the [runbook](../devops/judging-build.md#judging-laptop-runbook-39).
 
+## Day by day: June 24 to June 28 (2026-11-15)
+
+Both map screens play five NASA MODIS Terra images, same bounds and size, one day flowing into the next and resting on June 28:
+
+| Day | What the image shows | Caption |
+| --- | --- | --- |
+| June 24 | Broken cloud, ground and lakes visible | "before the smoke" |
+| June 25, 26, 27 | Overcast | "mostly cloud" |
+| June 28 | Grey smoke haze over the region | "wildfire smoke" |
+
+- **Where:** `places.json` lists the frames under `timelapse`; `Dataset.timelapse` loads them and always ends on June 28. `OpenOrbitView` cross-fades through them once per reveal (`LAPSE_STEP_MS`, `LAPSE_FADE_MS`) and stops. It doesn't loop, because a moving picture next to the flashing tiles would pull the wearer's eyes.
+- **The fire map** beside the satellite view shows only the detections up to the day on screen. Our FIRMS sample has detections for June 26 and June 28.
+- **Images and numbers cover different days, and the screen says so.** The images start on June 24. The EPA numbers we hold are for June 26 and June 28, so the table and the spoken comparison use those two days. A line under the image states this.
+- **The spoken satellite line** is now "NASA satellite images from June 24 to June 28, 2023: clear ground, then cloud, then wildfire smoke over southeast Michigan."
+- **Before any confirm,** the panel shows the June 28 image at 30 % opacity with the two places marked and no numbers.
+- Images are drawn in a rounded frame with a thin border.
+
 ## Known limits
 
-- **June 26 is mostly cloud** on both MODIS Terra and Aqua, so the "before" image shows little ground. The AQI rows carry the before and after. **Settled (#153):** the view captions it "mostly cloud", and the [science note](science-note.md) explains it.
+- **June 25, 26 and 27 are mostly cloud** on MODIS Terra, and also on Aqua and VIIRS (checked 2026-11-15), so those days show little ground. The view captions each one "mostly cloud", and the [science note](science-note.md) explains it. June 24 is the last day the surface is visible before the smoke.
 - **Stretched map:** the images are plain lat/lon grids, so they look about 1.35 times wider east to west than the ground really is.
-- **No bundled audio:** the spoken lines use the offline Windows voice, because no `data/openorbit/audio/<action_id>.wav` is bundled.
+- **Audio:** the comparison line has a bundled clip (`data/openorbit/audio/compare_air_quality.wav`) for machines without the natural voice. The satellite line no longer has one: its words changed when the view became a day-by-day sequence, and a clip must never say different words from the ones approved.
 
 ## FIRMS fire detections (#8, #31, #32)
 
