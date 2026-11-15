@@ -172,6 +172,37 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every shot and step says which input it uses, so simulated or recorded EEG is never passed off as live
 - Not done yet: the video itself. It needs the live headset (#23), the alpha confirm (PR #58), and the real map (PR #65). The team still has to confirm the tracks, two teammates' names, and the AI disclosure
 
+## 11/14/26 - 5:33 PM - Vasanth Anbukumar - #13 Run of show and submission prep ([PR #74](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/74))
+- Added the demo playbook in `docs/demo-submission/`: a second-by-second two-minute run of show with four roles, a shot list for a video under three minutes, a rehearsal checklist, judge Q&A, and an 8:15 PM headset pre-flight
+- Each beat has two tracks. The live track is the goal. The keyboard track is what `main` can do today, and the label you say out loud must match the one on screen
+- Found that the evidence view can't show a real P300 average yet. On the headset its flash markers have no visible flash, so the backup recording is for OSCAR and the eyes-closed alpha peak, and the P300 average stays labelled Simulated until the P300 chooser drives those markers
+- Checked the commands on Windows: keyboard and simulated runs work, and `--input live` refuses as expected. `pytest` passes 124 with 2 skipped after merging the latest `main`
+- Review fixes: marked the alpha confirm (#47) as merged with its real command (`--source hybrid-black`, plus `--demo`), and noted that the app's 175 ms, 10-flash tile timing has not been checked with the classifier, which was tested at 250 ms and 5 flashes
+- Merged with the #34 submission kit from PR #73: its `run-of-show.md` stays as the minute-by-minute plan, and this PR's second-by-second version with roles is now `stage-script.md`
+- Nothing here has been run with a real headset yet
+
+## 11/14/26 - 5:35 PM - Vasanth Anbukumar - #1 Sync the architecture docs with main ([PR #71](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/71))
+- Added a "Current status" table to the selection contract: what is merged and checked on simulated or synthetic data, what is still in an open PR (#29/#30 OpenOrbit), and what still needs the live headset (P300 accuracy, the alpha-switch threshold, live Unicorn input)
+- Fixed stale lines: the P300 pipeline now matches the code (Trigger per tile, LDA score, sequence vote), the folder table names the real files, and the tests section gives today's count (111 passed, 2 skipped after merging main, with a note that the number grows) and the 3-OS CI
+- Matched the dependency graph to GitHub's "Blocked by" links: added #22 to #30 and #21 to #23, and marked closed issues
+- `docs/MEMORY.md` no longer says simulated input still needs a one-line swap in `app.py`: it already uses the g.Pype stream
+- Docs only. No code changed, and pytest still passes
+
+## 11/14/26 - 5:38 PM - Vasanth Anbukumar - #48 Evidence view driven by the P300 chooser ([PR #76](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/76))
+- New flag: `python -m signal2speech.evidence --source generator --p300` (or `--source hybridblack --p300`) builds the judge window around the real P300 chooser instead of the stand-in flasher
+- The chooser's filter, scorers and calibration collectors now live in the same g.Pype pipeline as the scopes, and its flash markers go on the evidence view's marker
+- The target vs non-target average uses the calibration flashes, from the very Trigger nodes whose epochs train the classifier, so judges see what the classifier learns from
+- Two test tiles flash in the window header, and each decision (with the round's outcome from the SelectionHandler) shows next to them
+- The old mode without `--p300` works as before
+- Verified on simulated input only: new headless tests pass, and a 22 s offscreen run calibrated, trained, and made 2 of 2 correct simulated selections. Not tried with a headset
+
+## 11/14/26 - 5:41 PM - Vasanth Anbukumar - #46 Flash timing check ([PR #77](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/77))
+- Added a tool that checks whether the P300 flash markers line up with what the screen actually shows: `python -m signal2speech.eeg.flash_timing --seconds 30`
+    - It flashes the same kind of tiles the chooser uses and compares each marker with the moment the frame reaches the display. Then it prints the average and worst gap, the jitter, and the refresh rate, plus PASS or WARN (WARN above 20 ms of jitter)
+- Wrote a step-by-step check with a phone slow-motion camera or a cheap light sensor, so we can confirm the real screen timing on the judging laptop before 8:15. The tool compares those light times with its markers, so the two clocks don't need to match
+- Tested the maths and the PASS/WARN rules without a screen (18 tests), and ran the tool briefly in headless mode to show it works. Headless numbers mean nothing, so the tool always says WARN there
+- Not done yet: a run on the judging laptop's real display, and the camera or light-sensor check
+
 ## 11/14/26 - 5:45 PM - Vasanth Anbukumar - #23 Guided live-run harness ([PR #78](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/78))
 - Added one command for the headset slot: `python -m signal2speech.eeg.live --source hybridblack`. It walks through the device check, signal quality, P300 calibration, confirm calibration, 10 live attempts, and a summary
 - If the headset isn't paired, it says how to pair it and exits cleanly. If signal quality is bad, it names the bad channels and stops unless you choose to continue
@@ -242,6 +273,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Switch-back rehearsal on a Mac: 3 seconds from `main` to the known-good build `eecc31a` and one map reveal (keyboard input; the lock file was the same)
 - Also updated the runbook for the smoke check (#41) and the 8-second map reveal (#81). Still needed: tag `judging-draft` and `judging-final` and rehearse the switch on the judging laptop
 
+## 11/14/26 - 7:01 PM - MagicJester2764 - #40 Pre-headset checkpoint ([PR #90](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/90))
+- Wrote down where the demo stands before the headset arrives: `docs/sprint-operations/pre-headset-checkpoint.md`
+- The reveal works with no headset: InYoung's Wi-Fi-off keyboard run on her laptop (a slightly older build), plus a fresh simulated run on today's build where the real NASA/EPA view appears and one line is sent to speech (muted, so not heard)
+- Not yet checked: the simulated run with Wi-Fi off, and hearing the line on the judging laptop. That's my next job, since the judging laptop is mine
+- The smoke check is now fully green (7 of 7), now that the map and data have landed
+- The one thing left for a live demo: the headset isn't connected to the app yet. The P300 chooser and the eyes-closed confirm both work on their own, but nothing wires them into the app (#23)
+- Each developer is asked to confirm their row in #40
+
 ## 11/14/26 - 6:55 PM - In Young Song - #32 Verified June 2023 fire detections ([PR #89](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/89))
 - The team has a small, checked sample of NASA fire detections for the demo dates, bundled for offline use
     - `data/openorbit/firms/`: about 10,000 VIIRS detections for June 26 and 28, 2023, from the Great Lakes to Quebec. `SOURCES.md` explains what a detection means
@@ -270,3 +309,20 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `main` now requires all four CI jobs to pass before a PR can merge, and GitHub auto-merge is on: run `gh pr merge <n> --auto --squash` and GitHub merges once the checks are green
 - Why: the full suite had grown to about 3 minutes, and teammates merging during long CI runs kept forcing re-runs
 - The slow tests are listed in one place, `tests/conftest.py`, so no test files changed. Windows, the judging laptop, still runs everything on every PR
+## 11/14/26 - 7:12 PM - Long Le - #93 Judge-facing README ([PR #99](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/99))
+- A judge opening the repo now sees what Signal2Speech does, a screenshot, and a three-command offline quickstart at the top of `README.md`
+    - `pip install -r requirements-lock.txt`, then `python -m signal2speech.app --input keyboard`
+- A status table says honestly what works with keyboard, simulated, recorded, and live EEG input. The live headset tools are built but haven't run on a real wearer yet
+- Added team and data credits (NASA GIBS MODIS, EPA AirData) and a short AI-use note. The screenshot is 180 KB in `docs/demo-submission/media/`
+- Checked: every relative link resolves, and `tools/release_check.py --quick` passes apart from the known commit-email warning (#33)
+
+## 11/14/26 - 7:25 PM - Long Le - #94 Fits the judging laptop screen, plus fullscreen and key help ([PR #111](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/111))
+- The app now fits a 1080p laptop at 150% scaling (1280×720) without cutting anything off. Before, it needed 1400 px of width
+    - `python -m signal2speech.app --fullscreen`. F11 toggles fullscreen, and F1 shows the keys for whoever runs the demo
+- The input label in the bottom strip always shows in full, so simulated input can't look live on a small screen. Longer connection and outcome text clips instead, and the transcript keeps it
+- Checked with screenshots at 1280×720, 1366×768, and 1536×864 (preview, reveal, and help overlay), and tests assert the size limit in every state. Not yet seen on the judging laptop itself
+
+## 11/14/26 - 7:35 PM - Long Le - #95 Long replies fit their tiles ([PR #112](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/112))
+- Long AI replies now shrink to fit the tiles and the preview instead of getting cut off. The text never goes below 32 px, so it stays readable from the judge table
+- The size is only recalculated when the label or the window size changes, never during a flash, so the P300 flash timing isn't affected
+- Checked with screenshots at 1280×720 and 1536×864 using 12-word replies: they fit at 54–56 px. The demo labels stay at full size. Tests cover the 32 px floor, the flash, and the preview

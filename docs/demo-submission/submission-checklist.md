@@ -7,9 +7,9 @@ Deadlines are Eastern time: **draft on Devpost and the event app by Saturday mid
 | Field | Value | Status |
 | --- | --- | --- |
 | Project name | Signal2Speech | Ready |
-| Repo link | https://github.com/Order-of-the-Golden-Eagles/Signal2Speech (must be public before the final) | Check visibility before the final |
-| Team (all four) | Vasanth Anbukumar (`vas2000-personal`), Long Le (`LongNguyenThanhLe`), `MagicJester2764` (name to confirm), `InYoung-Song` (name to confirm) | Confirm names and Devpost invites |
-| Tracks | To confirm from the event page (g.tec / BCI track, plus any general track) | **Open** |
+| Repo link | https://github.com/Order-of-the-Golden-Eagles/Signal2Speech | Public (checked 11/14, 7:45 PM) |
+| Team (all four) | Vasanth Anbukumar (`vas2000-personal`), Long Le (`LongNguyenThanhLe`), Nate (`MagicJester2764`), In Young Song (`InYoung-Song`) | Names ready. Confirm Devpost invites |
+| Tracks | **Recommended:** the g.tec BCI track (a brain-computer interface app built on g.tec's Unicorn and g.Pype), plus one general track if the event offers a fit, such as accessibility or social impact | Recommended. Confirm the exact track names on the event page |
 | Video link | Under 3:00, see [video-shot-list.md](video-shot-list.md) | Not recorded |
 | Tagline | Answer without speaking or typing: pick, preview, and confirm the exact words with a brain-computer interface. | Draft |
 | Built with | Python, g.Pype, g.tec Unicorn Hybrid Black, PySide6, scikit-learn, Qt TextToSpeech, NASA MODIS imagery, EPA AQI data, Claude | Draft |
@@ -17,7 +17,7 @@ Deadlines are Eastern time: **draft on Devpost and the event app by Saturday mid
 
 ### AI disclosure (draft)
 
-> We used Claude (Anthropic) as a coding assistant during the hackathon; the devlog marks each change made "with Claude". In the app, AI Answering can suggest reply options using Claude (`claude-opus-5-5`) when an API key is configured. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with LDA, the alpha switch) is our own g.Pype pipeline, not an AI model.
+> We used Claude (Anthropic) as a coding assistant during the hackathon. In the app, AI Answering can suggest reply options using Claude (`claude-opus-5-5`) when an API key is configured. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with LDA, the alpha switch) is our own g.Pype pipeline, not an AI model.
 
 ## Before the final
 

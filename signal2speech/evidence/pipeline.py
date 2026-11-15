@@ -8,9 +8,11 @@ that connects its own filter chain after the EEG node and returns the
 node whose output is "filtered EEG". It may be called twice (once for
 the OSCAR branch), so it should build fresh nodes each call. The default
 is a 1–30 Hz bandpass with 50 and 60 Hz notches, the chain in the
-selection contract. When the P300 chooser lands, pass its front end here
-and let its tiles emit on ``graph.marker``, so the judge sees exactly
-what the classifier sees.
+selection contract. ``signal2speech.evidence.p300_mode`` passes the P300
+chooser's ``p300_front_end`` here, swaps in the chooser's synthetic P300
+node and marker codes, and hangs the chooser's scorers on the same
+Triggers the averages use, so the judge sees exactly what the classifier
+sees.
 """
 
 from __future__ import annotations
@@ -80,6 +82,17 @@ class EvidenceGraph:
     oscar: Optional[object] = None
     oscar_note: str = ""
     detail: str = ""
+    #: The filtered stream the Triggers cut epochs from (the OSCAR branch
+    #: when ``average_oscar`` asked for it and it exists).
+    epoch_input: Optional[object] = None
+    target_trigger: Optional[object] = None
+    nontarget_trigger: Optional[object] = None
+    target_code: int = TARGET_CODE
+    nontarget_code: int = NONTARGET_CODE
+    #: Extra ``(value, label, colour)`` markers for the time scopes.
+    extra_markers: tuple = ()
+    #: Title of the averaged-response scope; empty means the default.
+    average_title: str = ""
 
     @property
     def caption(self) -> str:
@@ -119,7 +132,13 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
                          label: InputLabel | None = None,
                          oscar: bool = True,
                          front_end: FrontEnd = default_front_end,
-                         synthetic_p300: bool | None = None) -> EvidenceGraph:
+                         synthetic_p300: bool | None = None,
+                         synthetic_node=None,
+                         target_code: int = TARGET_CODE,
+                         nontarget_code: int = NONTARGET_CODE,
+                         time_pre: float = TIME_PRE,
+                         time_post: float = TIME_POST,
+                         average_oscar: bool = False) -> EvidenceGraph:
     """Build the evidence pipeline without starting it or opening a window.
 
     Args:
@@ -133,6 +152,14 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
         front_end: Seam for #46. See the module docstring.
         synthetic_p300: Add the simulated P300 after target markers.
             Defaults to True for the Generator and False otherwise.
+        synthetic_node: Use this node as the synthetic P300 instead of the
+            built-in one. It gets the EEG on its ``in`` port and the
+            marker on its ``trigger`` port (``eeg.p300.SyntheticP300``).
+            Implies ``synthetic_p300``.
+        target_code, nontarget_code: Marker codes the two averages
+            trigger on.
+        time_pre, time_post: Epoch window around each flash, in seconds.
+        average_oscar: Cut epochs from the OSCAR branch when there is one.
 
     Returns:
         The graph. Call ``graph.pipeline.start()`` to run it.
@@ -163,7 +190,11 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
     source = make_source(kind, in_source_oscar)
     marker = gp.Marker(name="flashes")
 
-    if synthetic_p300:
+    if synthetic_node is not None:
+        p.connect(source, synthetic_node)
+        p.connect(marker, synthetic_node["trigger"])
+        raw = synthetic_node
+    elif synthetic_p300:
         mixed = gp.Router(input_channels=[gp.Router.ALL, gp.Router.ALL],
                           name="eeg_with_markers")
         p.connect(source, mixed["in1"])
@@ -184,18 +215,21 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
                  window_function="hamming", name="fft")
     p.connect(raw, fft)
 
-    epochs, averages = {}, {}
-    for name, code in (("target", TARGET_CODE),
-                       ("nontarget", NONTARGET_CODE)):
-        trigger = gp.Trigger(time_pre=TIME_PRE, time_post=TIME_POST,
+    epoch_input = oscar_filtered if (average_oscar and oscar_filtered
+                                     is not None) else filtered
+    epochs, averages, triggers = {}, {}, {}
+    for name, code in (("target", target_code),
+                       ("nontarget", nontarget_code)):
+        trigger = gp.Trigger(time_pre=time_pre, time_post=time_post,
                              target=code, name=f"{name}_trigger")
         baseline = gp.Baseline(name=f"{name}_epochs")
         average = gp.EpochAverage(name=f"{name}_average")
-        p.connect(filtered, trigger)
+        p.connect(epoch_input, trigger)
         p.connect(marker, trigger[gp.Trigger.PORT_TRIGGER])
         p.connect(trigger, baseline)
         p.connect(baseline, average)
         epochs[name], averages[name] = baseline, average
+        triggers[name] = trigger
 
     return EvidenceGraph(
         pipeline=p, kind=kind, label=label, source=source, marker=marker,
@@ -204,4 +238,7 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
         nontarget_epochs=epochs["nontarget"],
         target_average=averages["target"],
         nontarget_average=averages["nontarget"],
-        oscar=oscar_filtered, oscar_note=oscar_note)
+        oscar=oscar_filtered, oscar_note=oscar_note,
+        epoch_input=epoch_input, target_trigger=triggers["target"],
+        nontarget_trigger=triggers["nontarget"], target_code=target_code,
+        nontarget_code=nontarget_code)
