@@ -42,7 +42,17 @@ Run on `main` at `d7fe978` with `ANTHROPIC_API_KEY` in `.env` and `claude-opus-5
 | Question | Claude's two replies | Result |
 | --- | --- | --- |
 | "Would you like to take a short break and get some water?" | "Yes, please. A break and some water sounds good." / "No thanks, I'm fine. Let's keep going." | Replies in about 2 s. Key 1 previewed silently, key 1 confirmed, spoken **once** (OS voice). ✅ |
-| "Which county's AQI rose more when wildfire smoke reached southeast Michigan?" | "I think Wayne County's AQI rose more." / "I'm not sure. Can we look it up together?" | ❌ **Factually wrong.** Washtenaw rose +186, Wayne +168. Ungrounded replies can state wrong facts. #116 fixes this by grounding replies in the dataset and offering the Compare counties map action. **Don't ask data questions in the AI demo until #116 is merged.** |
+| "Which county's AQI rose more when wildfire smoke reached southeast Michigan?" | "I think Wayne County's AQI rose more." / "I'm not sure. Can we look it up together?" | ❌ **Factually wrong.** Washtenaw rose +186, Wayne +168. Ungrounded replies can state wrong facts. #116 fixes this by grounding replies in the dataset and offering the Compare counties map action. *Fixed by #116; re-checked below.* |
+
+### Re-check after #116 (#106, 2026-11-14 11:14 PM ET)
+
+`main` at `ac36dd3` with `claude-sonnet-5-5` and grounded replies, through `python -m signal2speech.ai` (macOS 12, keyboard input):
+
+| Check | Result |
+| --- | --- |
+| "Would you like to listen to some music?" | "Yes, I'd like some music. That sounds nice." / "No thanks, not right now. Maybe later." In about 2 s. Previewed, confirmed, spoken **once**. ✅ |
+| "Which county's AQI rose more when wildfire smoke reached southeast Michigan?" | Option 1 is the **Compare counties** map action: "Washtenaw's AQI rose 186 points. Wayne's rose 168 points." Confirming it **revealed the map** and spoke the line once (#116 grounding plus the #118 window fix). ✅ No more "Wayne". |
+| Offline fallback (provider unreachable: `ANTHROPIC_BASE_URL` pointed at a closed local port, the same failure as no network) | Saved phrases right away, labelled "offline: no connection to provider". ✅ A real Wi-Fi-off run is part of the judging-laptop session. |
 
 ## AI assistant reads the pipeline (MCP server, #110)
 
