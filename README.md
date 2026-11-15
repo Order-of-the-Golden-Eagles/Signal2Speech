@@ -72,6 +72,19 @@ keyboard / simulator ─────┘
 
 A plain-language walkthrough is in [How Signal2Speech works](docs/architecture/README.md).
 
+## For reviewers: reproduce our numbers on g.tec data
+
+No hardware is needed. With g.tec's P300 Speller dataset (`S1.mat`–`S5.mat`, from the Data Science section of [github.com/unicorn-bi/Hackathon](https://github.com/unicorn-bi/Hackathon)) unpacked anywhere outside the repo:
+
+```
+python -m signal2speech.evidence.dataset path/to/p300-speller            # the numbers
+python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat   # the live view
+```
+
+The first command prints, per subject, the target minus non-target peak and our classifier's cross-validated single-flash accuracy (1–30 Hz band-pass, 100 ms bins, shrinkage LDA, 5 folds). On the published files we get a 7–11 µV difference in all five subjects and 0.59–0.85 balanced accuracy, where chance is 0.50 ([full table](docs/eeg-hardware/README.md#recorded-human-p300-from-gtecs-dataset-142)). Any file in the same format (`fs`, `y` as samples × channels, `trig` with +1 for target and −1 for non-target) works. The second command plays the recording through the same g.Pype pipeline the app uses, labelled Recorded.
+
+The same code reads a live g.tec Unicorn Hybrid Black (`--source hybridblack`), and it picks the right channels for each device by itself ([devices and channels](docs/eeg-hardware/README.md#devices-and-channels-150)).
+
 ## Team, credits, and AI use
 
 - **Team:** Vasanth Anbukumar ([@vas2000-personal](https://github.com/vas2000-personal)), In Young Song ([@InYoung-Song](https://github.com/InYoung-Song)), Long Le ([@LongNguyenThanhLe](https://github.com/LongNguyenThanhLe)), [@MagicJester2764](https://github.com/MagicJester2764)

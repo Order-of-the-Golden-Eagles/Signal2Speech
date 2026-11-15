@@ -25,6 +25,7 @@ pluggy==1.7.0
 psutil==7.2.2
 pycparser==3.12
 Pygments==2.21.0
+pylsl==1.18.7
 pynput==1.8.2
 pypiwin32==223
 pyqtgraph==0.14.0

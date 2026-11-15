@@ -14,6 +14,9 @@ SLOW = (
     "tests/test_alpha_confirm.py::test_generator_alpha_burst",   # alpha switch on g.Pype (#47)
     "tests/test_p300.py::test_realtime_generator_pipeline",      # P300 real-time path (#46)
     "tests/test_evidence_dataset.py::test_realtime_recording",   # g.tec recording playback (#142)
+    "tests/test_lsl_source.py::test_first_run_check",             # LSL first-run check (#150)
+    "tests/test_lsl_source.py::test_a_board_that_really_sends",   # 244 Hz board clock (#150)
+    "tests/test_lsl_source.py::test_self_test_board",             # LSL board into the alpha switch (#150)
 )
 
 

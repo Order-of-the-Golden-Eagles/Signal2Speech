@@ -377,3 +377,54 @@ Offline results on 2026-11-14 (1–30 Hz band-pass, 100 ms bins, shrinkage LDA, 
 | S5 | −11.0 µV at 400 ms (PO7) | 0.75 |
 
 Each subject has 150 target and 1,050 non-target flashes over about 4 minutes. These show our pipeline finds a real P300 in real human EEG. They are **not** a result for our wearer or our two-tile layout. The dataset's files state no licence; it's provided by g.tec for this hackathon, so cite g.tec and don't redistribute it.
+
+## Devices and channels (#150)
+
+g.tec's g.Pype is the whole pipeline. The program works out which amplifier it's reading (`signal2speech/eeg/devices.py`) and uses the right channels for the eyes-closed confirm, which needs the back of the head.
+
+| Device | Channels | Back-of-head channels | How they're chosen |
+| --- | --- | --- | --- |
+| g.tec Unicorn Hybrid Black | 8: Fz C3 Cz C4 Pz PO7 Oz PO8 | PO7, Oz, PO8 (channels 6–8) | Fixed montage |
+| g.tec P300 Speller dataset | 8: Fz Cz P3 Pz P4 PO7 PO8 Oz | PO7, PO8, Oz (channels 6–8) | Fixed montage, from the dataset's `montage.png` |
+| PiEEG Octopus 16 | 16 unnamed pins in one 20 × 20 mm cluster | Wherever the puck is placed | Picked from the wearer's own data |
+
+The Octopus 16 is a 26 mm puck that reads **one spot**, not a cap. All 16 pins, the reference, and the ground sit in the same cluster. Its pins differ in contact, not position. So the check drops pins that are flat or railed (PiEEG's range for good contact is 2–150 µV RMS) and averages every pin whose alpha rises when the wearer closes their eyes. `--channels 3,7` overrides the pick. Because the reference is inside the cluster, expect a smaller signal than a cap gives.
+
+## Library session with the PiEEG Octopus 16 (#150, #171)
+
+The board is on the library's first floor. Take the judging laptop there.
+
+**Before you leave:** `python -m signal2speech.eeg.lsl_source --self-test --demo` passes on the laptop (no board needed). PiEEG's starter is cloned (`git clone https://github.com/pieeg-club/hello_world_octopus_16`). Run PiEEG's script with **our** venv's Python, which already has everything it needs (`pip install -e ".[dev,board]"` adds the Bluetooth library).
+
+| # | Step | You should see |
+| --- | --- | --- |
+| 1 | **Power the board from a 5 V power bank.** Never from the laptop's USB or a wall charger while it's on someone's head. | LED blinks slowly, about once a second |
+| 2 | Optional quick look in the browser: [cloud.pieeg.com](https://cloud.pieeg.com), pair with `Octopus-16-XXXX`. **Then click Disconnect or close the tab.** The board allows one Bluetooth connection at a time, so anything still connected blocks step 4. | 16 traces moving |
+| 3 | Put the puck on the **back of the head** (Oz, or Pz just above it). Part the hair, press it straight down, and hold it snug with a headband. | |
+| 4 | In PiEEG's starter folder: `python python_quickstart.py --lsl`. Leave it running. | LED turns solid. A line every second with `SPS`, `Lost`, and `Good Pins: n/16`. Adjust the puck until most pins are good. |
+| 5 | **First-run check**, in our repo: `python -m signal2speech.eeg.lsl_source --input live --check` | `device: PiEEG Octopus 16, 16 channels`, the measured sample rate, a contact line per pin, and `READY`. No prompts. Takes about 10 seconds. |
+| 6 | The full session: `python -m signal2speech.eeg.lsl_source --input live --demo` | The steps below |
+
+Step 6 walks through, with prompts:
+1. **Channel check** (8 s eyes open, 8 s closed): prints each pin's contact and how much its alpha rose, and picks the pins to use.
+2. **Calibration** (10 s open, 10 s closed), then **20 s of rest** counting false triggers, then **3 eye closures** timing each confirm.
+3. **Verdict.** Live confirm switches on only if the check is clean: 0 false triggers and exactly one confirm per closure.
+4. **Demo:** a keyboard preview of "Compare counties", confirmed by closing the eyes for two seconds.
+
+**If it fails**
+- "No LSL stream": step 4 isn't running, or something else still holds the Bluetooth connection (step 2).
+- "No channel's alpha rose": reseat the puck lower on the back of the head, and check `Good Pins` in step 4. A short rest with eyes closed before starting helps.
+- False triggers at rest: sit still and relax the jaw, or rerun so it recalibrates.
+- If PiEEG's script can't find the board at all, it may need firmware. PiEEG's README covers flashing it from the browser over USB-C.
+
+**Capture** (with the wearer's consent, and no faces unless they agree): the printed report (JSON line), a screen recording of one live confirm, a photo of the setup, and the session recording once #170 lands. Write the numbers into #23. Recordings are raw brain data: keep them off GitHub.
+
+**Label:** a real board on a person is **Live EEG (PiEEG Octopus 16)**. PiEEG's `--sim` simulator and our `--self-test` are **Simulated**. `--input live|simulated` is required, because LSL can't prove what's publishing.
+
+**Detection verified on 2026-11-15, on the judging laptop:**
+- Against **PiEEG's own script** (`python_quickstart.py --sim --lsl`): found on this computer, identified as the Octopus 16, 250.4 samples per second measured, contact reported for all 16 pins.
+- With a stream that claims 250 Hz but **really sends 244**, as some boards do: the full check still passes.
+- Host names are matched without case or domain, and a same-named stream from another computer is refused.
+- The laptop's Bluetooth LE adapter can scan (it's what PiEEG's script uses to reach the board).
+
+**Flow verified:** the self-test stream on the judging laptop, end to end. It found the one flat pin and the one railed pin, used the other 14, had 0 false triggers, and gave one confirm per closure in about 1.3 s. **Not verified:** a real Octopus 16, its Bluetooth link, or whether one small spot gives enough alpha on a real person. Some boards sample at 244.1 Hz instead of 250; PiEEG says that's fine for band power, and the check prints the measured rate.
