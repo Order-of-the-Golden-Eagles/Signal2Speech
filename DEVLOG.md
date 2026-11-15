@@ -591,3 +591,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Nothing is drawn by hand. Each diagram is built by the same code the app uses, then read back from g.Pype's own record of nodes and connections. A test fails if someone changes a pipeline and forgets `--write`
 - The AI assistant's `pipeline_graph` tool (#110) now returns the same drawing
 - Checked offline with no headset: the live diagrams build the Unicorn's graph without opening the device. GitHub renders Mermaid, but I haven't looked at it on the rendered page yet
+## 11/15/26 - 2:27 AM - Vasanth Anbukumar - #204 The app window now fits the judging laptop's screen ([PR #205](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/205))
+- The app used to open at a fixed 1700 × 900 and hang off the right and bottom of the judging laptop's screen. It now opens inside whatever screen it's on
+    - The laptop is 1920 × 1080 at 125 % scaling, which leaves only 1536 × 864 for windows
+    - Screens with more room still get the usual 1700 × 900
+- Found while rehearsing the PiEEG board in the real app (`python -m signal2speech.app --input pieeg --pieeg-self-test --keys 2`): the simulated board's eye closure confirmed and the map changed, but the window didn't fit
+- Verified on the judging laptop's real display: the window with its title bar is 1520 × 846, fully on screen. One new test. `--fullscreen` and F11 are unchanged

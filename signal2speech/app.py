@@ -82,6 +82,31 @@ class Transcript:
             print(line, flush=True)
 
 
+
+#: The size the window opens at when the screen has room for it.
+PREFERRED_SIZE = (1700, 900)
+#: Room left for the title bar and window borders, which sit outside the size we set.
+FRAME_ALLOWANCE = (16, 48)
+
+
+def fit_to_screen(widget, preferred=PREFERRED_SIZE, available=None) -> tuple:
+    """Size ``widget`` to ``preferred``, or smaller if the screen can't hold it, and keep it on
+    screen. A 1920 x 1080 laptop at 125 % scaling offers only 1536 x 864 minus the taskbar, so a
+    fixed 1700 x 900 hung off the right and bottom edges. Returns the (width, height) used."""
+    if available is None:
+        screen = widget.screen() or QApplication.primaryScreen()
+        available = screen.availableGeometry() if screen is not None else None
+    if available is None:
+        widget.resize(*preferred)
+        return tuple(preferred)
+    w = max(1, min(preferred[0], available.width() - FRAME_ALLOWANCE[0]))
+    h = max(1, min(preferred[1], available.height() - FRAME_ALLOWANCE[1]))
+    widget.resize(w, h)
+    widget.move(available.x() + (available.width() - FRAME_ALLOWANCE[0] - w) // 2 + FRAME_ALLOWANCE[0] // 2,
+                available.y() + max(0, (available.height() - FRAME_ALLOWANCE[1] - h) // 2))
+    return (w, h)
+
+
 class AppSink:
     """The only place output happens. SelectionHandler calls execute once per confirm."""
 
@@ -373,7 +398,7 @@ class App:
         row.addLayout(right, 2)
         self._row = row
         self.revealing = False
-        self.root.resize(1700, 900)
+        fit_to_screen(self.root)
 
         sc = QShortcut(QKeySequence("D"), self.root)   # rehearse a headset drop (#26)
         sc.setAutoRepeat(False)
