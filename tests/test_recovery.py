@@ -11,10 +11,17 @@ import os
 import time
 from pathlib import Path
 
+import importlib.util
+
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
+
+# g.Pype can't be installed everywhere (e.g. macOS 12, Intel Macs). These tests need it; the
+# rest of the file is pure Python. CI installs g.Pype, so they still run there (#98).
+needs_gpype = pytest.mark.skipif(importlib.util.find_spec("gpype") is None,
+                                 reason="needs g.Pype: pip install -r requirements-lock.txt")
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
 

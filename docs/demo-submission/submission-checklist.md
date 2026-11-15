@@ -10,7 +10,7 @@ Deadlines are Eastern time: **draft on Devpost and the event app by Saturday mid
 | Repo link | https://github.com/Order-of-the-Golden-Eagles/Signal2Speech | Public (checked 11/14, 7:45 PM) |
 | Team (all four) | Vasanth Anbukumar (`vas2000-personal`), Long Le (`LongNguyenThanhLe`), Nate (`MagicJester2764`), In Young Song (`InYoung-Song`) | Names ready. Confirm Devpost invites |
 | Tracks | **Recommended:** the g.tec BCI track (a brain-computer interface app built on g.tec's Unicorn and g.Pype), plus one general track if the event offers a fit, such as accessibility or social impact | Recommended. Confirm the exact track names on the event page |
-| Video link | Under 3:00, see [video-shot-list.md](video-shot-list.md) | Not recorded |
+| Video link | Under 3:00, see [shot-list.md](shot-list.md) | Not recorded |
 | Tagline | Answer without speaking or typing: pick, preview, and confirm the exact words with a brain-computer interface. | Draft |
 | Built with | Python, g.Pype, g.tec Unicorn Hybrid Black, PySide6, scikit-learn, Qt TextToSpeech, NASA MODIS imagery, EPA AQI data, Claude | Draft |
 | AI disclosure | See below | Draft, needs team sign-off |
@@ -40,7 +40,7 @@ Deadlines are Eastern time: **draft on Devpost and the event app by Saturday mid
 
 ## Rehearsal log
 
-Record each timed run of the [run of show](run-of-show.md). Keep live EEG results separate from simulated or keyboard runs (#36, #13).
+Record each timed run of the [stage script](stage-script.md) (test matrix in [rehearsal.md](rehearsal.md)). Keep live EEG results separate from simulated or keyboard runs (#36, #13).
 
 | When (ET) | Input | Choice | Result (preview / confirm / cancel / late or duplicate input) | Time | Notes |
 | --- | --- | --- | --- | --- | --- |
