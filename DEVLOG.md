@@ -648,7 +648,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why now: the PiEEG board was tested on two people tonight and gave no usable EEG, so g.tec's data is the brain signal we can honestly show
 - Verified end to end on the judging laptop with subject S4: the recorded responses picked the scripted tile, then the map and the spoken line followed. Three new tests; the automated one uses a made-up recording because CI has no dataset. Not yet run for many choices in a row in the app
 
-## 11/15/26 - 6:41 AM - Vasanth Anbukumar - #150 We tested the PiEEG board on two people: it records, but shows no usable brain signal (PR pending)
+## 11/15/26 - 6:41 AM - Vasanth Anbukumar - #150 We tested the PiEEG board on two people: it records, but shows no usable brain signal ([PR #216](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/216))
 - The borrowed PiEEG Octopus 16 is out of the demo. It connects, streams and records well, but on two people with good contact we found no eyes-closed alpha and no response to a flickering square, the two EEG signals we tried
     - A jaw clench and a hard blink showed up only faintly at the back of the head, too faint to use as a switch
     - Likely reason: the board's reference pin sits within 2 cm of its signal pins, which cancels a brain rhythm before it's measured. We didn't prove that; it's the explanation that fits
