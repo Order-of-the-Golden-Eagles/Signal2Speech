@@ -700,6 +700,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The satellite view now plays the days from June 24 to June 28 one after another: ground visible, three days of cloud, then the smoke. The fire map beside it adds each day's detections in step
     - Three more NASA images were added for this (June 24, 25 and 27), same satellite and same framing. Cloudy days are shown as they were
     - The line that is previewed and spoken changed to match: "NASA satellite images from June 24 to June 28, 2023: clear ground, then cloud, then wildfire smoke over southeast Michigan." Its old recorded clip is retired
+- The comparison screen flows through the same five days in one large image, in place of two still pictures, above the air-quality table. Its heading now reads "Wildfire smoke arrives: June 24 to 28, 2023"
 - The satellite and fire images have rounded corners and a thin border
 - Each launch of recorded mode now draws the recorded brain responses in a fresh order, so two runs can differ. Before, every launch replayed the same ones
 - Verified by screenshots of every screen on the judging laptop and by the interface tests. The opening animation ran without errors; Vasanth watched it once and it looked right

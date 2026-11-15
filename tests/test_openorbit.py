@@ -216,7 +216,7 @@ def test_images_load_with_matching_sizes_and_render(qapp):
     view.compare_air_quality()
     assert not view.grab().isNull()
     maps = [m for m in view.findChildren(MapImage) if m.isVisibleTo(view)]
-    assert sorted(m.date for m in maps) == [BEFORE, AFTER]
+    assert [m.date for m in maps] == [AFTER]              # one flowing image, resting on the smoke
     for m in maps:
         rect = m.image_rect()
         assert all(rect.contains(point) for _, point in m.marker_points())
@@ -317,9 +317,11 @@ def test_cloudy_before_image_is_captioned(qapp):
     from signal2speech.openorbit.view import MapImage, OpenOrbitView
     view = OpenOrbitView(load_dataset())
     view.compare_air_quality()
-    captions = [m.caption for m in view.findChildren(MapImage)]
-    assert any(c and c.endswith("mostly cloud") and "June 26" in c for c in captions)
-    assert not any(c and "June 28" in c and "cloud" in c for c in captions)
+    # The comparison now flows through the days; each overcast day's caption says cloud.
+    captions = {d: view._lapse_caption(d, note) for d, note in view.dataset.timelapse}
+    assert captions[BEFORE].endswith("mostly cloud") and "June 26" in captions[BEFORE]
+    assert "cloud" not in captions[AFTER] and "June 28" in captions[AFTER]
+    assert "cloud" not in view.cmp_image.caption          # at rest it shows June 28
 
 
 def test_pollutant_line_is_stable_and_never_overclaims(qapp):
@@ -365,6 +367,9 @@ def test_satellite_view_plays_the_days_in_order_and_ends_on_the_smoke(qapp, monk
     view = OpenOrbitView()
     view.show_satellite()                                   # fades off (tests): straight to the last day
     assert view.sat_image.date == AFTER and "wildfire smoke" in view.sat_image.caption
+    view.compare_air_quality()                              # the comparison flows the same way
+    assert view.cmp_image.date == AFTER and view._lapse_image is view.cmp_image
+    view.show_satellite()
     assert view.fires_map.until is None                     # every detection shown at the end
 
     monkeypatch.setattr(fade, "ENABLED", True)              # as on screen: start on the first day

@@ -436,8 +436,8 @@ class OpenOrbitView(QWidget):
         return True
 
     # ── Day by day: the satellite view plays the days leading up to the smoke ──
-    LAPSE_STEP_MS = 1300      # each day stays this long
-    LAPSE_FADE_MS = 450
+    LAPSE_STEP_MS = 1300      # a new day starts this often
+    LAPSE_FADE_MS = 900       # and takes this long to flow in over the last one
 
     def _lapse_caption(self, date: str, note: str) -> str:
         return _long_date(date) + (f" · {note}" if note else "")
@@ -446,9 +446,10 @@ class OpenOrbitView(QWidget):
         """Play the days in order and stop on the last one (June 28, the smoke). One day at a time
         is all a daily satellite pass gives; the cloudy days are shown as they were."""
         frames = self.dataset.timelapse if self.dataset is not None else ()
-        image = getattr(self, "sat_image", None)
+        image = getattr(self, "cmp_image" if self._mode == "compare" else "sat_image", None)
         if image is None or len(frames) < 2:
             return
+        self._lapse_image = image
         from PySide6.QtCore import QTimer
         from signal2speech.ui import fade
         timer = getattr(self, "_lapse_timer", None)
@@ -471,7 +472,7 @@ class OpenOrbitView(QWidget):
     def _fires_until(self, date: Optional[str]) -> None:
         """The fire map beside the images shows only what had been detected by that day."""
         fires_map = getattr(self, "fires_map", None)
-        if fires_map is not None:
+        if fires_map is not None and self._mode == "satellite":
             fires_map.until = date
             fires_map.update()
 
@@ -479,7 +480,7 @@ class OpenOrbitView(QWidget):
         frames = self.dataset.timelapse
         self.lapse_index += 1
         date, note = frames[self.lapse_index]
-        self.sat_image.show_day(date, self._lapse_caption(date, note), self.LAPSE_FADE_MS)
+        self._lapse_image.show_day(date, self._lapse_caption(date, note), self.LAPSE_FADE_MS)
         last = self.lapse_index >= len(frames) - 1
         self._fires_until(None if last else date)
         if last:
@@ -491,8 +492,9 @@ class OpenOrbitView(QWidget):
         self._start_timelapse()
 
     def compare_air_quality(self) -> None:
-        """June 26 and June 28 imagery plus the county AQI comparison."""
+        """The days from June 24 to June 28 flowing in one image, plus the county AQI comparison."""
         self._show("compare")
+        self._start_timelapse()
 
     def reset(self) -> None:
         """Blank panel for cancel, disconnect, or the next question."""
@@ -589,16 +591,13 @@ class OpenOrbitView(QWidget):
     def _build_compare(self) -> QWidget:
         ds = self.dataset
         page, layout = self._page()
-        layout.addWidget(_label("Wildfire smoke: before and after", TITLE_PX, bold=True))
+        layout.addWidget(_label("Wildfire smoke arrives: June 24 to 28, 2023", TITLE_PX, bold=True))
 
-        images = QHBoxLayout()
-        images.setSpacing(10)
-        for date in (BEFORE, AFTER):
-            # June 26 was overcast for both MODIS satellites: the white is cloud, not clear air (#153).
-            caption = _long_date(date) + (" · mostly cloud" if date == BEFORE else "")
-            images.addWidget(MapImage(ds, date, caption=caption,
-                                      caption_short=_long_date(date)), 1)
-        layout.addLayout(images, 1)
+        # One large image that flows through the days, in place of two stills. June 25 to 27 were
+        # overcast for every NASA satellite we checked: the white is cloud, not clear air (#153),
+        # and each frame's caption says so.
+        self.cmp_image = MapImage(ds, AFTER, caption=_long_date(AFTER))
+        layout.addWidget(self.cmp_image, 1)
         layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
 
         layout.addWidget(self._aqi_table())
