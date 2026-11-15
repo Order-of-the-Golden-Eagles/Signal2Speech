@@ -46,6 +46,8 @@ AQI_COLORS = {
 }
 
 BLANK_HINT = "The map appears after a confirmed choice."
+#: How faint the idle picture is. Low enough that nobody takes it for the revealed map.
+IDLE_OPACITY = 0.30
 # Text sizes in px. They keep the view inside the app's output panel (#4) next to the selection
 # tiles on a 1536x864 screen (1920x1080 at 125%). The images take the remaining space.
 TITLE_PX, BODY_PX, SMALL_PX = 26, 17, 13
@@ -115,6 +117,7 @@ class MapImage(QWidget):
         self.caption = caption
         self.caption_short = caption_short    # used when the full caption won't fit the image
         self._pixmap = QPixmap(str(dataset.images[date]))
+        self.opacity = 1.0                    # below 1 draws the whole map faintly (idle panel, #182)
         self.setMinimumSize(200, 111)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -213,6 +216,7 @@ class MapImage(QWidget):
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
+        painter.setOpacity(self.opacity)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         r = self.image_rect()
@@ -398,10 +402,25 @@ class OpenOrbitView(QWidget):
         return page, layout
 
     def _build_blank(self) -> QWidget:
+        """Before any confirm: a dimmed look at the region, so the panel isn't an empty box (#182).
+        It is plainly not the reveal: it is faint, has no data on it, and says what it's waiting for."""
         page, layout = self._page()
-        layout.addStretch(1)
-        layout.addWidget(_label(BLANK_HINT, SMALL_PX + 2, MUTED, align=Qt.AlignCenter))
-        layout.addStretch(1)
+        ds = self.dataset
+        if ds is None or self.data_error is not None:
+            layout.addStretch(1)
+            layout.addWidget(_label(BLANK_HINT, SMALL_PX + 2, MUTED, align=Qt.AlignCenter))
+            layout.addStretch(1)
+            return page
+        layout.addWidget(_label("Wildfire smoke over southeast Michigan", TITLE_PX, MUTED, bold=True))
+        layout.addWidget(_label(f"{_long_date(BEFORE)} and {_long_date(AFTER)}  ·  NASA satellite imagery "
+                                "and EPA air quality", SMALL_PX + 2, MUTED))
+        self.idle_image = MapImage(ds, AFTER)
+        # Drawn faintly by the painter itself. A graphics effect on this custom-painted widget
+        # crashed the test run on macOS (bus error).
+        self.idle_image.opacity = IDLE_OPACITY
+        layout.addWidget(self.idle_image, 1)
+        layout.addWidget(_label(BLANK_HINT, BODY_PX, MUTED, align=Qt.AlignCenter))
+        layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
         return page
 
     def _build_missing(self, error: str) -> QWidget:

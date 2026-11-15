@@ -666,6 +666,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - This is offline analysis of five people who are not our wearer, labelled Recorded. It shows the method works on real human brain responses. It doesn't predict a live wearer's accuracy
 - Verified on the judging laptop against the real dataset; one new test uses a made-up recording, since the dataset is never committed
 
+## 11/15/26 - 7:12 AM - Vasanth Anbukumar - #182 The map panel shows the region before anything is confirmed ([PR #219](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/219))
+- Before a choice is confirmed, the right-hand panel used to be an empty box with one line of small text. It now shows a faint satellite view of southeast Michigan with both places marked, the two dates, and the same line: "The map appears after a confirmed choice."
+- It can't be mistaken for the result: the picture is dimmed to 30 %, carries no air-quality numbers, and the NASA credit stays visible
+- Why: on the judging laptop the app's first screen was half empty, which read as unfinished
+- This is the first part of #182 only. The animated reveal and the bar chart of the two counties aren't built
+- Verified by screenshot on the judging laptop's real display, and by one new test that checks no results appear before a confirm
 ## 11/15/26 - 7:36 AM - Vasanth Anbukumar - #143 The two-minute script and judge answers now match what we can actually show ([PR #220](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/220))
 - `docs/demo-submission/stage-script.md` opens with a judging-day plan for no headset: one command to start, what to say second by second, and what never to say
     - Start it before the judge arrives: `python -m signal2speech.app --input recorded --sim 2,1,1,1,2,1,1,1 --fullscreen`. Setup takes about 70 seconds and is silent
