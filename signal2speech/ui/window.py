@@ -525,6 +525,7 @@ class SelectionWindow(QMainWindow):
             self.ring.reset()
             self.ring.label = "Hold 1\nor close eyes" if self.eyes_can_confirm() else "Hold 1"
             was_hidden = self.preview_box.isHidden()
+            self.preview.setVisible(True)          # calibration hides the label itself
             self.preview_box.setVisible(True)
             if was_hidden:
                 fade_in(self.preview_box, P.BG)       # the words arrive, they don't pop
@@ -579,6 +580,7 @@ class SelectionWindow(QMainWindow):
                 self.preview.setText(f"“{spoken.spoken_text or spoken.label}”")
                 self.ring.mark_confirmed(filled_by)
                 was_hidden = self.preview_box.isHidden()
+                self.preview.setVisible(True)      # calibration hides the label itself
                 self.preview_box.setVisible(True)
                 if was_hidden:
                     fade_in(self.preview_box, P.BG)       # the words arrive, they don't pop

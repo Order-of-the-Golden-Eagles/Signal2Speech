@@ -199,9 +199,11 @@ class AnsweringDemo:
 
     def _arm_recorded(self) -> None:
         """Recorded input: one scripted look and one confirm, then the script is empty again."""
-        if self.recorded and self._asked:
+        if not self.recorded:
+            return
+        self.app.sim.script.clear()            # a look left over from a replaced round never carries on
+        if self._asked:
             self._asked = False
-            self.app.sim.script.clear()
             self.app.sim.script.extend([self.next_pick, 1])
             self.next_pick = 2 if self.next_pick == 1 else 1
 
@@ -277,6 +279,7 @@ class AnsweringDemo:
             self.current = rs
             self.panel.show_origin(rs)
             self.app.choices = list(rs.choices)
+            self.app.options_origin = rs.origin.lower()      # never "from Claude" for saved phrases
 
 
 def main(argv=None) -> int:
