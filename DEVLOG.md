@@ -427,6 +427,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every claim was checked against the code. Two were fixed: we don't have "required" CI checks (just CI on every change), and the AI-reply wording depends on whether #116 is merged when we submit
 - The text never says the headset was used on a real wearer, because it hasn't been yet
 - Two AI answers are ready, one for each state of #116, so we never claim a feature that isn't merged when we submit
+
 ## 11/14/26 - 9:20 PM - In Young Song - #138 PiEEG's simulator drives the eye-closure confirm ([PR #144](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/144))
 - PiEEG's own simulated EEG now runs through our g.Pype pipeline: a keyboard preview, then PiEEG's "eyes closed" alpha burst confirms it, and the map changes and the line is spoken once
     - `python python_quickstart.py --sim --lsl` (PiEEG's starter), then `python -m signal2speech.eeg.pieeg_lsl --demo`. Setup is in `docs/eeg-hardware/pieeg.md`
@@ -449,6 +450,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - With the real headset it reports signal quality and the eye-closure signal. The P300 needs tiles on screen, so use the app or the evidence view for that
 - Still to do: record the 30-second clip for the video (#34), and try it with a real wearer
 - Code review follow-up: the evidence window closes when the assistant disconnects, a missing or busy headset fails cleanly instead of hanging, and the accuracy figure counts every sequence, including ones with no answer
+
 ## 11/14/26 - 9:36 PM - Long Le - #132 Video title card, closing card, and diagram ([PR #147](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/147))
 - The submission video has its three graphics ready in `docs/demo-submission/media/`: a title card, a closing card with the repo link and AI-use note, and an architecture diagram for shot 9
 - They're drawn by a script, so changing a name or a line is one command: `python docs/demo-submission/make_graphics.py`
@@ -487,6 +489,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The June 26 satellite image is mostly cloud, and the screen now says so, so nobody reads white cloud as clean air
 - Checked against EPA and NASA documentation and news reports of the June 28 smoke alert. The judge Q&A has three science answers ready
 - After review, corrected the fire distances from FIRMS data (most fires about 1,340 km away in Quebec, a few small ones closer, nearest 84 km), made Wayne the like-for-like PM2.5 comparison, and kept the June 26 caption inside the image on small screens. Verified with `pytest tests/test_openorbit.py` (keyboard and offscreen only)
+
 ## 11/14/26 - 11:03 PM - Long Le - #128 Judge Q&A cites the response times ([PR #157](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/157))
 - The judge Q&A now answers "How fast does it respond?" with the measured times: map change in 2–30 ms and speech starting in about 15–50 ms after a confirm
 - It's honest about where the time really goes: the P300 choice takes a flash sequence (about 2.5–3.5 s), and the alpha confirm lands about 1.2–1.5 s after the eyes close. Those EEG numbers come from simulated data until the headset run
@@ -496,6 +499,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Worked out what to record for the demo video and handed it to Vasanth as #160: a screen recording only, no headset, 2:30 or less, which fits both the Devpost and g.tec limits
     - Exact commands, what each shot shows, the narration, and how to export. Every brain-signal shot is labelled Simulated or Keyboard
 - The Devpost checklist now uses the grounded-Claude AI answer (#116 merged) and enters the Beyond the Horizon prize (#153)
+
 ## 11/14/26 - 11:14 PM - Long Le - #106 Real Claude replies re-checked after grounding ([PR #158](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/158))
 - Re-tested the AI demo window on the current code (Claude Sonnet 5.5 with grounded replies): a fresh question got two good replies in about 2 seconds, and the confirmed one was spoken once
 - The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
@@ -508,6 +512,16 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The pre-push hook does the same locally: quick checks always, and the full test suite only when the pushed commits change code, tests, data, or build files
 - Anything under `signal2speech/`, `tests/`, `contracts/`, `data/` (except its `.md` notes), `tools/`, `.github/`, `.githooks/`, or the dependency files still runs everything. Pushes to `main` always run the full suite on every OS
 
+## 11/15/26 - 12:11 AM - Vasanth Anbukumar - #150 The program detects the EEG device and picks the right channels ([PR #186](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/186))
+- One eyes-closed check now works on different amplifiers without anyone setting channel numbers: `python -m signal2speech.eeg.lsl_source --input live --demo`
+    - g.tec devices have a fixed electrode layout, so it uses the three back-of-head electrodes (PO7, Oz, PO8)
+    - The PiEEG Octopus 16 is a coin-sized puck with 16 pins on one spot. The check drops pins that aren't touching and averages every pin that responds when the wearer closes their eyes
+- Why: the confirm watched channels 6 to 8, which is right for the g.tec Unicorn and wrong for a 16-pin board. g.tec's g.Pype is still the whole pipeline; the PiEEG board is only an extra amplifier, read over LSL
+- Live confirm switches on only after a clean check on that wearer: no false triggers at rest and exactly one confirm per eye closure
+- Reviewers can reproduce our numbers on g.tec's own data with no hardware: `python -m signal2speech.evidence.dataset path/to/p300-speller` (new README section)
+- The library run sheet is in `docs/eeg-hardware/README.md`: power bank only while worn, close PiEEG Cloud first (one Bluetooth connection at a time), puck on the back of the head
+- First-run check: `python -m signal2speech.eeg.lsl_source --input live --check` detects the board, measures the sample rate, and reports each pin's contact in about 10 seconds, with no prompts
+- Verified against PiEEG's own script (their simulator publishing the real stream): detected as the Octopus 16 at 250 samples per second. Also verified with a stream that really sends 244 per second, as some boards do, and on our simulated 16-pin stream, where it found the flat pin and the loose pin, used the other 14, and confirmed once per closure. Not yet tried on a real board or a real person
 ## 11/15/26 - 11:59 PM - Long Le - #174 One visual design and redesigned tiles ([PR #185](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/185))
 - The app now has one visual design: `signal2speech/ui/theme.py` sets the colours, text sizes, spacing, and corners, and every screen we built uses it
 - The two choice tiles are redesigned: an icon, a clear title, a one-line "what happens" line, and the key as a small badge in the corner instead of "[1]" in the title. They have distinct idle, flashing, selected (green check after a confirm), and waiting states
