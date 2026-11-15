@@ -518,6 +518,7 @@ class RecordedEegInput(LiveEegInput):
                  responses: p300.RecordedResponses, soa_s: float = p300.RECORDED_SOA_S,
                  narrator: Optional[Callable[[str], None]] = None, **kwargs):
         self.narrator = narrator                   # speaks the walkthrough's guidance lines
+        self.mark_gaze = True                      # outline the card the wearer would look at
         super().__init__(handler, window, log, source="recorded", recorded=responses,
                          soa_s=soa_s, **kwargs)
         self.responses = responses
@@ -532,7 +533,7 @@ class RecordedEegInput(LiveEegInput):
         needs to see where the attention is. That choice is the scripted part, and the strip says
         the EEG is recorded."""
         for target, tile in self.window.tiles.items():
-            on = attended is not None and target == attended
+            on = self.mark_gaze and attended is not None and target == attended
             tile.highlight = on
             tile.note = GAZE_NOTE if on else None
             tile.update()

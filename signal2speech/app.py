@@ -908,6 +908,10 @@ def main(argv=None) -> int:
                    help="live/--p300: seconds of eyes open, then closed, for the alpha switch")
     p.add_argument("--practice", action="store_true",
                    help="start with the 30 s practice round (#196); P starts it any time")
+    p.add_argument("--no-gaze-mark", action="store_true",
+                   help="--input recorded: don't outline the card the wearer would be looking at")
+    p.add_argument("--no-narration", action="store_true",
+                   help="--input recorded: don't speak the walkthrough's guidance lines")
     p.add_argument("--no-intro", action="store_true",
                    help="skip the opening animation of the two cards")
     p.add_argument("--no-attract", action="store_true",
@@ -1018,6 +1022,10 @@ def main(argv=None) -> int:
         print(f"Couldn't set up the EEG pipeline: {type(err).__name__}: {err}\n{setup_help()}",
               file=sys.stderr)
         return 3
+    if source == InputSources.RECORDED:
+        app.sim.mark_gaze = not args.no_gaze_mark
+        if args.no_narration:
+            app.sim.narrator = None
     qapp.aboutToQuit.connect(app.close)
     if not args.no_report:
         qapp.aboutToQuit.connect(lambda: print(f"session report: {app.write_report()}", flush=True))
