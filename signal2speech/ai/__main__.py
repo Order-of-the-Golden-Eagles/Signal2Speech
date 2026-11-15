@@ -31,13 +31,11 @@ CHAT_SPLIT = (3, 2)
 CHAT_TILE_HEIGHT = 300
 CHAT_TILE_PX = (30, 20)        # title size on the reply cards: from, and down to for long replies
 CHAT_LOG_HEIGHT = 300          # the conversation box: room for one question and its answer
-SUITE_HELP = ("Could not read the headset from Unicorn Suite.
-"
-              "  1. Open Unicorn Suite, then Unicorn Recorder, and connect the headset there.
-"
-              "  2. In Unicorn Recorder, switch on its LSL output and start the acquisition.
-"
-              "  3. Run this again. A stream with another name: set SIGNAL2SPEECH_LSL_NAME to it.")
+SUITE_HELP = "\n".join([
+    "Could not read the headset from Unicorn Suite.",
+    "  1. Open Unicorn Suite, then Unicorn Recorder, and connect the headset there.",
+    "  2. In Unicorn Recorder, switch on its LSL output and start the acquisition.",
+    "  3. Run this again. A stream with another name: set SIGNAL2SPEECH_LSL_NAME to it."])
 READ_S = 17                     # headset: seconds to read the replies before the cards flash
 NASA_QUESTION = "Which county's AQI rose more when wildfire smoke reached southeast Michigan?"
 
@@ -531,7 +529,7 @@ def main(argv=None) -> int:
             raise
         from signal2speech.eeg.app_live import PAIRING_HELP
         print(f"Couldn't set up the EEG pipeline: {type(err).__name__}: {err}"
-              + (f"\n{PAIRING_HELP}" if source == InputSources.LIVE_EEG else ""), file=sys.stderr)
+              + (f"\n{SUITE_HELP if args.via_suite else PAIRING_HELP}" if source == InputSources.LIVE_EEG else ""), file=sys.stderr)
         return 3
     demo.read_s = max(0, args.read_seconds)
     demo.root.show()
@@ -550,7 +548,7 @@ def main(argv=None) -> int:
             from signal2speech.eeg.app_live import PAIRING_HELP
             demo.app.close()
             print(f"{type(err).__name__}: {err}"
-                  + (f"\n{PAIRING_HELP}" if source == InputSources.LIVE_EEG else ""), file=sys.stderr)
+                  + (f"\n{SUITE_HELP if args.via_suite else PAIRING_HELP}" if source == InputSources.LIVE_EEG else ""), file=sys.stderr)
             return 3
         try:
             ok = demo.app.sim.calibrate({TargetIds.TARGET_1: "Reply 1", TargetIds.TARGET_2: "Reply 2"})
