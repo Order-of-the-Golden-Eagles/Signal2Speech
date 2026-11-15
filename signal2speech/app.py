@@ -42,6 +42,7 @@ from signal2speech.core import (ActionIds, Choice, ConfirmedAction, EegClassMap,
                                 InputSources, Outcome, Round, RoundKind, SelectionEvent,
                                 SelectionHandler, TargetIds)
 from signal2speech.speech import MutedSpeaker, OfflineSpeaker, Speaker
+from signal2speech.speech.neural import PiperVoice
 from signal2speech.ui import INPUT_LABELS, KeyHelpOverlay, SelectionWindow
 from signal2speech.ui import theme as T
 from signal2speech.ui.conversation import KINDS, ConversationView
@@ -276,7 +277,8 @@ class App:
         self.log = Transcript(self.transcript_view, echo=echo)
         self.view = view if view is not None else load_view()
         if speaker is None:
-            speaker = MutedSpeaker(self.log) if mute else OfflineSpeaker(self.log)
+            speaker = (MutedSpeaker(self.log) if mute
+                       else OfflineSpeaker(self.log, neural=PiperVoice.find()))
         self.speaker = speaker
         self.sink = AppSink(self.view, speaker, self.log, clock=clock)
         self.sink.on_timing = self._show_timing
@@ -295,6 +297,9 @@ class App:
         h = self.handler
         h.on_round_opened.append(self._log_round)
         h.on_preview.append(lambda c: self.log(f"preview (no output): \"{c.spoken_text or c.label}\""))
+        prepare = getattr(self.speaker, "prepare", None)     # make the audio while it's previewed
+        if prepare is not None:
+            h.on_preview.append(lambda c: prepare(c.spoken_text) if c.spoken_text else None)
         h.on_cleared.append(lambda r: self.log(f"cleared ({r}): no output"))
         h.on_handled.append(self._log_outcome)
         h.on_round_opened.append(self._talk_round)          # #176, same events as the log

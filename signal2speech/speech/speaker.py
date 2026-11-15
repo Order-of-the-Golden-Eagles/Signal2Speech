@@ -1,6 +1,9 @@
 """Offline speech (#25, #28). Only AppSink calls say(), once per confirmed action.
 
 Order, all offline:
+0. A natural neural voice (Piper, see neural.py), when it is installed and a voice file is
+   present. It speaks every line, so the wearer has one voice. If a line can't be made, the
+   steps below take over for that line.
 1. Bundled clip: data/openorbit/audio/<action_id>.wav, only for the fixed OpenOrbit lines
    (show_satellite, compare_air_quality). Generated replies never use a clip, because a
    recording can't match words the wearer just approved.
@@ -17,9 +20,14 @@ import sys
 from pathlib import Path
 from typing import Callable, List, Optional, Protocol
 
-from PySide6.QtCore import QObject, QUrl
+from PySide6.QtCore import QObject, QTimer, QUrl
 
 from signal2speech.core import ActionIds
+from signal2speech.speech.neural import PiperVoice
+
+#: How often to look whether a line being made is ready, and how long to wait before giving up.
+NEURAL_POLL_MS = 25
+NEURAL_WAIT_MS = 6000
 
 ROOT = Path(__file__).resolve().parents[2]
 AUDIO_DIR = ROOT / "data" / "openorbit" / "audio"
@@ -55,8 +63,11 @@ class MutedSpeaker:
 
 class OfflineSpeaker(QObject):
     def __init__(self, log: Log, audio_dir: Path = AUDIO_DIR, use_qt_tts: bool = True,
-                 parent: Optional[QObject] = None):
+                 parent: Optional[QObject] = None, neural: Optional[PiperVoice] = None):
         super().__init__(parent)
+        self.neural = neural                                 # the natural voice, when available
+        self._waiting = None                                 # the neural clip say() is waiting for
+        self._waited_ms = 0
         self.log = log
         self.audio_dir = audio_dir
         self._sound = None
@@ -65,7 +76,8 @@ class OfflineSpeaker(QObject):
         self.on_started: Optional[Callable[[], None]] = None
         self._awaiting_start = False
         self.tts = self._make_qt_tts() if use_qt_tts else None
-        self.backend = ("Qt TextToSpeech (" + self.tts.engine() + ")") if self.tts else self._pyttsx3_name()
+        self.fallback_backend = ("Qt TextToSpeech (" + self.tts.engine() + ")") if self.tts else self._pyttsx3_name()
+        self.backend = f"Piper ({self.neural.name})" if self.neural else self.fallback_backend
 
     def _make_qt_tts(self):
         try:
@@ -95,31 +107,66 @@ class OfflineSpeaker(QObject):
             return "none"
         return "pyttsx3"
 
+    def prepare(self, text: str) -> None:
+        """Start making a line that may be spoken soon (it is on screen as a preview), so it is
+        ready the moment the wearer confirms. Makes no sound."""
+        if self.neural is not None and text:
+            self.neural.request(text)
+
     def say(self, text: str, clip: Optional[str] = None) -> None:
         self._awaiting_start = True
+        self._waiting = None
+        if self.neural is not None:
+            self._waiting, self._waited_ms = (self.neural.request(text), clip), 0
+            self._play_neural_when_ready()
+            return
+        self._say_without_neural(text, clip)
+
+    def _play_neural_when_ready(self) -> None:
+        if self._waiting is None:
+            return
+        made, clip = self._waiting
+        state = made.state()
+        if state == "working" and self._waited_ms < NEURAL_WAIT_MS:
+            self._waited_ms += NEURAL_POLL_MS
+            QTimer.singleShot(NEURAL_POLL_MS, self._play_neural_when_ready)
+            return
+        self._waiting = None
+        if state == "ready":
+            self._play_wav(made.wav)
+            self.log(f"speech: natural voice, {self.backend}"
+                     + (f" (waited {self._waited_ms} ms)" if self._waited_ms else ""))
+            return
+        self.log("speech: the natural voice couldn't make this line, using the standard voice")
+        self._say_without_neural(made.text, clip)
+
+    def _play_wav(self, wav: Path) -> None:
+        from PySide6.QtMultimedia import QSoundEffect
+        self._sound = QSoundEffect(self)
+        sound = self._sound
+        if hasattr(sound, "playingChanged"):
+            def on_playing(sound=sound) -> None:
+                try:
+                    playing = sound.isPlaying()
+                except RuntimeError:          # Qt already deleted it (app quitting)
+                    return
+                if playing:
+                    self._started()
+            sound.playingChanged.connect(on_playing)
+        self._sound.setSource(QUrl.fromLocalFile(str(wav)))
+        self._sound.play()
+
+    def _say_without_neural(self, text: str, clip: Optional[str] = None) -> None:
         wav = bundled_clip(clip, self.audio_dir)
         if wav is not None:
-            from PySide6.QtMultimedia import QSoundEffect
-            self._sound = QSoundEffect(self)
-            sound = self._sound
-            if hasattr(sound, "playingChanged"):
-                def on_playing(sound=sound) -> None:
-                    try:
-                        playing = sound.isPlaying()
-                    except RuntimeError:          # Qt already deleted it (app quitting)
-                        return
-                    if playing:
-                        self._started()
-                sound.playingChanged.connect(on_playing)
-            self._sound.setSource(QUrl.fromLocalFile(str(wav)))
-            self._sound.play()
+            self._play_wav(wav)
             self.log(f"speech: bundled {wav.relative_to(ROOT) if wav.is_relative_to(ROOT) else wav}")
             return
         if self.tts is not None:
-            self.log(f"speech: OS voice, {self.backend}")
+            self.log(f"speech: OS voice, {self.fallback_backend}")
             self.tts.say(text)
             return
-        if self.backend == "pyttsx3":
+        if self.fallback_backend == "pyttsx3":
             self.log("speech: pyttsx3, in a helper process")
             self._speak_pyttsx3(text)
             return

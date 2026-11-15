@@ -584,3 +584,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The library run isn't affected either way: on the judging laptop the session uses Windows' own voice, which always spoke every cue
 - If no voice works at all, the cue is still printed and the session carries on
 - Verified on the judging laptop by switching the Windows voice off: three cues in a row spoke for 2.3 s, 2.1 s and 2.2 s. Two new tests. Not tried on a real Mac or Linux machine
+
+## 11/15/26 - 2:38 AM - Vasanth Anbukumar - #206 The wearer now has a natural-sounding voice, still offline (PR pending)
+- The app can speak with a natural neural voice (Piper) instead of Windows' robotic one. It runs on the laptop with no network, so the Wi-Fi-off demo is unchanged
+    - Set up once per machine: `pip install piper-tts` and download one voice file into `voices/`. The steps are in `docs/text-to-speech/README.md`. The judging laptop is set up
+    - Without Piper or the voice file, the app speaks exactly as it did before
+- No wait after confirming: the app starts making the audio while the reply is still a preview. Measured on the judging laptop, speech starts 0.15 s after the confirm
+- Abbreviations are said properly: "AQI" is spoken as "air quality index", and ones we don't know are spelled out letter by letter. The screen still shows the original text
+- Licences to know about: Piper is GPL-3.0, so we run it as a separate program. The voice we chose is for non-commercial use with credit. The 63 MB voice file is not in the repo
+- Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux
