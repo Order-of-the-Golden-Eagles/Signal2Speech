@@ -378,6 +378,8 @@ class Options:
     confirm: str = "auto"               # auto | alpha | keyboard
     seed: int = 0
     logs_dir: str = "logs"
+    show: bool = False                  # tile window + on-screen/spoken cues in simulated mode too
+    voice: bool = True                  # speak wearer cues (offline OS voice)
 
 
 class LiveHarness:
@@ -409,6 +411,30 @@ class LiveHarness:
     # ── plumbing ──
     def say(self, text: str) -> None:
         self.console.say(f"[live:{self.label}] {text}")
+
+    def cue(self, text: str, spoken: Optional[str] = None) -> None:
+        """Wearer instruction: banner on the tile window and, if enabled, spoken aloud."""
+        if self.tiles is not None:
+            self.tiles.set_message(text)
+        voice = getattr(self, "voice", None)
+        if voice is not None:
+            try:
+                voice.say(spoken or text)
+            except Exception:
+                pass
+        if self.app is not None:
+            self.app.processEvents()
+
+    @staticmethod
+    def _spoken_alpha(text: str) -> str:
+        t = text.lower()
+        if "close" in t:
+            return "Close your eyes."
+        if "rest" in t:
+            return "Keep your eyes open and relax."
+        if "open" in t:
+            return "Open your eyes."
+        return text
 
     @property
     def oscar(self) -> str:
@@ -490,8 +516,14 @@ class LiveHarness:
         self.chooser.bridge.listeners.append(self._on_p300)
         if self.alpha_mod is not None:
             self.alpha = self._build_alpha()
-        if not self.simulated:
+        if not self.simulated or self.opts.show:
             self.tiles = p300._TestTiles()
+            if self.opts.voice:
+                try:
+                    from signal2speech.speech.speaker import OfflineSpeaker
+                    self.voice = OfflineSpeaker(lambda _msg: None, use_qt_tts=True)
+                except Exception as err:   # no voice is fine: the banner still shows every cue
+                    self.say(f"(Spoken cues unavailable: {type(err).__name__}: {err})")
 
     def _build_alpha(self):
         """AlphaConfirm (#47). Live: hang its branch off the shared headset pipeline.
@@ -516,25 +548,27 @@ class LiveHarness:
                 self.alpha.start()
         except Exception as err:   # g.Pype raises various errors for a missing device
             self.log.write("device", ok=False, error=f"{type(err).__name__}: {err}")
-            self.say(f"Could not open the source: {type(err).__name__}: {err}")
+            self.say(f"Couldn't connect to the headset ({type(err).__name__}: {err}).")
             if not self.simulated:
                 self.say(PAIRING_HELP)
             return False
         if not self.pump(5.0, until=lambda: self._samples_seen >= RATE):
             self.log.write("device", ok=False, error="no samples within 5 s")
-            self.say("The source opened but sent no samples within 5 s.")
+            self.say("The headset connected but isn't sending any data yet.")
             if not self.simulated:
                 self.say(PAIRING_HELP)
             return False
         self.log.write("device", ok=True, samples=self._samples_seen)
-        self.say(f"Stream is up ({self._samples_seen} samples so far).")
+        self.say(f"Connected. The headset is sending data ({self._samples_seen} samples so far).")
         return True
 
     # ── step 2 ──
     def signal_quality(self) -> QualityReport:
-        self.step(2, f"signal quality for {self.opts.quality_s:g} s, {self.oscar}")
+        self.step(2, f"checking the signal for {self.opts.quality_s:g} seconds ({self.oscar})")
         if not self.simulated:
-            self.say("Sit still, eyes open, relaxed jaw.")
+            self.say("WEARER: sit still with your eyes open. Relax your face and jaw, and don't talk.")
+        self.cue("Sit still with your eyes open. Relax your face and jaw.",
+                 "Sit still with your eyes open, and relax your jaw.")
         with self._ring_lock:
             self._ring.clear()
         self.pump(self.opts.quality_s)
@@ -568,9 +602,11 @@ class LiveHarness:
     # ── step 3 ──
     def calibrate_p300(self) -> bool:
         from signal2speech.eeg import p300
-        self.step(3, f"P300 calibration, {self.opts.calibration} sequences")
+        self.step(3, f"learning how your brain reacts to the flashes ({self.opts.calibration} rounds)")
         if not self.simulated:
-            self.say("Look at the tile with the yellow border and silently count its flashes.")
+            self.say("WEARER: look at the tile with the YELLOW border. Every time it flashes, count it silently in your head. Ignore the other tile.")
+        self.cue("Look at the tile with the YELLOW border.\nCount its flashes silently.",
+                 "Look at the tile with the yellow border, and count its flashes.")
         t0 = time.monotonic()
         tiles = list(p300.FLASH_CODES)
         for i in range(self.opts.calibration):
@@ -582,14 +618,14 @@ class LiveHarness:
             model = self.chooser.finish_calibration()
         except Exception as err:
             self.log.write("p300_calibration", ok=False, error=f"{type(err).__name__}: {err}")
-            self.say(f"P300 calibration failed: {err}")
+            self.say(f"Couldn't learn your brain's response ({err}). Try again with --flashes 12.")
             return False
         cv = calibration_cv_accuracy(model)
         n_t = model.n_target
         self.log.write("p300_calibration", ok=True, target_epochs=n_t,
                        nontarget_epochs=len(model.trials) - n_t, cv_epoch_accuracy=cv,
                        seconds=round(time.monotonic() - t0, 1))
-        self.say(f"Trained LDA on {n_t} target and {len(model.trials) - n_t} non-target epochs; "
+        self.say(f"Learned your response. Trained LDA on {n_t} target and {len(model.trials) - n_t} non-target epochs; "
                  f"cross-validated epoch accuracy {cv if cv is None else f'{cv:.2f}'} "
                  f"(chance 0.50), {time.monotonic() - t0:.0f} s.")
         return True
@@ -603,13 +639,20 @@ class LiveHarness:
             self.say(f"Keyboard confirm: {how}.")
             self.log.write("confirm_calibration", method="keyboard")
             return True
-        self.step(4, f"alpha-switch calibration ({self.opts.alpha_calib_s:g} s open, "
+        self.step(4, f"learning your eyes-closed YES signal ({self.opts.alpha_calib_s:g} s eyes open, "
                      f"{self.opts.alpha_calib_s:g} s closed, {self.opts.alpha_rest_s:g} s rest)")
-        report = self.alpha_mod.measure(self.alpha, self.opts.alpha_calib_s,
-                                        self.opts.alpha_rest_s, closures=2)
+        _orig_prompt = getattr(self.alpha_mod, '_prompt', None)
+        if _orig_prompt is not None:
+            self.alpha_mod._prompt = lambda t: (_orig_prompt(t), self.cue(t, self._spoken_alpha(t)))
+        try:
+            report = self.alpha_mod.measure(self.alpha, self.opts.alpha_calib_s,
+            self.opts.alpha_rest_s, closures=2)
+        finally:
+            if _orig_prompt is not None:
+                self.alpha_mod._prompt = _orig_prompt
         self.log.write("confirm_calibration", method="alpha", report=_scalars(report))
         if "error" in report:
-            self.say(f"Alpha calibration failed: {report['error']}")
+            self.say(f"Couldn't learn the eyes-closed signal ({report['error']}). Re-run with --confirm keyboard to say yes with a key instead.")
             return False
         self.say(f"Alpha calibration: {report.get('calibration')}; "
                  f"false triggers at rest: {report.get('false_triggers')}; "
@@ -633,7 +676,7 @@ class LiveHarness:
             self.log.write("attempt", **asdict(a), p300_correct=a.p300_correct,
                            false_confirm=a.false_confirm)
             mark = "ok" if a.p300_correct else "MISS"
-            self.say(f"  #{a.index}: attend {a.intended} -> preview {a.decoded} ({mark}) -> "
+            self.say(f"  Try {a.index}: looked at {a.intended}, app picked {a.decoded} ({mark}) -> "
                      f"{a.confirm_outcome} via {a.confirm_source or '-'} in {a.seconds} s")
             self.pump(0.5)
         self.pump(p300.TIME_POST + 0.5)   # catch any late decision
@@ -641,7 +684,9 @@ class LiveHarness:
     def _run_attempt(self, a: Attempt) -> None:
         from signal2speech.eeg import p300
         if not self.simulated:
-            self.say(f"Attempt {a.index}: attend {a.intended}.")
+            self.say(f"Try {a.index} of {self.opts.attempts}: WEARER, look at {a.intended.replace('target-', 'tile ')} (the one with the YELLOW border) and count its flashes.")
+            self.cue(f"Try {a.index} of {self.opts.attempts}: look at the YELLOW tile and count its flashes.",
+                     f"Try {a.index}. Look at the yellow tile.")
         t0 = time.monotonic()
         self.handler.begin_choice_round(list(CHOICES))
         outcomes_before = len(self.chooser.bridge.outcomes)
@@ -685,7 +730,9 @@ class LiveHarness:
     def _alpha_confirm(self, intend: bool, confirm_round) -> None:
         bursts = getattr(self.alpha, "bursts", None)
         if not self.simulated:
-            self.say("  Correct preview? Close your eyes ~2 s to confirm. Wrong? Keep them open.")
+            self.say("  Is that the tile you looked at? If YES, close your eyes for about 2 seconds. If NO, keep your eyes open.")
+            self.cue(f"The app picked {str(a.decoded).replace('target-', 'Tile ')}.\nRight? Close your eyes 2 seconds for YES. Keep them open for NO.",
+                     f"The app picked {str(a.decoded).replace('target-', 'tile ')}. If that's right, close your eyes.")
         elif bursts is not None:
             self.pump(self.alpha.settle_s + 0.3)   # eyes open after arming, as a wearer would
             if intend:
@@ -699,7 +746,9 @@ class LiveHarness:
         if self.simulated:
             self.keyboard.select_now(TargetIds.TARGET_1 if intend else TargetIds.TARGET_2)
             return
-        ans = self.console.ask(f"  Preview is {a.decoded}. Confirm? y=confirm, Enter=cancel", "")
+        self.cue(f"The app picked {str(a.decoded).replace('target-', 'Tile ')}. Right? Press y then Enter for YES, Enter for NO.",
+                 f"The app picked {str(a.decoded).replace('target-', 'tile ')}. Is that right?")
+        ans = self.console.ask(f"  The app picked {str(a.decoded).replace('target-', 'tile ')}. Is that right? Type y and press Enter for YES, or just press Enter for NO.", "")
         self.pump(0.05)
         self.keyboard.select_now(TargetIds.TARGET_1 if ans.lower().startswith("y")
                                  else TargetIds.TARGET_2)
@@ -707,6 +756,7 @@ class LiveHarness:
     # ── step 6 ──
     def finish(self) -> ArmingDecision:
         self.step(6, "summary")
+        self.cue("Done. Thank you! You can relax.", "Done. Thank you.")
         summary = self.stats.summary()
         decision = decide_arming(self.stats)
         self.log.write("summary", **summary, arming_safe=decision.safe,
@@ -744,9 +794,9 @@ class LiveHarness:
             if not self.device_check():
                 return EXIT_NO_DEVICE
             report = self.signal_quality()
-            if not report.go and not self.console.yes("Signal quality is NO-GO. Continue anyway?",
+            if not report.go and not self.console.yes("The signal is too noisy (NO-GO). Continue anyway? Better: adjust the headset and start again.",
                                                       default=self.simulated):
-                self.say("Stopped at signal quality. Re-seat the electrodes and run again.")
+                self.say("Stopped because the signal is too noisy. Adjust the headset so the electrodes touch the scalp, then run the same command again.")
                 return EXIT_NO_GO
             if not self.calibrate_p300() or not self.calibrate_confirm():
                 return EXIT_CALIBRATION
@@ -816,12 +866,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--no-oscar", action="store_true", help="HybridBlack without OSCAR")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--logs", default="logs", help="log directory (gitignored)")
+    ap.add_argument("--show", action="store_true",
+                    help="show the tile window and on-screen/spoken cues in a simulated run too")
+    ap.add_argument("--no-voice", action="store_true", help="banner cues only, no speech")
     args = ap.parse_args(argv)
     opts = Options(source=args.source, attempts=args.attempts, quality_s=args.quality_s,
                    calibration=args.calibration, flashes=args.flashes, soa=args.soa,
                    confirm_timeout_s=args.confirm_timeout, alpha_calib_s=args.alpha_calib_s,
                    alpha_rest_s=args.alpha_rest_s, enable_oscar=not args.no_oscar,
-                   confirm=args.confirm, seed=args.seed, logs_dir=args.logs)
+                   confirm=args.confirm, seed=args.seed, logs_dir=args.logs,
+                   show=args.show, voice=not args.no_voice)
     harness = LiveHarness(opts)
     if args.confirm == "alpha" and harness.alpha_mod is None:
         harness.say("--confirm alpha needs signal2speech/eeg/alpha_confirm.py (#47); "

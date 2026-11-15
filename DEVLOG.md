@@ -203,6 +203,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Tested the maths and the PASS/WARN rules without a screen (18 tests), and ran the tool briefly in headless mode to show it works. Headless numbers mean nothing, so the tool always says WARN there
 - Not done yet: a run on the judging laptop's real display, and the camera or light-sensor check
 
+## 11/14/26 - 5:45 PM - MagicJester2764 - #38 Proved the PR check passes and fails ([PR #75](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/75))
+- Pushed a test that fails on purpose. CI went red on all four systems and pointed straight at the failing test. Then I removed it to get green again
+- That closes out #14: every PR now shows a clear pass or fail without needing the headset
+- Explained in the workflow why Ubuntu runs twice: Python 3.12 is what the judging laptop uses, and 3.13 is an early warning for newer Python. It caught a real bug on its first day
+- Recorded a flaky evidence test on macOS (#48) so nobody chases it as a real failure
+
 ## 11/14/26 - 5:45 PM - Vasanth Anbukumar - #23 Guided live-run harness ([PR #78](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/78))
 - Added one command for the headset slot: `python -m signal2speech.eeg.live --source hybridblack`. It walks through the device check, signal quality, P300 calibration, confirm calibration, 10 live attempts, and a summary
 - If the headset isn't paired, it says how to pair it and exits cleanly. If signal quality is bad, it names the bad channels and stops unless you choose to continue
@@ -210,12 +216,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every outcome, accuracy, and time per selection goes to `logs/` (not committed). The log refuses raw EEG on purpose
 - A dry run with the alpha switch from #47 showed that the P300 and alpha inputs both start their event IDs at 1, so the second one was thrown away as a duplicate. The harness tags them apart, and the app will need the same fix
 - Verified on simulated input only: `--source generator` now uses the merged alpha switch and ran start to finish in about 160 s (10/10 confirmed by simulated eye closures, 0 false triggers, 0 false confirms). Tests also inject a wrong decode to check the cancel, timeout, and false-confirm paths, and 194 tests pass. Nothing has run on the real headset yet
-
-## 11/14/26 - 5:45 PM - MagicJester2764 - #38 Proved the PR check passes and fails ([PR #75](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/75))
-- Pushed a test that fails on purpose. CI went red on all four systems and pointed straight at the failing test. Then I removed it to get green again
-- That closes out #14: every PR now shows a clear pass or fail without needing the headset
-- Explained in the workflow why Ubuntu runs twice: Python 3.12 is what the judging laptop uses, and 3.13 is an early warning for newer Python. It caught a real bug on its first day
-- Recorded a flaky evidence test on macOS (#48) so nobody chases it as a real failure
 
 ## 11/14/26 - 5:58 PM - MagicJester2764 - #26 Recovery checks ([PR #80](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/80))
 - Proved that nothing goes wrong when things go wrong: cancelling, a headset drop, repeated keys, and late or replayed brain decisions never cause an extra map change or spoken line
@@ -351,6 +351,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Updated the script for what's on `main` now: the real map with its 8 s reveal, fullscreen, F1 key help, and the confirm countdown. Submission fields live only in `submission-checklist.md`
 - Checked: every relative link in the folder resolves. Docs only
 
+## 11/14/26 - 8:13 PM - Vasanth Anbukumar - #23 Plain-language prompts in the live-run guide ([PR #127](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/127))
+- The guided headset test (`python -m signal2speech.eeg.live --source hybridblack`) now speaks to the wearer in plain words: "WEARER: look at the tile with the YELLOW border… count it silently", "If YES, close your eyes for about 2 seconds"
+- Steps read as what's happening ("checking the signal", "learning how your brain reacts to the flashes", "learning your eyes-closed YES signal") instead of jargon
+- Error messages say what to do next (adjust the headset, re-run with `--flashes 12`, or use `--confirm keyboard`)
+- Only the wording changed; the steps, timing, and safety rules are the same. Checked with a dry run on simulated data; the wearer prompts appear only with the real headset
+
 ## 11/14/26 - 8:30 PM - In Young Song - #107 Code tour ([PR #123](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/123))
 - Any teammate can now walk a judge through the code in five minutes: `docs/demo-submission/code-tour.md`
     - It goes flash to P300 decision, eye-closure confirm, why nothing is spoken twice, where the map and voice run, then CI and the git hooks, with one sentence to say at each stop
@@ -363,3 +369,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - They're made with espeak-ng, an open-source voice whose output we can share freely. It sounds robotic but clear. `python data/openorbit/audio/make_audio.py` regenerates them
 - A test fails if the contract wording or the dataset's comparison line changes without regenerating the audio, so the words heard always match the words on screen. AI replies still use the live OS voice
 - Checked on a Mac: the app played the bundled clip (Qt status Ready, played to the end), and the phonemes say "A-Q-I" and "Washtenaw" correctly. Not yet heard through the judging laptop's speakers
+
+## 11/14/26 - 8:44 PM - Vasanth Anbukumar - #23 On-screen and spoken cues for the wearer ([PR #127](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/127))
+- The guided test now tells the wearer what to do on the tile window itself (a big yellow instruction line) and out loud with the laptop's offline voice: "Look at the yellow tile", "Close your eyes", "The app picked tile 2. If that's right, close your eyes"
+    - So one person can wear the headset without watching the terminal, and eyes-closed steps work because the cues are spoken
+- New `--show` flag: `python -m signal2speech.eeg.live --source generator --show` opens the same window and cues on simulated data, so judges can watch the flow without hardware. `--no-voice` keeps the banner but mutes speech
+- Tiles now read "Tile 1" and "Tile 2" instead of internal IDs
+- Only prompts and the window changed; the EEG decoding and safety rules are the same. Checked with a simulated run (2/2 correct, 0 false confirms) and the fast EEG tests (50 passed). Whether the voice is audible was checked by ear on the judging laptop
