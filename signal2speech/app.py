@@ -223,7 +223,11 @@ class App:
                  confirm_timeout_ms: int = CONFIRM_TIMEOUT_MS,
                  p300: bool = False, arm_live_confirm: bool = False,
                  live_options: Optional[dict] = None,
+                 pieeg: Optional[dict] = None,
                  clock: Callable[[], float] = time.monotonic):
+        if pieeg is not None and input_source != InputSources.KEYBOARD:
+            raise ValueError("--input pieeg chooses by keyboard: the board gives the eyes-closed "
+                             "confirm only (#172)")
         if input_source in BLOCKED_INPUTS:
             raise ValueError(BLOCKED_INPUTS[input_source])
         if input_source not in (InputSources.KEYBOARD, InputSources.SIMULATED,
@@ -272,6 +276,11 @@ class App:
                 script=sim_script or [2, 1], arm_live_confirm=arm_live_confirm,
                 **(live_options or {}))
             sim_label = self.sim.connection_label()
+        elif pieeg is not None:
+            # #172: keys choose; a PiEEG board's eye closure confirms, after this session's check.
+            from signal2speech.eeg.app_live import PiEEGConfirm
+            self.sim = PiEEGConfirm(h, self.window, self.log, **pieeg)
+            sim_label = self.sim.connection_label()
         elif input_source == InputSources.SIMULATED:
             self.sim, sim_label = make_simulated_input(h, self.window, sim_script or [2, 1],
                                                        self.log, confirm_delay_ms)
@@ -298,7 +307,7 @@ class App:
         h.on_round_opened.append(lambda _r: self._set_reveal(False))
 
         self.root = QWidget()
-        self.root.setWindowTitle(f"Signal2Speech · {INPUT_LABELS[input_source]}")
+        self.root.setWindowTitle(f"Signal2Speech · {self.input_summary()}")
         self.root.setStyleSheet(f"background:{T.BG};")
         right = QVBoxLayout()
         title = QLabel("Output and transcript")
@@ -331,13 +340,19 @@ class App:
                 ("F1", "Show or hide this help")]
         if hasattr(self.sim, "set_next"):
             rows.insert(3, ("Ctrl+1 / Ctrl+2", "Pick for the simulated decoder"))
-        self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {INPUT_LABELS[input_source]}")
+        self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {self.input_summary()}")
         for seq, fn in (("F1", self.help.toggle), ("F11", self.toggle_fullscreen)):
             s3 = QShortcut(QKeySequence(seq), self.root)
             s3.setAutoRepeat(False)
             s3.activated.connect(fn)
-        self.log(f"input: {INPUT_LABELS[input_source]}" + (f" ({sim_label})" if sim_label else ""))
+        self.log(f"input: {self.input_summary()}" + (f" ({sim_label})" if sim_label else ""))
         self.log(f"speech: {getattr(self.speaker, 'backend', type(self.speaker).__name__)}")
+
+    def input_summary(self) -> str:
+        """The input as judges should read it. With a PiEEG confirm (#172), both inputs."""
+        if hasattr(self.sim, "strip_text"):
+            return self.sim.strip_text()
+        return INPUT_LABELS[self.input_source]
 
     def toggle_fullscreen(self) -> None:
         if self.root.isFullScreen():
@@ -432,7 +447,7 @@ class App:
             commit = ""
         lines = [f"# Signal2Speech session · {self.started_at}", "",
                  f"- **Commit:** `{commit or 'unknown'}`",
-                 f"- **Input:** {INPUT_LABELS[self.input_source]}",
+                 f"- **Input:** {self.input_summary()}",
                  f"- **Connection:** {self.window.connection_label.text().removeprefix('Connection: ')}"
                  if self.window.connection_label.isVisibleTo(self.window) else "- **Connection:** n/a",
                  f"- **Speech:** {getattr(self.speaker, 'backend', type(self.speaker).__name__)}",
@@ -493,7 +508,7 @@ def _timeout_seconds(text: str) -> float:
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python -m signal2speech.app")
     p.add_argument("--input", default=InputSources.KEYBOARD,
-                   choices=["keyboard", "simulated", "recorded", "live"])
+                   choices=["keyboard", "simulated", "recorded", "live", "pieeg"])
     p.add_argument("--sim", default="2,1", help="simulated classes in order, e.g. '2,1' "
                                                 "(choose target-2, then confirm)")
     p.add_argument("--keys", default="", help="keyboard presses after start, e.g. '2,1'")
@@ -511,6 +526,20 @@ def main(argv=None) -> int:
                    help="live/--p300: P300 calibration sequences before the demo")
     p.add_argument("--alpha-calib-s", type=float, default=10.0,
                    help="live/--p300: seconds of eyes open, then closed, for the alpha switch")
+    g = p.add_argument_group("PiEEG eye-closure confirm (--input pieeg, #172)")
+    g.add_argument("--pieeg", choices=["live", "simulated", "recorded"],
+                   help="what is publishing the board's LSL stream: a real board on a person, "
+                        "a simulator, or a replayed recording. Required: LSL can't prove it")
+    g.add_argument("--pieeg-self-test", action="store_true",
+                   help="publish our own simulated 16-pin stream (no board), labelled Simulated")
+    g.add_argument("--stream", default=None, help="LSL stream name (PiEEG: Octopus16)")
+    g.add_argument("--any-host", action="store_true",
+                   help="accept the stream from another computer (default: this computer only)")
+    g.add_argument("--channels", default="auto",
+                   help="'auto' picks the pins that respond; or 1-based pins, e.g. 3,7")
+    g.add_argument("--probe-s", type=float, default=8.0, help="seconds per eye state in the channel check")
+    g.add_argument("--rest-s", type=float, default=20.0, help="eyes-open false-trigger window")
+    g.add_argument("--closures", type=int, default=3, help="deliberate closures in the check")
     p.add_argument("--screenshot", type=Path, help="save a PNG after the first confirm and exit")
     p.add_argument("--smoke", nargs="?", const="dev", choices=["dev", "judging"],
                    help="hardware-free smoke check, exit 0/1 (#41); 'judging' fails on any SKIP")
@@ -518,7 +547,25 @@ def main(argv=None) -> int:
     if args.smoke:
         from signal2speech.diagnostics import run_smoke
         return run_smoke(args.smoke)
-    source = InputSources.LIVE_EEG if args.input == "live" else args.input
+    pieeg = None
+    if args.input == "pieeg":
+        if not (args.pieeg or args.pieeg_self_test):
+            print("--input pieeg: say what is publishing the stream with --pieeg live, simulated, "
+                  "or recorded (or use --pieeg-self-test)", file=sys.stderr)
+            return 2
+        if args.pieeg_self_test and args.pieeg == "live":
+            print("--pieeg-self-test is a simulator: it can't be labelled live", file=sys.stderr)
+            return 2
+        if args.arm_live_confirm:
+            print("--arm-live-confirm doesn't apply to --input pieeg: the #150 check in this "
+                  "session decides", file=sys.stderr)
+            return 2
+        pieeg = {"stream_is": args.pieeg or "simulated", "self_test": args.pieeg_self_test,
+                 "stream": args.stream, "any_host": args.any_host, "channels": args.channels,
+                 "probe_s": args.probe_s, "alpha_calib_s": args.alpha_calib_s,
+                 "rest_s": args.rest_s, "closures": args.closures}
+    source = {"live": InputSources.LIVE_EEG, "pieeg": InputSources.KEYBOARD}.get(args.input,
+                                                                                  args.input)
     if source in BLOCKED_INPUTS:
         print(BLOCKED_INPUTS[source], file=sys.stderr)
         return 2
@@ -528,18 +575,23 @@ def main(argv=None) -> int:
     if any(s not in (1, 2) for s in script):
         print(f"--sim takes 1s and 2s, e.g. 2,1; got {args.sim!r}", file=sys.stderr)
         return 2
-    live_path = source == InputSources.LIVE_EEG or (source == InputSources.SIMULATED and args.p300)
+    live_path = (source == InputSources.LIVE_EEG or pieeg is not None
+                 or (source == InputSources.SIMULATED and args.p300))
+
+    def setup_help() -> str:
+        from signal2speech.eeg.app_live import PAIRING_HELP, PIEEG_HELP
+        return PIEEG_HELP if pieeg is not None else PAIRING_HELP
     try:
         app = App(source, sim_script=script, mute=args.mute,
                   confirm_timeout_ms=int(args.confirm_timeout * 1000),
                   p300=args.p300, arm_live_confirm=args.arm_live_confirm,
                   live_options={"calibration_sequences": args.calibration,
-                                "alpha_calib_s": args.alpha_calib_s})
+                                "alpha_calib_s": args.alpha_calib_s},
+                  pieeg=pieeg)
     except Exception as err:
         if not live_path:
             raise
-        from signal2speech.eeg.app_live import PAIRING_HELP   # driver or pipeline setup failed
-        print(f"Couldn't set up the EEG pipeline: {type(err).__name__}: {err}\n{PAIRING_HELP}",
+        print(f"Couldn't set up the EEG pipeline: {type(err).__name__}: {err}\n{setup_help()}",
               file=sys.stderr)
         return 3
     qapp.aboutToQuit.connect(app.close)
@@ -550,8 +602,7 @@ def main(argv=None) -> int:
         try:
             app.sim.start()
         except Exception as err:               # g.Pype raises various errors for a missing device
-            from signal2speech.eeg.app_live import PAIRING_HELP
-            print(f"{type(err).__name__}: {err}\n{PAIRING_HELP}", file=sys.stderr)
+            print(f"{type(err).__name__}: {err}\n{setup_help()}", file=sys.stderr)
             app.close()
             return 3
         try:

@@ -418,23 +418,34 @@ def _prompt(text: str) -> None:
     print(f">>> {text}", flush=True)
 
 
+
 def measure(ac: AlphaConfirm, calib_s: float, rest_s: float, closures: int,
-            closure_s: float = 2.0, gap_s: float = 3.0, min_ratio: float = 2.0) -> dict:
-    """Calibrate, count false triggers at rest, then time ``closures`` deliberate closures."""
+            closure_s: float = 2.0, gap_s: float = 3.0, min_ratio: float = 2.0,
+            prompt: Optional[Callable[[str], None]] = None,
+            tick: Optional[Callable[[], None]] = None) -> dict:
+    """Calibrate, count false triggers at rest, then time ``closures`` deliberate closures.
+
+    ``prompt`` shows each instruction (default: print it). ``tick`` runs while it waits and may
+    raise to abort, so the app can show the prompts on screen and stay responsive (#172)."""
     sim = ac.bursts
+    say = prompt or _prompt
+
+    def ac_collect(seconds: float):
+        return ac.collect(seconds, tick)
+
     report = {"input": ac.input_source, "settle_s": ac.settle_s, "dwell_rows": ac.dwell}
 
-    _prompt(f"Calibration: keep your eyes OPEN and relaxed for {calib_s:g} s")
+    say(f"Calibration: keep your eyes OPEN and relaxed for {calib_s:g} s")
     if sim:
         sim.open_eyes()
-    ac.collect(1.0)                                   # let the 1 s FFT window fill
-    open_vals = ac.collect(calib_s)
-    _prompt(f"Calibration: CLOSE your eyes for {calib_s:g} s")
+    ac_collect(1.0)                                   # let the 1 s FFT window fill
+    open_vals = ac_collect(calib_s)
+    say(f"Calibration: CLOSE your eyes for {calib_s:g} s")
     if sim:
         sim.close_eyes()
-    ac.collect(1.0)
-    closed_vals = ac.collect(calib_s)
-    _prompt("Open your eyes")
+    ac_collect(1.0)
+    closed_vals = ac_collect(calib_s)
+    say("Open your eyes")
     if sim:
         sim.open_eyes()
     try:
@@ -443,25 +454,25 @@ def measure(ac: AlphaConfirm, calib_s: float, rest_s: float, closures: int,
         report["error"] = str(err)
         return report
     report["calibration"] = {**asdict(cal), "ratio": round(cal.ratio, 2)}
-    ac.collect(max(gap_s, 1.5))                       # settle back to open
+    ac_collect(max(gap_s, 1.5))                       # settle back to open
 
-    _prompt(f"Rest: keep your eyes OPEN for {rest_s:g} s (counting false triggers)")
+    say(f"Rest: keep your eyes OPEN for {rest_s:g} s (counting false triggers)")
     before = ac.edge_count
-    ac.collect(rest_s)
+    ac_collect(rest_s)
     report["rest_s"] = rest_s
     report["false_triggers"] = ac.edge_count - before
 
     latencies, per_closure = [], []
     for i in range(closures):
-        _prompt(f"Closure {i + 1}/{closures}: CLOSE your eyes now for {closure_s:g} s")
+        say(f"Closure {i + 1}/{closures}: CLOSE your eyes now for {closure_s:g} s")
         before, t0 = ac.edge_count, time.monotonic()
         if sim:
             sim.close_eyes()
-        ac.collect(closure_s)
-        _prompt("Open")
+        ac_collect(closure_s)
+        say("Open")
         if sim:
             sim.open_eyes()
-        ac.collect(gap_s)
+        ac_collect(gap_s)
         new = ac.edges_since(before)
         per_closure.append(len(new))
         if new:

@@ -404,6 +404,7 @@ The board is on the library's first floor. Take the judging laptop there.
 | 4 | In PiEEG's starter folder: `python python_quickstart.py --lsl`. Leave it running. | LED turns solid. A line every second with `SPS`, `Lost`, and `Good Pins: n/16`. Adjust the puck until most pins are good. |
 | 5 | **First-run check**, in our repo: `python -m signal2speech.eeg.lsl_source --input live --check` | `device: PiEEG Octopus 16, 16 channels`, the measured sample rate, a contact line per pin, and `READY`. No prompts. Takes about 10 seconds. |
 | 6 | The full session: `python -m signal2speech.eeg.lsl_source --input live --demo` | The steps below |
+| 7 | **In the real app (#172):** `python -m signal2speech.app --input pieeg --pieeg live`. Close step 6 first: both read the same stream. | The same check, prompted on screen. Then key 2 previews "Compare counties", a two-second eye closure confirms, and the map changes and the line is spoken once. The strip says `Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)`. This is the footage to record. |
 
 Step 6 walks through, with prompts:
 1. **Channel check** (8 s eyes open, 8 s closed): prints each pin's contact and how much its alpha rose, and picks the pins to use.

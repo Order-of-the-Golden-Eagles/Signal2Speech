@@ -538,3 +538,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - It said live input was switched off, which stopped being true when #103's code merged. A judge reading it would undersell the demo
 - Eye-closure confirm is still off on a real headset and key 1 confirms instead. That still needs one wearer run (#23, #103)
 - Docs only. Nothing new was run
+
+## 11/15/26 - 1:05 AM - MagicJester2764 - #172 PiEEG eye closure confirms in the real app (PR pending)
+- A teammate can now run the real app with a PiEEG board's eye closure as the confirm: keys pick the answer, closing the eyes for two seconds says it, and the map changes once
+    - `python -m signal2speech.app --input pieeg --pieeg live` (no board: `--pieeg-self-test`)
+- Eye confirm turns on only after the board check from #150 passes on screen in that same session. If it fails, key 1 confirms instead
+- You have to say what is sending the signal (`--pieeg live`, `simulated` or `recorded`), because the stream itself can't prove it, so a simulator can never show up as Live EEG
+- The bottom strip names both inputs, for example "Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)"
+- Verified on our simulated 16-pin stream, end to end in the app and in `tests/test_app_pieeg.py`. Not yet tried with a real board on a person, which is the library session (step 7 in the hardware doc)

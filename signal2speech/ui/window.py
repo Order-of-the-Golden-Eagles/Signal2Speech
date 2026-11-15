@@ -280,6 +280,14 @@ class SelectionWindow(QMainWindow):
         self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(source, P.STRIP_TEXT)};"
                                        "font-weight:700;")
 
+    def set_input_text(self, text: str, color_source: str) -> None:
+        """Name two inputs at once, e.g. 'Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)'
+        (#172). ``input_source`` stays the chooser's; the colour is the confirm's when it's on."""
+        self.input_label.setText(text)
+        self.input_label.setToolTip(text)
+        self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(color_source, P.STRIP_TEXT)};"
+                                       "font-weight:700;")
+
     def set_connection(self, state: str) -> None:
         self.connection_label.setText(f"Connection: {state}")
         self.connection_label.setToolTip(self.connection_label.text())

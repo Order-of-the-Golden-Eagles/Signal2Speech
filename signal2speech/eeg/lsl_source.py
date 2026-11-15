@@ -135,15 +135,19 @@ class RawReader:
         self._inlet = pylsl.StreamInlet(newest, max_buflen=60)
         self._inlet.open_stream(timeout=timeout)
 
-    def read(self, seconds: float) -> np.ndarray:
+    def read(self, seconds: float, tick=None) -> np.ndarray:
+        """Samples over the next ``seconds``. ``tick()`` runs between pulls, so a window can stay
+        responsive (#172); it may raise to abort."""
         while self._inlet.pull_chunk(timeout=0.0)[0]:      # drop anything buffered so far
             pass
         rows: list = []
         end = time.monotonic() + seconds
         while time.monotonic() < end:
-            chunk, _ = self._inlet.pull_chunk(timeout=0.2)
+            chunk, _ = self._inlet.pull_chunk(timeout=0.05 if tick else 0.2)
             if chunk:
                 rows.extend(chunk)
+            if tick:
+                tick()
         return np.asarray(rows, dtype=float)
 
     def close(self) -> None:
@@ -163,8 +167,10 @@ def contact_report(device: devices.Device, block: np.ndarray, rate: float) -> st
 
 
 def choose_channels(device: devices.Device, requested: Optional[List[int]], stream_name: str,
-                    rate: float, probe_s: float, prompt, sim=None, say=print) -> devices.ChannelPick:
-    """Use --channels or the device's montage; otherwise run the eyes open/closed channel check."""
+                    rate: float, probe_s: float, prompt, sim=None, say=print,
+                    tick=None) -> devices.ChannelPick:
+    """Use --channels or the device's montage; otherwise run the eyes open/closed channel check.
+    ``tick`` keeps a window responsive while it reads (#172)."""
     if requested or device.fixed_montage:
         return devices.resolve_alpha_channels(device, requested)
     reader = RawReader(stream_name)
@@ -172,12 +178,12 @@ def choose_channels(device: devices.Device, requested: Optional[List[int]], stre
         prompt(f"Channel check: keep your eyes OPEN and relaxed for {probe_s:g} s")
         if sim:
             sim.open_eyes()
-        open_block = reader.read(probe_s)
+        open_block = reader.read(probe_s, tick)
         prompt(f"Channel check: CLOSE your eyes for {probe_s:g} s")
         if sim:
             sim.close_eyes()
-        time.sleep(0.5)
-        closed_block = reader.read(probe_s)
+        reader.read(0.5, tick)                              # let the alpha rise; not used
+        closed_block = reader.read(probe_s, tick)
         prompt("Open your eyes")
         if sim:
             sim.open_eyes()

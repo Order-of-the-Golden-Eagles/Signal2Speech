@@ -26,6 +26,7 @@ The same tools without the launcher (`python -m signal2speech --help` lists them
 | --- | --- |
 | The demo with keyboard input | `python -m signal2speech.app --input keyboard` |
 | Simulated brain signals through a real g.Pype pipeline | `python -m signal2speech.app --input simulated --sim 2,1` |
+| Keys choose, a PiEEG board's eye closure confirms (no board: `--pieeg-self-test`) | `python -m signal2speech.app --input pieeg --pieeg live` |
 | AI reply suggestions for a typed question | `python -m signal2speech.ai` |
 | The g.Pype evidence view (scopes, OSCAR, averaged P300) | `python -m signal2speech.evidence --source generator` |
 | A hardware-free check of the whole demo | `python -m signal2speech.app --smoke` |
