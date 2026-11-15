@@ -30,7 +30,7 @@ Assign the roles at the first rehearsal and write the names here.
 
 ## Before the judge arrives (not on the clock)
 
-- O: app window open on the Choose round, evidence window open behind it, both labels visible.
+- O: app started with `python tools/demo_launcher.py --input <keyboard|simulated|live>`, so a crash restarts it in about 1 s. The Choose round is open, the evidence window is behind it, and both labels are visible.
 - S: question card in hand, stopwatch at 0:00.
 - W: seated, headset on, eyes on the screen, impedance or signal quality checked in the evidence view.
 - If the headset isn't ready in 30 seconds, switch to Track K before the judge sits down. Don't debug in front of the judge.

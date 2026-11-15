@@ -1,0 +1,11 @@
+{
+  "comment": "Saved phrases for AI Answering (#134). Each pair is what the two tiles show and speak. Keep each phrase under 120 characters and make the two in a pair different. If this file is missing or invalid, the app uses its built-in list and says why.",
+  "pairs": [
+    ["Yes.", "No."],
+    ["Please give me a moment.", "Could you repeat the question?"],
+    ["Thank you.", "I need help, please."],
+    ["I'm comfortable.", "I'm in pain."],
+    ["I agree.", "I don't agree."],
+    ["Let's talk later.", "Please keep going."]
+  ]
+}

@@ -25,7 +25,8 @@ Add `--mute` for silent runs. `--confirm-timeout SECONDS` (default 15; 0 = never
 - **Still stand-ins, all labelled on screen:**
   - **Map (#30, merged in #65):** `load_view()` uses `signal2speech.openorbit.OpenOrbitView`. The dashed stand-in panel appears only if that import fails.
   - **Simulated input (#21):** `--input simulated` uses `signal2speech.eeg.simulated.SimulatedDecoder`, a real g.Pype `Generator` stream, whenever it imports. Ctrl+1 and Ctrl+2 pick for a waiting sequence, and the stream closes on exit. If it can't import, the app injects scripted decisions through the same `arm_capture()` and `select_captured()` path. The connection label says why it fell back: "#21 SimulatedDecoder not merged" or "g.Pype not installed". Events are labelled `simulated` either way.
-  - **Live and recorded input:** `--input live` and `--input recorded` exit with a message that they're blocked on #46, #47, #23, and #48.
+  - **Live input (#103):** `--input live` opens one Unicorn pipeline, calibrates on the app's own tiles, then runs the demo. The P300 chooses and the eye-closure switch confirms. See [EEG Hardware](../eeg-hardware/README.md#live-eeg-in-the-app-103).
+  - **Recorded input:** `--input recorded` still exits with a "blocked" message (#104). Record and replay work in the evidence view (#48).
 
 ## Rehearse without a headset: g.Pype simulated input (#21)
 
@@ -42,3 +43,8 @@ Add `--mute` for silent runs. `--confirm-timeout SECONDS` (default 15; 0 = never
 - With no picks left, a sequence waits for `set_next(cls)`.
 - `disconnect_stream()` stops the stream and calls `handler.disconnect()` (#26).
 - Standalone: `python -m signal2speech.eeg.simulated --ui --picks 2,1`. See [EEG Hardware](../eeg-hardware/README.md#simulated-input-21--works) for the threading details.
+
+## Confirm-to-output timing and the session report (#130, #131)
+
+- **Timing:** every confirm logs `timing: confirm→map N ms` (until the map call returns) and `timing: confirm→speech N ms` (until the audio actually starts: Qt's voice reports Speaking, or the bundled clip reports playing). The bottom strip shows the latest values after "Last:". Measured on a Mac (macOS 12): map 2–30 ms, speech 14–17 ms for a bundled clip, and about 50 ms for the OS voice. Muted runs have no speech time.
+- **Session report:** on exit, `python -m signal2speech.app` writes `logs/session-<time>.md` (gitignored). It has the date, commit, input, connection, and voice, the counts of previews, confirms, cancels, clears, and rejections, a confirm-to-output table, and the timeline. It's built only from handler outcomes and timings. Any line that looks like raw samples (20+ decimal numbers) is dropped. `--no-report` turns it off. Paste it into the rehearsal log in `docs/demo-submission/submission-checklist.md`.

@@ -112,6 +112,7 @@ class SelectionWindow(QMainWindow):
         self.handler = handler
         self.keyboard = keyboard
         self.flash_enabled = flash
+        self.eye_confirm: Optional[bool] = None   # False once eye-closure calibration failed (#103)
         self._preview: Optional[Choice] = None
         self.setWindowTitle("Signal2Speech")
         self.setStyleSheet(_STYLE)
@@ -225,6 +226,17 @@ class SelectionWindow(QMainWindow):
         self.handler.cancel()
 
     # ── Handler listeners ────────────────────────────────────
+    def confirm_hint(self) -> str:
+        """The Confirm-round hint, matching what really confirms (#103)."""
+        if self.eye_confirm is False:
+            return ("Confirm: key 1  (eye-closure confirm is off: its calibration failed)   ·   "
+                    "Cancel: key 2 or Esc")
+        if (self.input_source == InputSources.LIVE_EEG
+                and not self.handler.live_eeg_confirm_armed):
+            return ("Confirm: key 1  (eye-closure confirm is off until #23 says it's safe)   ·   "
+                    "Cancel: key 2 or Esc")
+        return "Confirm: close your eyes for 2 s, or key 1   ·   Cancel: key 2 or Esc"
+
     def show_round(self, rnd: Round) -> None:
         self.flasher.stop()
         for target, tile in self.tiles.items():
@@ -236,14 +248,14 @@ class SelectionWindow(QMainWindow):
             self.preview.setText(self._preview_text())
             self._fit_preview()
             self.preview.setVisible(True)
-            self.hint.setText("Confirm: close your eyes for 2 s, or key 1   ·   "
-                              "Cancel: key 2 or Esc")
+            self.hint.setText(self.confirm_hint())
         else:
             self._preview = None
             self.prompt.setText("Choose a reply")
             self.set_countdown(None)
             self.preview.setVisible(False)
-            self.hint.setText("Look at a tile, or press 1 or 2   ·   Esc clears")
+            self.hint.setText("Look at a tile, or press 1 or 2   ·   Esc clears" if self.flash_enabled
+                              else "Press 1 or 2   ·   Esc clears")
             if self.flash_enabled:
                 self.flasher.start([t for t in _TILE_ORDER if rnd.find(t)])
 
@@ -276,6 +288,12 @@ class SelectionWindow(QMainWindow):
 
     # ── Helpers ──────────────────────────────────────────────
     PREVIEW_MAX_PX = 44
+
+    def add_outcome_note(self, note: str) -> None:
+        """Append e.g. "map 3 ms · speech 180 ms" to the last outcome in the strip (#130)."""
+        base = self.outcome_label.text().split("  ⏱ ")[0]
+        self.outcome_label.setText(f"{base}  ⏱ {note}")
+        self.outcome_label.setToolTip(self.outcome_label.text())
 
     def set_countdown(self, seconds) -> None:
         """Show "Cancels in N s" under the preview, or hide it with None."""

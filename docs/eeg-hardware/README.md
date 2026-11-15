@@ -301,3 +301,59 @@ The harness uses its own handler with a logging sink, so nothing is spoken and t
 | `RejectedStaleRound` seen | |
 | Class → tile mapping | 1 → `target-1`, 2 → `target-2` (`EegClassMap.default()`) |
 | Arm `live_eeg_confirm_armed`? | |
+
+## Live EEG in the app (#103)
+
+`python -m signal2speech.app --input live` runs the demo on the Unicorn. The P300 chooses a tile, and the eye-closure switch confirms. Both run on **one** `HybridBlack(enable_oscar=True)` pipeline, because the headset opens only once. The code is in `signal2speech/eeg/app_live.py` (`LiveEegInput`).
+
+```
+python -m signal2speech.app --input live                        # pair the Unicorn first; calibrate, then the demo
+python -m signal2speech.app --input live --arm-live-confirm     # only after #23's run says eye confirm is safe
+python -m signal2speech.app --input simulated --p300 --sim 2,1  # the same code path on the Generator
+```
+
+Flags: `--calibration N` sets the P300 calibration sequences (default 10). `--alpha-calib-s S` sets the seconds of eyes open, then eyes closed (default 10).
+
+**What happens**
+
+1. **Device check.** With no usable headset, g.Pype's `start()` blocks instead of failing, so every step is bounded:
+   - discovery: 15 s
+   - opening the headset: 20 s, which catches a headset held by another app
+   - first data: 8 s
+
+   If any step fails, the app prints the pairing checklist and exits with code 3.
+2. **Calibration on the app's own tiles.**
+   - P300: N flash sequences, each naming the tile to watch, e.g. "look at “Compare counties” and count its flashes". `P300Chooser.finish_calibration()` then refits the LDA.
+   - Alpha switch: eyes open, then eyes closed, then `AlphaConfirm.calibrate`.
+   - **If a calibration fails, that path turns off.** A failed P300 calibration stops the tiles flashing, and the Choose hint changes to "Press 1 or 2". A failed eye-closure calibration leaves the threshold at "never fires", and the Confirm hint says key 1. The prompt shows the result for 6 s before the first question (2 s if both passed), and the strip keeps it.
+   - **Errors exit cleanly and release the headset.** A driver or setup error exits 3 with the pairing help. A crash during calibration exits 1. A Unicorn scan that fails reports a driver problem, not "not paired".
+   - Closing the window during calibration exits cleanly. The headset is released.
+3. **Demo.**
+   - Choose rounds flash the tiles at the chooser's validated timing: 5 flashes per tile, 100 ms on, 250 ms SOA. Each flash emits the P300 `Marker` on the frame the tile lights. The decision reaches the handler on the Qt main thread through `InputAdapter(LIVE_EEG)`.
+   - If a sequence produces no decision at all (for example, the stream stalled), the tiles flash again, up to 2 times. After that, the hint says to press 1 or 2.
+   - Confirm rounds listen for one deliberate eye closure on the same pipeline.
+   - The bottom strip reads **Input: Live EEG · Unicorn Hybrid Black · OSCAR on · eye confirm off (#23)**.
+4. **Live confirm stays disarmed** (`handler.live_eeg_confirm_armed = False`) until #23's harness (`python -m signal2speech.eeg.live`) says it's safe. Until then, an eye closure is logged and rejected, key 1 confirms, and the Confirm hint says so. `SelectionWindow.confirm_hint()` reads the arming state, so the hint can't drift out of sync. `--arm-live-confirm` turns eye confirm on.
+
+**Simulated through the same path (`--input simulated --p300`).** This uses the same `LiveEegInput`, the same hooks, and the same calibration, on `gp.Generator` plus `SyntheticP300`, labelled **Simulated**. The `--sim` script alternates:
+- the tile the synthetic brain attends in each Choose round (1 or 2)
+- what it does in each Confirm round: 1 closes its eyes, so the alpha switch confirms; 2 keeps them open, so the confirm timeout cancels
+
+Values other than 1 or 2 are refused. When the script runs out, the tiles stop flashing and keys 1 and 2 take over.
+
+The alpha branch uses its own Generator with `AlphaBursts`, because the P300 Generator carries a constant 10 Hz sine.
+
+**Verified (2026-11-14, Linux, simulated only).** `--input simulated --p300 --sim 2,1 --calibration 6 --alpha-calib-s 2`:
+- The P300 calibrated on 30 target and 30 non-target epochs, and the alpha ratio was 6.1.
+- The P300 picked tile 2, giving a preview. An eye closure confirmed. The result was one map action and one spoken line.
+- Peak memory was 310 MB, and the whole run took 38 s.
+
+`tests/test_app_live.py` covers the simulated end-to-end run, the live wiring without hardware (shared pipeline, labels, disarmed hint, key 1 confirm), `--arm-live-confirm`, and the no-headset exit (code 3, under 15 s).
+
+**Not verified: anything on a real wearer.** At the slot:
+1. Pair the headset.
+2. Run `--input live`.
+3. Do one deliberate preview and confirm.
+4. Record the result here and in #103.
+
+The app's 5-flash, 250 ms timing still needs #101's flash-timing check on the judging laptop's real display.

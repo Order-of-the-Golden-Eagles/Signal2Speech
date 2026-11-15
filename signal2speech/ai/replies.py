@@ -163,6 +163,43 @@ class SavedPhrases:
         return self.current(note)
 
 
+# ── Editable saved phrases (#134) ────────────────────────────
+PHRASES_FILE = ROOT / "data" / "phrases.json"
+
+
+def load_saved_phrases(path: Path = PHRASES_FILE) -> Tuple[List[Tuple[str, str]], str]:
+    """Pairs from data/phrases.json if it's valid, else the built-in list. Never raises.
+
+    Returns (pairs, note); the note says where the phrases came from, or why the file was skipped.
+    """
+    builtin = list(SAVED_PHRASES)
+    if not path.is_file():
+        return builtin, f"built-in (no {path.name})"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return builtin, f"built-in ({path.name} unreadable: {type(e).__name__})"
+    raw = data.get("pairs") if isinstance(data, dict) else data
+    if not isinstance(raw, list) or not raw:
+        return builtin, f"built-in ({path.name} has no \"pairs\" list)"
+    pairs: List[Tuple[str, str]] = []
+    for i, pair in enumerate(raw, 1):
+        if not (isinstance(pair, list) and len(pair) == 2 and all(isinstance(t, str) for t in pair)):
+            return builtin, f"built-in ({path.name} pair {i} isn't two strings)"
+        try:
+            a, b = validate(pair)
+        except ProviderError as e:
+            return builtin, f"built-in ({path.name} pair {i}: {e.args[0].replace('provider ', '')})"
+        pairs.append((a, b))
+    return pairs, f"{path.name} ({len(pairs)} pairs)"
+
+
+def saved_phrases_from_file(path: Path = PHRASES_FILE) -> "SavedPhrases":
+    pairs, note = load_saved_phrases(path)
+    saved = SavedPhrases(pairs)
+    saved.source = note
+    return saved
+
 # ── Providers ────────────────────────────────────────────────
 SYSTEM_PROMPT = (
     "You write reply options for a person who can't speak or type. They answer a "

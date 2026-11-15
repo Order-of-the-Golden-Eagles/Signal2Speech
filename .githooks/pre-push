@@ -16,6 +16,9 @@ done
 
 root="$(git rev-parse --show-toplevel)"
 cd "$root"
+# Git exports GIT_DIR and friends to hooks. Drop them, so tests or tools that run git in a
+# subprocess (tests/test_githooks.py did) can't write into this repo by accident.
+unset $(git rev-parse --local-env-vars)
 
 # Prefer the project venv so hooks use the same interpreter as the team.
 if   [ -x ".venv/Scripts/python.exe" ]; then py=".venv/Scripts/python.exe"

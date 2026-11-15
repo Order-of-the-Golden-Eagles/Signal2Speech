@@ -34,3 +34,27 @@ Type the question and press Enter, then use keys 1/2 and Esc as usual. **Other r
 - **Not verified yet:** the live call inside the full app with a headset. The panel flow is unit-tested with a fake client.
 
 **Map suggestions in the AI demo window.** When Claude suggests `show_satellite` or `compare_air_quality` (#106), `python -m signal2speech.ai` reveals the real OpenOrbit map and speaks its line once, the same as `python -m signal2speech.app`. The demo used to have no map on purpose, and that would have dropped the reveal.
+
+## Live check in the AI demo window (#5, 2026-11-14 8:50 PM ET)
+
+Run on `main` at `d7fe978` with `ANTHROPIC_API_KEY` in `.env` and `claude-opus-5-5`, through `python -m signal2speech.ai` (macOS 12, keyboard input):
+
+| Question | Claude's two replies | Result |
+| --- | --- | --- |
+| "Would you like to take a short break and get some water?" | "Yes, please. A break and some water sounds good." / "No thanks, I'm fine. Let's keep going." | Replies in about 2 s. Key 1 previewed silently, key 1 confirmed, spoken **once** (OS voice). ✅ |
+| "Which county's AQI rose more when wildfire smoke reached southeast Michigan?" | "I think Wayne County's AQI rose more." / "I'm not sure. Can we look it up together?" | ❌ **Factually wrong.** Washtenaw rose +186, Wayne +168. Ungrounded replies can state wrong facts. #116 fixes this by grounding replies in the dataset and offering the Compare counties map action. **Don't ask data questions in the AI demo until #116 is merged.** |
+
+## Editing the saved phrases (#134)
+
+The offline saved phrases live in `data/phrases.json`, one pair per line. Each pair is what the two tiles show and speak:
+
+```json
+"pairs": [
+  ["Yes.", "No."],
+  ["I'd like some water.", "I'm not thirsty."]
+]
+```
+
+- **Rules:** two different phrases per pair, each under 120 characters. "Saved phrases" in the AI demo cycles through the pairs in order.
+- **Fallback:** if the file is missing, can't be read, or breaks a rule, the app uses its built-in list (the same six pairs the file ships with). The transcript says why, for example `saved phrases: built-in (phrases.json pair 3: reply too long)`.
+- **Check after editing:** start `python -m signal2speech.ai --provider saved` and read the `saved phrases:` line in the transcript.

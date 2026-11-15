@@ -30,6 +30,9 @@ On synthetic data, with the chooser's settings (250 ms SOA, 5 flashes per tile):
 **What stops a wrong answer from being spoken?**
 Every pick is only a preview. Speech needs a second, different brain signal (alpha, not P300). Cancel, a timeout, a disconnect or a late decision from an old round all produce no output. Tests check this.
 
+**How do you know it never speaks twice, or speaks without a confirm?**
+We fuzz it. `tests/test_contract_fuzz.py` throws random sequences of picks, confirms, cancels, disconnects, late and stale decisions, duplicates, malformed events, and every input source at the selection handler. An independent checker asserts after every step: one output per confirm, never an output without a fresh preview, the exact previewed words, no event accepted twice, no live-EEG confirm while it's disarmed, and no old-round decision acting in a newer round. **3,000,000 operations (50,000 sequences) found 0 violations**, reaching 61,779 confirms. CI runs 180,000 operations on every PR. We also break the handler on purpose (double output, a cancel that keeps the preview, ignored round IDs), and the fuzzer catches each one. *These are software guarantees with keyboard and simulated input, not live-EEG accuracy.*
+
 ## Bonus criteria
 
 **Is it a platform or a product?** *(platform, not a product)*
