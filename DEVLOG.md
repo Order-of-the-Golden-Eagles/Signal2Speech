@@ -673,3 +673,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `docs/demo-submission/judge-qa.md` has straight answers to the questions we'll get: is this live, is the choice faked, how accurate is it, did you try real hardware, and why not a blink
 - Why: the old script assumed someone wearing a g.tec headset. Reading from it at the table would have meant saying things that aren't true today
 - Checked on the judging laptop: the four-exchange command ran and the recorded data picked the scripted tile all four times (2, 1, 2, 1). The older live-wearer plan is kept below the new section for reference
+
+## 11/15/26 - 7:52 AM - Vasanth Anbukumar - #91 The app's screens hold still, show much bigger NASA images, and nothing is cut off (PR pending)
+- The layout no longer jumps between screens: the heading stays at the top, the two cards stay at the bottom, and the columns keep the same width from question to result
+- The NASA images are about three times bigger. To make room, the box under the map shows only the latest thing chosen or said; F2 still shows the full log
+- Nothing is cut off any more. The status strip runs the full width of the window, and a long input label, such as recorded mode's, gets a line to itself
+    - Before, the strip was squeezed into the left column and showed "Last: Co" on the result screen
+- Smaller cards with smaller text, emojis in place of the drawn icons, and a colour for each kind of card: blue and violet for the two choices, green for Confirm, red for Cancel
+- A cleaner font, a calmer status strip, and short fades when the preview and the map appear. The card flashes are untouched: they stay instant and plain white, because the brain response is timed against them
+- Verified by screenshots on the judging laptop's real display in every screen, and by the interface tests. Not checked on macOS or Linux, where the font and emoji fall back to what's installed

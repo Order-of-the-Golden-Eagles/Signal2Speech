@@ -54,6 +54,10 @@ BODY = 22                 # hints, buttons, descriptions
 CAPTION = 18              # strip, footers, small print
 TILE_TITLE_MIN = 32       # long tile and preview text shrinks no further (#95)
 MONO = "Menlo, Consolas, monospace"
+#: The interface font, first one installed wins. Segoe UI Variable is Windows 11's own.
+FONT_FAMILIES = ["Segoe UI Variable Display", "Segoe UI", "Inter", "SF Pro Display",
+                 "Helvetica Neue", "Noto Sans", "sans-serif"]
+FONT = ", ".join(f'"{f}"' if " " in f else f for f in FONT_FAMILIES)
 
 # ── Text size (#195) ─────────────────────────────────────────
 # Ctrl+= / Ctrl+- step SCALE through these; Ctrl+0 resets. Every text size on screen goes
@@ -91,11 +95,24 @@ BORDER_W = 4
 # ── What each tile does: (icon, one-line description) ────────
 ACTION_INFO = {
     ActionIds.SHOW_SATELLITE: ("satellite", "June 28 satellite image"),
-    ActionIds.COMPARE_AIR_QUALITY: ("chart", "County AQI, June 26 vs. 28"),
+    ActionIds.COMPARE_AIR_QUALITY: ("chart", "County air quality"),
     ActionIds.SPEAK_REPLY: ("speech", "Says these exact words"),
     ActionIds.CONFIRM: ("check", "Hold 1, or close your eyes"),
     ActionIds.CANCEL: ("cross", "Nothing is said"),
 }
+
+
+#: A colour for each kind of tile, so the screen isn't all one grey-blue. It tints the border,
+#: the key badge and (faintly) the background. A flashing tile ignores it: the flash stays plain
+#: white, because the brain response is timed against that exact stimulus.
+ACTION_TINT = {
+    ActionIds.SHOW_SATELLITE: "#38bdf8",        # sky blue
+    ActionIds.COMPARE_AIR_QUALITY: "#c084fc",   # violet
+    ActionIds.SPEAK_REPLY: "#fbbf24",           # amber
+    ActionIds.CONFIRM: "#4ade80",               # green
+    ActionIds.CANCEL: "#fb7185",                # rose
+}
+TINT_BG_ALPHA = 0.10
 
 
 def window_qss() -> str:
@@ -103,14 +120,14 @@ def window_qss() -> str:
     return f"""
 QMainWindow, QWidget#root {{ background: {BG}; }}
 QLabel {{ color: {TEXT}; }}
-QLabel#prompt {{ font-size: {px(HEADING)}px; font-weight: 600; color: {MUTED}; }}
+QLabel#prompt {{ font-size: {px(HEADING)}px; font-weight: 600; color: {TEXT}; }}
 QLabel#preview {{ font-size: {px(PREVIEW)}px; font-weight: 700; color: {ACCENT}; padding: {M}px;
                   background: {SURFACE}; border-left: 6px solid {ACCENT}; border-radius: {RADIUS_M}px; }}
 QLabel#hint {{ font-size: {px(BODY)}px; color: {MUTED}; }}
 QLabel#previewHeader {{ font-size: {px(BODY)}px; font-weight: 600; color: {MUTED}; }}
 QLabel#countdown {{ font-size: {px(BODY)}px; color: {QUIET}; }}
 QFrame#strip {{ background: {STRIP_BG}; border-top: 2px solid {STRIP_BORDER}; }}
-QLabel.strip {{ font-size: {px(CAPTION + 2)}px; font-family: {MONO}; color: {STRIP_TEXT}; }}
+QLabel.strip {{ font-size: {px(CAPTION)}px; font-family: {FONT}; color: {STRIP_TEXT}; }}
 """
 
 

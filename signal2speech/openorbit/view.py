@@ -382,8 +382,12 @@ class OpenOrbitView(QWidget):
         self._show("blank")
 
     def _show(self, mode: str) -> None:
+        changed = mode != self._mode
         self._mode = mode
         self._stack.setCurrentWidget(self._pages[mode])
+        if changed:
+            from signal2speech.ui.fade import fade_in
+            fade_in(self, BACKGROUND, 320)             # the reveal fades in (#182)
 
     @staticmethod
     def _page() -> Tuple[QWidget, QVBoxLayout]:

@@ -19,7 +19,8 @@ from signal2speech.core import (ActionIds, Choice, InputAdapter, InputSources, O
 from .confirm_ring import HOLD_S, ConfirmRing
 from .fit import fit_pixel_size
 from .flash import FlashScheduler
-from .icons import draw_emoji
+from .fade import fade_in
+from .icons import draw_emoji, draw_icon
 from . import theme as P
 
 INPUT_LABELS = {InputSources.KEYBOARD: "Keyboard", InputSources.SIMULATED: "Simulated",
@@ -160,6 +161,9 @@ class Tile(QLabel):
             "selected": (P.TILE_SELECTED_BG, P.TILE_SELECTED_TEXT, P.TILE_SELECTED_BORDER, P.TILE_SELECTED_TEXT),
             "idle": (P.TILE_BG, P.TILE_TEXT, P.TILE_BORDER, P.MUTED),
         }[state]
+        tint = P.ACTION_TINT.get(self.action_id) if state == "idle" else None
+        if tint:
+            border = tint
         if self.highlight and state == "idle":
             border = P.ACCENT
         p = QPainter(self)
@@ -169,6 +173,10 @@ class Tile(QLabel):
         path = QPainterPath()
         path.addRoundedRect(body, P.RADIUS_L, P.RADIUS_L)
         p.fillPath(path, QColor(bg))
+        if tint:                                   # a faint wash of the tile's own colour
+            wash = QColor(tint)
+            wash.setAlphaF(P.TINT_BG_ALPHA)
+            p.fillPath(path, wash)
         p.setPen(QPen(QColor(border), P.BORDER_W))
         p.drawPath(path)
         inner = QRectF(self.rect()).adjusted(self.INSET, self.INSET, -self.INSET, -self.INSET)
@@ -183,15 +191,18 @@ class Tile(QLabel):
             return
         # Top row: icon on the left, key badge on the right.
         if self.icon:
-            draw_emoji(p, "check" if state == "selected" else self.icon,
-                       QRectF(inner.left(), inner.top(), 48, 48))
+            box = QRectF(inner.left(), inner.top(), 48, 48)
+            if state == "lit":      # the flash stays plain black on white, exactly as before
+                draw_icon(p, self.icon, box, fg)
+            else:
+                draw_emoji(p, "check" if state == "selected" else self.icon, box)
         badge = QRectF(inner.right() - 48, inner.top(), 48, 48)
         if state == "lit":     # keep the flash plain white: outline only, no filled block
             p.setPen(QPen(QColor(P.TILE_LIT_TEXT), 3))
             p.setBrush(Qt.BrushStyle.NoBrush)
         else:
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(P.ACCENT))
+            p.setBrush(QColor(tint or P.ACCENT))
         p.drawRoundedRect(badge, P.RADIUS_S, P.RADIUS_S)
         p.setPen(QColor(P.TILE_LIT_TEXT if state == "lit" else P.ON_ACCENT))
         f = QFont(self.font())
@@ -518,7 +529,10 @@ class SelectionWindow(QMainWindow):
             self.preview.setText(f"“{self._preview_text()}”")
             self.ring.reset()
             self.ring.label = "Hold 1\nor close eyes" if self.eyes_can_confirm() else "Hold 1"
+            was_hidden = self.preview_box.isHidden()
             self.preview_box.setVisible(True)
+            if was_hidden:
+                fade_in(self.preview_box, P.BG)       # the words arrive, they don't pop
             self._fit_preview()
             self.hint.setText(self.confirm_hint())
         else:
@@ -569,7 +583,10 @@ class SelectionWindow(QMainWindow):
                                             else "✓ Spoken")
                 self.preview.setText(f"“{spoken.spoken_text or spoken.label}”")
                 self.ring.mark_confirmed(filled_by)
+                was_hidden = self.preview_box.isHidden()
                 self.preview_box.setVisible(True)
+                if was_hidden:
+                    fade_in(self.preview_box, P.BG)       # the words arrive, they don't pop
             self.prompt.setText("Confirmed · sent to output")
             chosen = last.find(e.targetId) if (last is not None and e is not None) else None
             tile = self.tiles.get(e.targetId) if e is not None else None

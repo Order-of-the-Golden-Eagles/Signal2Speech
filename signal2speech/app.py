@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Callable, List, Optional, Protocol
 
 from PySide6.QtCore import QObject, Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QPlainTextEdit, QVBoxLayout,
                                QWidget)
 
@@ -59,6 +59,9 @@ CHOOSE_SPLIT = (2, 3)
 REVEAL_SPLIT = (2, 3)     # the same on a reveal: columns that change width make the screen jump
 #: Height of the one-line conversation box, before the text scale.
 CONVERSATION_HEIGHT = 104
+PANEL_TITLE = (f"<span style='color:{T.ACTION_TINT[ActionIds.SHOW_SATELLITE]}'>OpenOrbit</span>"
+               " &nbsp;·&nbsp; NASA and EPA data"
+               f" &nbsp;·&nbsp; <span style='color:{T.QUIET}'>F2: developer log</span>")
 
 BLOCKED_INPUTS: dict = {}     # every input is wired in: recorded runs since #104
 
@@ -448,12 +451,16 @@ class App:
         h.on_round_opened.append(lambda _r: self._set_reveal(False))
 
         self.root = QWidget()
+        ui_font = QFont()
+        ui_font.setFamilies(T.FONT_FAMILIES)           # one clean family across the whole app
+        QApplication.instance().setFont(ui_font)
         self.root.setWindowTitle(f"Signal2Speech · {self.input_summary()}")
         if hasattr(self.sim, "on_label"):              # #172: the check changes the label
             self.sim.on_label = lambda text: self.root.setWindowTitle(f"Signal2Speech · {text}")
         self.root.setStyleSheet(f"background:{T.BG};")
         right = QVBoxLayout()
-        self.panel_title = QLabel("Conversation   ·   F2: developer log")
+        self.panel_title = QLabel(PANEL_TITLE)
+        self.panel_title.setTextFormat(Qt.TextFormat.RichText)
         self.panel_title.setWordWrap(True)
         right.addWidget(self.panel_title)
         if isinstance(self.view, QWidget):
@@ -652,8 +659,7 @@ class App:
         show_log = not self.transcript_view.isVisibleTo(self.root)
         self.transcript_view.setVisible(show_log)
         self.conversation.setVisible(not show_log)
-        self.panel_title.setText("Developer log   ·   F2: conversation" if show_log
-                                 else "Conversation   ·   F2: developer log")
+        self.panel_title.setText("Developer log   ·   F2: back" if show_log else PANEL_TITLE)
 
     def add_question(self, text: str) -> None:
         """The conversation partner's question, shown before the options it produced."""
