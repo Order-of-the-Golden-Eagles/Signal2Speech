@@ -210,6 +210,9 @@ class AnsweringDemo:
         self.app.log("judge: NASA example")
         self.panel.set_busy(False)
         self.panel.origin.setText("Replies: built-in NASA and EPA data (works offline)")
+        self.panel.question.setText(NASA_QUESTION)     # the question box shows what was asked
+        self.panel.question.setCursorPosition(0)
+        self.panel.question.clearFocus()               # keys 1 and 2 go to the cards
         self.app.add_question(NASA_QUESTION)
         self.app.choices = list(self.nasa_choices)
         self.app.options_origin = self.nasa_origin
