@@ -657,7 +657,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - New tool, tested on the real board: `python -m signal2speech.eeg.pieeg_keepalive` keeps the board's stream up and reconnects after a dropped link, which PiEEG's own script doesn't do
 - Verified by ten labelled recordings kept privately under `recordings/`, never committed. The full table of what was tried, where, and the numbers is in the hardware docs
 
-## 11/15/26 - 7:12 AM - Vasanth Anbukumar - #182 The map panel shows the region before anything is confirmed (PR pending)
+## 11/15/26 - 7:12 AM - Vasanth Anbukumar - #182 The map panel shows the region before anything is confirmed ([PR #219](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/219))
 - Before a choice is confirmed, the right-hand panel used to be an empty box with one line of small text. It now shows a faint satellite view of southeast Michigan with both places marked, the two dates, and the same line: "The map appears after a confirmed choice."
 - It can't be mistaken for the result: the picture is dimmed to 30 %, carries no air-quality numbers, and the NASA credit stays visible
 - Why: on the judging laptop the app's first screen was half empty, which read as unfinished
