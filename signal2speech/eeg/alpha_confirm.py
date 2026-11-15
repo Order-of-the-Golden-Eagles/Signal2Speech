@@ -132,9 +132,18 @@ class ChannelMean(gp.IONode):
 
 
 class _Tap(gp.INode):
-    """Hands each frame to ``on_rows`` on the g.Pype worker thread."""
+    """Hands each frame to ``on_rows`` on the g.Pype worker thread.
 
-    def __init__(self, **kwargs):
+    ``inherit_timing=True`` lets it follow an event node such as ``EpochAverage`` (like
+    ``gp.Collector``); the default is a plain stream input.
+    """
+
+    def __init__(self, inherit_timing: bool = False, **kwargs):
+        if inherit_timing:
+            from gpype.backend.core.i_port import IPort
+            from gpype.common.constants import Constants
+            kwargs.setdefault("input_ports", [IPort.Configuration(
+                name=PORT_IN, timing=Constants.Timing.INHERITED)])
         super().__init__(**kwargs)
         self.on_rows: Callable[[np.ndarray], None] = lambda rows: None
 
