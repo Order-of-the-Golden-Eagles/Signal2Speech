@@ -459,3 +459,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - One colour failed: the purple "Recorded" input label was slightly too dark (4.4:1, needs 4.5). It's now a lighter purple (6.6:1). Nothing else changed visually
 - All colours now live in one file, `signal2speech/ui/palette.py`, and the test fails if someone adds a raw colour code elsewhere, so new colours get checked too
 - The ratios for every pair are listed in `docs/accessibility-ui/README.md`
+
+## 11/14/26 - 10:54 PM - Long Le - #136 One entry point: python -m signal2speech ([PR #156](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/156))
+- Judges and teammates no longer need to know module names: `python -m signal2speech` opens a small launcher with a button for each tool (keyboard demo, simulated demo, AI Answering, evidence view, smoke check)
+    - Each button says which input it uses. A tool that can't run on this machine is grayed out with the reason
+- Each tool runs as its own process, so one crashing can't take the launcher down. The smoke check runs inside it and shows PASS or FAIL
+- `python -m signal2speech --help` lists the same tools, and `python -m signal2speech demo-keyboard` runs one directly. The README quickstart uses it now
+- Checked on a Mac: the buttons start the right commands, and the evidence view is grayed out here because g.Pype isn't installed. The smoke check correctly shows FAIL for the same reason. It should pass on the judging laptop
