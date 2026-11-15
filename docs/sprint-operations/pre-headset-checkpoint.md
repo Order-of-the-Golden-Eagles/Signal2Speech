@@ -26,7 +26,7 @@ None of this is live EEG. Still unverified: simulated input with Wi-Fi off, and 
 
 **Update, 8:10 PM: wired in by #103.** `python -m signal2speech.app --input live` now runs the steps below, and it's verified on simulated input through the same code path. What's left is the slot itself (step 4). The original 7:00 PM text follows.
 
-**Live EEG isn't wired into the app.** `python -m signal2speech.app --input live` refuses to start. This PR updates that refusal message to name the real gap, because the old one blamed #46 and #47, which are merged. What's missing is the #23 wiring:
+**Live EEG wasn't wired into the app (at 7:00 PM).** `python -m signal2speech.app --input live` refused to start. This PR updates that refusal message to name the real gap, because the old one blamed #46 and #47, which are merged. What's missing is the #23 wiring:
 
 1. Open one `HybridBlack(enable_oscar=True)` pipeline in `App`. Hang the P300 branch and `AlphaConfirm(pipeline=, upstream=)` off it, because the Unicorn opens only once.
 2. Connect the chooser to the tile flasher (`P300Chooser.attach(FlashScheduler)`) and label the input **Live EEG**.
