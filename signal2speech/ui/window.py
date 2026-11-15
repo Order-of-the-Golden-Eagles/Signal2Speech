@@ -78,6 +78,7 @@ class Tile(QLabel):
     TOP = 64                          # icon and key badge row
 
     MAX_PX = P.TILE_TITLE             # tile titles at full size, before the text scale (#195)
+    MIN_PX = P.TILE_TITLE_MIN         # and the size long titles shrink to
     HEIGHT = 250                      # a tile is a target to look at, not a poster
 
     @property
@@ -149,7 +150,7 @@ class Tile(QLabel):
         font.setBold(True)
         r = self.title_rect()
         px = fit_pixel_size(self._label, font, int(r.width()), int(max(r.height(), 40)),
-                            P.px(self.MAX_PX), P.TILE_TITLE_MIN)
+                            P.px(self.MAX_PX), self.MIN_PX)
         changed, self.font_px = px != self.font_px, px
         return changed
 

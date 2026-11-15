@@ -26,6 +26,11 @@ from .replies import (HELP_PHRASES, TIMEOUT_S, ReplySet, ReplySuggester, languag
                       language_name, make_provider, saved_phrases_from_file)
 
 
+#: The main screen: the reply cards get more of the width than the conversation beside them.
+CHAT_SPLIT = (3, 2)
+CHAT_TILE_HEIGHT = 330
+CHAT_TILE_PX = (34, 24)        # title size on the reply cards: from, and down to for long replies
+CHAT_LOG_HEIGHT = 300          # the conversation box: room for one question and its answer
 NASA_QUESTION = "Which county's AQI rose more when wildfire smoke reached southeast Michigan?"
 
 
@@ -166,6 +171,22 @@ class AnsweringDemo:
         app = self.app
         conv = app.conversation
         conv.latest_only = on
+        conv.current_question_only = not on
+        # Replies are the main thing on the main screen: wider column, taller cards, and a title
+        # size that lets a whole sentence fit. The NASA screens keep their own proportions.
+        from signal2speech.app import CHOOSE_SPLIT
+        split = CHOOSE_SPLIT if on else CHAT_SPLIT
+        app._row.setStretch(0, split[0])
+        app._row.setStretch(1, split[1])
+        for tile in app.window.tiles.values():
+            tile.HEIGHT = type(tile).HEIGHT if on else CHAT_TILE_HEIGHT
+            tile.MAX_PX = type(tile).MAX_PX if on else CHAT_TILE_PX[0]
+            tile.MIN_PX = type(tile).MIN_PX if on else CHAT_TILE_PX[1]
+            tile.setMaximumHeight(tile.HEIGHT)
+            tile.updateGeometry()
+            tile._fit()
+            tile.update()
+        side = app._row.itemAt(1).layout()
         # Hide before showing: if both sets were visible for a moment, the window would grow
         # past the screen and stay there.
         if not on and isinstance(app.view, QWidget):
@@ -182,11 +203,14 @@ class AnsweringDemo:
         if on:
             from signal2speech.app import CONVERSATION_HEIGHT, PANEL_TITLE
             conv.setFixedHeight(T.px(CONVERSATION_HEIGHT))
+            side.setStretchFactor(conv, 0)
+            side.setAlignment(conv, Qt.AlignmentFlag(0))
             conv.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             app.panel_title.setText(PANEL_TITLE)
         else:
-            conv.setMinimumHeight(0)
-            conv.setMaximumHeight(16777215)
+            conv.setFixedHeight(T.px(CHAT_LOG_HEIGHT))        # one exchange, not a history
+            side.setStretchFactor(conv, 1)
+            side.setAlignment(conv, Qt.AlignmentFlag.AlignTop)
             conv.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             app.panel_title.setText(f"<span style='color:{T.TEXT};font-weight:700'>Conversation</span>")
         conv.restyle()
