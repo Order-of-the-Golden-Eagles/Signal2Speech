@@ -224,6 +224,10 @@ class LiveEegInput:
         self.nodes, self.alpha, self.bursts = build_live_graph(
             handler, source, self.input_source, placeholder=placeholder, enable_oscar=enable_oscar,
             recorded=recorded)
+        # A display-only tap on the filtered EEG, for the app's small "Brain Activity" graph. It
+        # reads the same 1-30 Hz signal the chooser cuts its epochs from and changes nothing.
+        self.trace_tap = am._Tap(name="brain_activity_display")
+        self.nodes.pipeline.connect(self.nodes.eeg, self.trace_tap)
         self.adapter = InputAdapter(handler, self.input_source)
         self.chooser = p300.P300Chooser(self.nodes, self.adapter, flashes_per_tile=flashes)
         self.chooser.bridge.listeners.append(self._on_p300_decision)

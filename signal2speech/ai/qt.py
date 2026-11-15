@@ -101,6 +101,9 @@ class QuestionPanel(QWidget):
         self.language.setWordWrap(True)
         self.language.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
         notes.addWidget(self.language, 2)
+        from signal2speech.ui.brain_trace import BrainTrace
+        self.trace = BrainTrace()              # fixed size, fixed place, on every screen
+        notes.addWidget(self.trace, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.language.setVisible(False)
         col.addLayout(notes)
         self.alt_btn.setEnabled(False)

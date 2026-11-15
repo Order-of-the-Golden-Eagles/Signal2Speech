@@ -28,7 +28,7 @@ from .replies import (HELP_PHRASES, TIMEOUT_S, ReplySet, ReplySuggester, languag
 
 #: The main screen: the reply cards get more of the width than the conversation beside them.
 CHAT_SPLIT = (3, 2)
-CHAT_TILE_HEIGHT = 330
+CHAT_TILE_HEIGHT = 300
 CHAT_TILE_PX = (30, 20)        # title size on the reply cards: from, and down to for long replies
 CHAT_LOG_HEIGHT = 300          # the conversation box: room for one question and its answer
 NASA_QUESTION = "Which county's AQI rose more when wildfire smoke reached southeast Michigan?"
@@ -88,6 +88,13 @@ class AnsweringDemo:
         self.panel.saved_requested.connect(self.saved)
         self.panel.nasa_requested.connect(lambda: self.back() if self._map_on else self.nasa())
         self.app.handler.on_round_opened.append(self._fit_side_panel)
+        tap = getattr(self.app.sim, "trace_tap", None)
+        if tap is not None:                    # an EEG input: show what the pipeline receives
+            tap.on_rows = self.panel.trace.feed
+            self.panel.trace.set_source({
+                InputSources.LIVE_EEG: "Live EEG from the headset",
+                InputSources.RECORDED: "Recorded g.tec EEG, played at each flash",
+            }.get(input_source, "Simulated signal, not a brain"))
         self.app.on_text_scale.append(self._style_banner)
         self._map_on = True
         self._show_map(False)
