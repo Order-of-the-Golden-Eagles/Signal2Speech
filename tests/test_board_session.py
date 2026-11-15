@@ -172,7 +172,7 @@ def test_natural_voice_speaks_cues_and_falls_back_when_a_line_fails(monkeypatch)
     v = bs.Voice(enabled=True, neural=natural)
     v._sapi = None
     played = []
-    v._play = played.append
+    v._neural, v._play = natural, played.append      # as on Windows, where a waiting player exists
     assert v.audible and "test-voice" in v.name
     v.warm(["One: Yes.", "Two: No."])
     assert natural.asked == ["One: Yes.", "Two: No."] and not played     # made ahead, no sound

@@ -146,7 +146,8 @@ class Voice:
         return min(8.0, 0.9 + 0.045 * len(text))
 
     def beep(self, kind: str = "go") -> None:
-        """'go' (low): do it now. 'stop' (high): stop. 'ok' (double): registered."""
+        """'go' (low): close your eyes, or start. 'stop' (high): open your eyes, or stop.
+        'ok' (double): registered."""
         if not self.enabled:
             return
         tones = {"go": [(660, 180)], "stop": [(990, 180)], "ok": [(880, 90), (1320, 120)]}[kind]
@@ -480,24 +481,32 @@ class BoardSession:
         from signal2speech.eeg import alpha_confirm as alpha
 
         T, settle = self.opts.block_s, self.opts.settle_s
-        self.voice.say(f"Calibration. {self.opts.calib_reps} rounds. Eyes open on the low beep, "
-                       "eyes closed on the high beep.")
+        # Same rule in every phase: low beep, close your eyes; high beep, open them. Each beep
+        # is played once as an example, right after it is named.
+        self.voice.warm(["close your eyes. On the high beep,", "open them."])
+        self.voice.say(f"Calibration. {self.opts.calib_reps} rounds. On the low beep,")
+        self.voice.beep("go")
+        self.voice.say("close your eyes. On the high beep,")
+        self.voice.beep("stop")
+        self.voice.say("open them.")
+        self.wait(1.0)
         cal = None
         for attempt in (1, 2):
             opens, closeds = [], []
             for rep in range(self.opts.calib_reps):
                 # The intro explained the beeps. Say the words on the first round only.
                 words = rep == 0 and attempt == 1
-                self.cue("cal_open", "Eyes open." if words else None, rep=rep, attempt=attempt)
+                self.cue("cal_open", "Eyes open." if words else None, beep="stop",
+                         rep=rep, attempt=attempt)
                 self.wearer.open()
                 self.wait(settle)
                 opens.extend(self.wait(T - settle).tolist())
-                self.cue("cal_closed", "Eyes closed." if words else None, beep="stop",
+                self.cue("cal_closed", "Eyes closed." if words else None, beep="go",
                          rep=rep, attempt=attempt)
                 self.wearer.close()
                 self.wait(settle)
                 closeds.extend(self.wait(T - settle).tolist())
-            self.cue("cal_end")                      # low beep: eyes open, as in every round
+            self.cue("cal_end", beep="stop")         # high beep: open your eyes, as in every round
             self.wearer.open()
             try:
                 cal = self.ac.calibrate(opens, closeds)
@@ -542,8 +551,8 @@ class BoardSession:
         self.wait(1.2)                                         # settle with eyes open
 
     def switch_test(self) -> None:
-        self.voice.say("Switch test. Each time you hear the low beep, close your eyes. "
-                       "Open them on the high beep.")
+        self.voice.say("Switch test. As before: close your eyes on each low beep, "
+                       "and open them on the high beep.")
         hits, latencies, extra = 0, [], 0
         import random
         rng = random.Random(1)

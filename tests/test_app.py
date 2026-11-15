@@ -401,3 +401,18 @@ def test_window_opens_inside_the_screen_it_is_on(qapp):
     big = QRect(100, 50, 2560, 1400)                           # a second monitor, offset
     assert fit_to_screen(w, available=big) == PREFERRED_SIZE   # roomy screens keep the usual size
     assert big.contains(w.geometry())
+
+
+def test_long_status_text_wraps_instead_of_widening_the_window(qapp):
+    """The PiEEG eye check names two inputs and a device in the strip. That line used to force
+    the window to 1841 wide on a 1536-wide screen."""
+    app = App(InputSources.KEYBOARD, view=WidgetView(), speaker=FakeSpeaker(), echo=False)
+    app.root.show()
+    app.ask()
+    before = app.root.minimumSizeHint().width()
+    app.window.set_input_text("Choose: Keyboard · Confirm: hold 1 · Simulated (self-test LSL "
+                              "stream): eye check not run yet", InputSources.KEYBOARD)
+    app.window.prompt.setText("Eye-closure confirm ON: Simulated (self-test LSL stream) passed the check")
+    assert app.root.minimumSizeHint().width() <= before
+    app.close()
+    app.root.close()

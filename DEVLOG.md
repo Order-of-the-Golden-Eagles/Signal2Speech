@@ -609,4 +609,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Calibration says "eyes open" and "eyes closed" on the first round only. After that the beeps are enough, because the introduction already explains them
 - Fixed the voice briefly switching to the old one mid-session: too many lines were being made at once, so one arrived late. They're now made two at a time
 - In the app and the session, dates are now read as dates: "June 28, 2023" is spoken as "June twenty-eighth, twenty twenty-three"
-- Verified on the judging laptop with a full spoken dry run from a cold start on our simulated board: no cue fell back to the old voice, and every check passed. Four new tests. Not yet run on a real board
+- In the app, the PiEEG eye check can now be followed with closed eyes. It speaks one sentence, playing the low and high beep as examples as it names them, then uses beeps alone, then says "Ready." After that the app speaks only the replies the wearer confirms
+    - The screen shows the same words the voice says
+    - One rule everywhere, including the board session: low beep, close your eyes; high beep, open them
+- Fixed the app window growing past the screen during the eye check: a long status line forced it to 1841 wide on a 1536-wide screen. Long lines now wrap
+- Verified on the judging laptop: a full spoken dry run of the board session from a cold start with no cue falling back to the old voice, and the app in PiEEG mode on our simulated board staying 1520 wide. Seven new tests. Not yet run on a real board
