@@ -585,7 +585,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - If no voice works at all, the cue is still printed and the session carries on
 - Verified on the judging laptop by switching the Windows voice off: three cues in a row spoke for 2.3 s, 2.1 s and 2.2 s. Two new tests. Not tried on a real Mac or Linux machine
 
-## 11/15/26 - 2:38 AM - Vasanth Anbukumar - #206 The wearer now has a natural-sounding voice, still offline (PR pending)
+## 11/15/26 - 2:38 AM - Vasanth Anbukumar - #206 The wearer now has a natural-sounding voice, still offline ([PR #207](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/207))
 - The app can speak with a natural neural voice (Piper) instead of Windows' robotic one. It runs on the laptop with no network, so the Wi-Fi-off demo is unchanged
     - Set up once per machine: `pip install piper-tts` and download one voice file into `voices/`. The steps are in `docs/text-to-speech/README.md`. The judging laptop is set up
     - Without Piper or the voice file, the app speaks exactly as it did before
