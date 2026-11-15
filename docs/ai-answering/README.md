@@ -57,7 +57,7 @@ python -m signal2speech.mcp --source hybridblack # Unicorn (Live EEG): signal qu
 | Resource `signal2speech://selection-contract` | The selection contract |
 
 **How it works.** `signal2speech/mcp/monitor.py` runs the same P300 evidence pipeline as `python -m signal2speech.evidence --p300` (#76), headless, with no Qt.
-- **Generator:** a session thread flashes the two tiles itself. First come 6 cued calibration sequences, which fill the averages and train the LDA. Then it runs one online sequence every 6 s with a random attended tile, so decisions can be checked against a known answer.
+- **Generator:** a session thread flashes the two tiles itself. First come 8 cued calibration sequences (`--calibration`), which fill the averages and train the LDA. Then it runs one online sequence every 6 s with a random attended tile, so decisions can be checked against a known answer.
 - **Live:** there are no tiles to look at in a headless process, so it doesn't flash. The P300 tools say so, and quality and alpha stay live.
 - **Data shape:** results are summaries. The last 10 s of signal stays in the process, and no list in a result is longer than 64 values. A test checks this.
 - **Transport:** stdio only, with no network listener.
@@ -72,7 +72,7 @@ python -m signal2speech.mcp --source hybridblack # Unicorn (Live EEG): signal qu
 - `p300_visible: true`, labelled Simulated
 - 3 of 3 decisions correct
 
-`tests/test_mcp.py` (7 tests, `slow`) runs every tool against a Generator pipeline. It also runs one real stdio session with the official MCP client, including a bad argument, which returns a tool error instead of crashing. CI installs the `mcp` extra, so these tests run there.
+`tests/test_mcp.py` (8 tests, `slow`) runs every tool against a Generator pipeline. It pins the visibility verdict with constructed averages, because the verdict on real noise is statistical. It also runs one real stdio session with the official MCP client, including a bad argument, which returns a tool error instead of crashing. CI installs the `mcp` extra, so these tests run there.
 
 **For the video (#34):** start the server in Claude Desktop, ask "Is the wearer's P300 visible?", and record about 30 s of the assistant calling `p300_average` and answering. Say on screen that the data is **Simulated**.
 

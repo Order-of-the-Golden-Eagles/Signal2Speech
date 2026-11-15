@@ -144,7 +144,8 @@ def build_server(monitor: Monitor) -> MCPServer:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="python -m signal2speech.mcp")
     ap.add_argument("--source", choices=["generator", "hybridblack"], default="generator")
-    ap.add_argument("--calibration", type=int, default=6, help="P300 calibration sequences")
+    ap.add_argument("--calibration", type=int, default=8,
+                    help="P300 calibration sequences (more = steadier average)")
     ap.add_argument("--period", type=float, default=6.0, help="seconds between decisions")
     args = ap.parse_args(argv)
     monitor = Monitor(args.source, calibration=args.calibration, period=args.period)

@@ -49,7 +49,8 @@ def test_every_tool_answers_from_the_pipeline_and_labels_simulated(running):
     a = call(s, "p300_average", {"channel": "Pz"})
     assert a["input"] == "Simulated" and a["ready"]
     assert a["epochs"]["target"] > 0 and a["epochs"]["nontarget"] > 0
-    assert a["p300_visible"] is True and 250 <= a["peak_latency_ms"] <= 500
+    assert 250 <= a["peak_latency_ms"] <= 500 and a["peak_difference_uv"] > 0
+    assert isinstance(a["p300_visible"], bool)      # the verdict itself is pinned below
 
     d = call(s, "latest_decisions", {"n": 5})
     assert d["calibrated"] and d["decisions"] and d["accuracy_so_far"] is not None
@@ -136,3 +137,30 @@ def test_stdio_transport_with_the_official_client():
     assert names == {"signal_quality", "pipeline_graph", "latest_decisions", "p300_average",
                      "alpha_state", "evidence_view"}
     assert quality["input"] == "Simulated"
+
+
+def test_visibility_verdict_is_deterministic():
+    """The verdict rule on constructed averages: a clear 300 ms peak is visible, noise isn't."""
+    import numpy as np
+
+    from signal2speech.eeg import p300
+    from signal2speech.mcp.monitor import summarize_average
+
+    n = int(round((p300.TIME_PRE + p300.TIME_POST) * p300.RATE))
+    t_ms = (np.arange(n) - int(round(p300.TIME_PRE * p300.RATE))) / p300.RATE * 1000
+
+    class Fake:
+        p300_note = ""
+
+        def __init__(self, bump_uv):
+            rng = np.random.default_rng(0)
+            self.non = rng.normal(0, 0.3, (n, 8))
+            self.tgt = self.non + bump_uv * np.exp(-((t_ms - 300) / 60) ** 2)[:, None]
+
+        def averages(self):
+            return {"target": self.tgt, "nontarget": self.non}, {"target": 30, "nontarget": 30}
+
+    clear = summarize_average(Fake(5.0), "Pz")
+    assert clear["p300_visible"] is True and 280 <= clear["peak_latency_ms"] <= 320
+    flat = summarize_average(Fake(0.0), "Pz")
+    assert flat["p300_visible"] is False
