@@ -176,7 +176,9 @@ def test_eye_progress_drives_the_ring_only_when_eyes_can_confirm(qapp):
     assert app.window.ring.model.progress == 0.0
     app.close()
     app.root.close()
-    app, _, _ = make(qapp, InputSources.SIMULATED, sim_script=[], confirm_delay_ms=60000)
+    # Cancel picks only: no simulated eye closure holds the ring (an empty script means the
+    # default [2, 1], whose confirm pick would hold it on the g.Pype path).
+    app, _, _ = make(qapp, InputSources.SIMULATED, sim_script=[2, 2, 2], confirm_delay_ms=60000)
     app.window.press_target(T2)
     app.window.set_eye_progress(0.7)
     assert app.window.ring.model.progress == 0.7
