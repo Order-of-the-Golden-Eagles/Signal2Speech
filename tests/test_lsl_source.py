@@ -76,3 +76,65 @@ def test_self_test_board_picks_good_pins_and_confirms_once_per_closure(capsys):
     assert [l["outcome"] for l in lines if "outcome" in l] == ["Previewed", "Confirmed"]
     assert "14 of 16 pins have good contact" in out
     assert code == 0
+
+
+def _visible(name):
+    import pylsl
+    return bool(pylsl.resolve_byprop("name", name, 1, 5.0))
+
+
+def test_first_run_check_detects_the_board_and_reports_contact(capsys):
+    """--check: no prompts. Detect the device, measure the rate, report pin contact."""
+    pub = lsl.SelfTestStream(name="S2S-Probe2").start()
+    try:
+        seen = _visible("S2S-Probe2")
+    finally:
+        pub.stop()
+    if not seen:
+        pytest.skip("LSL streams can't be discovered on this machine (multicast blocked)")
+    code = lsl.main(["--self-test", "--check", "--probe-s", "3"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "device: PiEEG Octopus 16, 16 channels" in out
+    assert "data is arriving" in out and "14 of 16 pins have good contact" in out
+    assert "READY: PiEEG Octopus 16 detected" in out
+    assert ">>>" not in out                                   # no eye prompts in a check
+
+
+def test_a_board_that_really_sends_244_per_second_still_checks_out(capsys):
+    """PiEEG: some boards sample at 244.14 Hz while the stream says 250."""
+    pub = lsl.SelfTestStream(name="S2S-Probe3").start()
+    try:
+        seen = _visible("S2S-Probe3")
+    finally:
+        pub.stop()
+    if not seen:
+        pytest.skip("LSL streams can't be discovered on this machine (multicast blocked)")
+    code = lsl.main(["--self-test", "--self-test-rate", "244.14", "--check", "--probe-s", "4"])
+    out = capsys.readouterr().out
+    assert code == 0 and "READY" in out
+    rate = float(out.split("data is arriving: ")[1].split(" ")[0])
+    assert 238 <= rate <= 250, rate
+
+
+def test_host_names_match_without_case_or_domain(monkeypatch):
+    import socket
+
+    from signal2speech.eeg import pieeg_lsl
+
+    class Stream:
+        def __init__(self, host): self._h = host
+        def hostname(self): return self._h
+
+    def not_found(**_):
+        raise pieeg_lsl.PiEEGStreamNotFound("none")
+
+    import pylsl
+    monkeypatch.setattr(pieeg_lsl, "find_local_stream", not_found)
+    monkeypatch.setattr(socket, "gethostname", lambda: "Vas-Laptop")
+    mine, other = Stream("VAS-LAPTOP.local"), Stream("someone-else")
+    monkeypatch.setattr(pylsl, "resolve_byprop", lambda *a, **k: [other, mine])
+    assert lsl.find_stream("Octopus16") is mine
+    monkeypatch.setattr(pylsl, "resolve_byprop", lambda *a, **k: [other])
+    with pytest.raises(pieeg_lsl.PiEEGStreamNotFound):
+        lsl.find_stream("Octopus16")                          # another team's stream is refused

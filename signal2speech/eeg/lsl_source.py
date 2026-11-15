@@ -73,12 +73,14 @@ class SelfTestStream:
     FLAT, RAILED = 0, 1
 
     def __init__(self, name: str = SELF_TEST_NAME, alpha_open_uv: float = 3.0,
-                 alpha_closed_uv: float = 25.0, noise_uv: float = 10.0, seed: int = 0):
+                 alpha_closed_uv: float = 25.0, noise_uv: float = 10.0, seed: int = 0,
+                 actual_rate: float = SAMPLING_RATE):
         import pylsl
 
         self.name = name
         self._open, self._closed, self._noise = alpha_open_uv, alpha_closed_uv, noise_uv
         self._amp = alpha_open_uv
+        self._actual_rate = actual_rate      # some boards send 244.14/s while claiming 250
         self._rng = random.Random(seed)
         info = pylsl.StreamInfo(name, STREAM_TYPE, CHANNELS, SAMPLING_RATE, "float32",
                                 "signal2speech_selftest")
@@ -99,6 +101,7 @@ class SelfTestStream:
     def stop(self) -> None:
         self._stop.set()
         self._thread.join(timeout=2)
+        self._outlet = None                 # withdraw the stream now, not at garbage collection
 
     def _sample(self, t: float) -> List[float]:
         base = self._amp * math.sin(2 * math.pi * 10.0 * t)
@@ -108,11 +111,11 @@ class SelfTestStream:
         return row
 
     def _run(self) -> None:
-        dt = 1.0 / SAMPLING_RATE
+        dt = 1.0 / self._actual_rate
         n, next_t = 0, time.perf_counter()
         while not self._stop.is_set():
             now = time.perf_counter()
-            while now >= next_t:
+            while now >= next_t and self._outlet is not None:
                 self._outlet.push_sample(self._sample(n * dt))
                 n += 1
                 next_t += dt
@@ -128,7 +131,8 @@ class RawReader:
         found = pylsl.resolve_byprop("name", stream_name, 1, timeout)
         if not found:
             raise RuntimeError(f"LSL stream '{stream_name}' disappeared")
-        self._inlet = pylsl.StreamInlet(found[0], max_buflen=60)
+        newest = max(found, key=lambda s: s.created_at())    # a stale twin can linger briefly
+        self._inlet = pylsl.StreamInlet(newest, max_buflen=60)
         self._inlet.open_stream(timeout=timeout)
 
     def read(self, seconds: float) -> np.ndarray:
@@ -188,6 +192,48 @@ def choose_channels(device: devices.Device, requested: Optional[List[int]], stre
     return pick
 
 
+def find_stream(name: str, any_host: bool = False, timeout: float = 5.0):
+    """The stream on this computer. Host names are compared without case or domain, because
+    Windows and LSL don't always agree on either ("Vas-Laptop" vs "VAS-LAPTOP.local")."""
+    import socket
+
+    from signal2speech.eeg import pieeg_lsl
+
+    try:
+        return pieeg_lsl.find_local_stream(timeout=timeout, any_host=any_host, name=name)
+    except pieeg_lsl.PiEEGStreamNotFound:
+        import pylsl
+
+        short = lambda h: (h or "").split(".")[0].casefold()
+        for s in pylsl.resolve_byprop("name", name, timeout=1.0):
+            if short(s.hostname()) == short(socket.gethostname()):
+                return s
+        raise
+
+
+def quick_check(device: devices.Device, stream_name: str, rate: float, seconds: float,
+                say=print) -> bool:
+    """No prompts: is data arriving, at what rate, and which pins are touching?"""
+    reader = RawReader(stream_name)
+    try:
+        block = reader.read(seconds)
+    finally:
+        reader.close()
+    if len(block) < rate:
+        say(f"The stream is there but only {len(block)} samples arrived in {seconds:g} s. "
+            "Is the board still connected (LED solid) and PiEEG's script still running?")
+        return False
+    measured = len(block) / seconds
+    say(f"data is arriving: {measured:.1f} samples per second (stream says {rate:g})")
+    say("pin contact:")
+    say(contact_report(device, block, rate))
+    good = int(devices.contact_ok(block, rate, device.contact_rms_uv).sum())
+    if good == 0:
+        say("No pin has good contact yet. Part the hair, press the sensor straight down, and "
+            "hold it snug with a headband.")
+    return good > 0
+
+
 def safe_to_arm(report: dict, closures: int) -> tuple:
     """Live confirm is switched on only after a clean check on this wearer, this session."""
     reasons = []
@@ -217,6 +263,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--calib-s", type=float, default=10.0)
     p.add_argument("--rest-s", type=float, default=20.0, help="eyes-open false-trigger window")
     p.add_argument("--closures", type=int, default=3)
+    p.add_argument("--self-test-rate", type=float, default=SAMPLING_RATE,
+                   help="self-test: samples per second really sent (try 244.14, as some boards do)")
+    p.add_argument("--check", action="store_true",
+                   help="first run: detect the device, measure the rate, report pin contact, and stop")
     p.add_argument("--demo", action="store_true",
                    help="after the check: keyboard preview, then confirm by closing the eyes")
     args = p.parse_args(argv)
@@ -234,11 +284,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     from signal2speech.ui.__main__ import PrintSink, load_demo_choices
 
     app = QCoreApplication.instance() or QCoreApplication(sys.argv[:1])
-    publisher = SelfTestStream().start() if args.self_test else None
+    publisher = (SelfTestStream(actual_rate=args.self_test_rate).start()
+                 if args.self_test else None)
     relay = None
     try:
         try:
-            info = pieeg_lsl.find_local_stream(timeout=5.0, any_host=args.any_host, name=args.stream)
+            info = find_stream(args.stream, any_host=args.any_host)
         except pieeg_lsl.PiEEGSetupError as err:
             print(str(err).replace("--sim --lsl", "--lsl   (add --sim for PiEEG's simulator)"), flush=True)
             return 1
@@ -254,6 +305,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               f"{relay.rate:g} Hz (stream '{info.name()}' on {info.hostname()})", flush=True)
         if live:
             print(SAFETY, flush=True)
+        if relay.channels != device.channel_count and device.channel_count:
+            print(f"note: expected {device.channel_count} channels for {device.name}, the stream "
+                  f"has {relay.channels}. Using the stream's count.", flush=True)
+        if args.check:
+            ok = quick_check(device, relay.name, relay.rate, max(args.probe_s, 3.0),
+                             say=lambda t: print(t, flush=True))
+            print(("READY: " if ok else "NOT READY: ") + f"{device.name} detected"
+                  + ("" if ok else ", but no usable pins yet"), flush=True)
+            return 0 if ok else 1
 
         try:
             requested = parse_channels(args.channels, relay.channels)
@@ -297,6 +357,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             relay.stop()
         if publisher is not None:
             publisher.stop()
+        relay = publisher = None
+        import gc
+        gc.collect()                        # release LSL outlets so the names are free again
 
 
 if __name__ == "__main__":

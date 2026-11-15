@@ -520,4 +520,5 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Live confirm switches on only after a clean check on that wearer: no false triggers at rest and exactly one confirm per eye closure
 - Reviewers can reproduce our numbers on g.tec's own data with no hardware: `python -m signal2speech.evidence.dataset path/to/p300-speller` (new README section)
 - The library run sheet is in `docs/eeg-hardware/README.md`: power bank only while worn, close PiEEG Cloud first (one Bluetooth connection at a time), puck on the back of the head
-- Verified on our own simulated 16-pin stream: it found the flat pin and the loose pin, used the other 14, and confirmed once per closure. Not yet tried on a real board or a real person
+- First-run check: `python -m signal2speech.eeg.lsl_source --input live --check` detects the board, measures the sample rate, and reports each pin's contact in about 10 seconds, with no prompts
+- Verified against PiEEG's own script (their simulator publishing the real stream): detected as the Octopus 16 at 250 samples per second. Also verified with a stream that really sends 244 per second, as some boards do, and on our simulated 16-pin stream, where it found the flat pin and the loose pin, used the other 14, and confirmed once per closure. Not yet tried on a real board or a real person

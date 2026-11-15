@@ -394,7 +394,7 @@ The Octopus 16 is a 26 mm puck that reads **one spot**, not a cap. All 16 pins, 
 
 The board is on the library's first floor. Take the judging laptop there.
 
-**Before you leave:** `python -m signal2speech.eeg.lsl_source --self-test --demo` passes on the laptop (no board needed). PiEEG's starter is cloned: `git clone https://github.com/pieeg-club/hello_world_octopus_16`, then `pip install bleak pylsl numpy` in its folder's Python.
+**Before you leave:** `python -m signal2speech.eeg.lsl_source --self-test --demo` passes on the laptop (no board needed). PiEEG's starter is cloned (`git clone https://github.com/pieeg-club/hello_world_octopus_16`). Run PiEEG's script with **our** venv's Python, which already has everything it needs (`pip install -e ".[dev,board]"` adds the Bluetooth library).
 
 | # | Step | You should see |
 | --- | --- | --- |
@@ -402,9 +402,10 @@ The board is on the library's first floor. Take the judging laptop there.
 | 2 | Optional quick look in the browser: [cloud.pieeg.com](https://cloud.pieeg.com), pair with `Octopus-16-XXXX`. **Then click Disconnect or close the tab.** The board allows one Bluetooth connection at a time, so anything still connected blocks step 4. | 16 traces moving |
 | 3 | Put the puck on the **back of the head** (Oz, or Pz just above it). Part the hair, press it straight down, and hold it snug with a headband. | |
 | 4 | In PiEEG's starter folder: `python python_quickstart.py --lsl`. Leave it running. | LED turns solid. A line every second with `SPS`, `Lost`, and `Good Pins: n/16`. Adjust the puck until most pins are good. |
-| 5 | In our repo: `python -m signal2speech.eeg.lsl_source --input live --demo` | The steps below |
+| 5 | **First-run check**, in our repo: `python -m signal2speech.eeg.lsl_source --input live --check` | `device: PiEEG Octopus 16, 16 channels`, the measured sample rate, a contact line per pin, and `READY`. No prompts. Takes about 10 seconds. |
+| 6 | The full session: `python -m signal2speech.eeg.lsl_source --input live --demo` | The steps below |
 
-Step 5 walks through, with prompts:
+Step 6 walks through, with prompts:
 1. **Channel check** (8 s eyes open, 8 s closed): prints each pin's contact and how much its alpha rose, and picks the pins to use.
 2. **Calibration** (10 s open, 10 s closed), then **20 s of rest** counting false triggers, then **3 eye closures** timing each confirm.
 3. **Verdict.** Live confirm switches on only if the check is clean: 0 false triggers and exactly one confirm per closure.
@@ -420,4 +421,10 @@ Step 5 walks through, with prompts:
 
 **Label:** a real board on a person is **Live EEG (PiEEG Octopus 16)**. PiEEG's `--sim` simulator and our `--self-test` are **Simulated**. `--input live|simulated` is required, because LSL can't prove what's publishing.
 
-**Verified on 2026-11-15:** the self-test stream on the judging laptop, end to end. It found the one flat pin and the one railed pin, used the other 14, had 0 false triggers, and gave one confirm per closure in about 1.3 s. **Not verified:** a real Octopus 16, its Bluetooth link, or whether one small spot gives enough alpha on a real person. Some boards sample at 244.1 Hz instead of 250; PiEEG says that's fine for band power, and the check prints the measured rate.
+**Detection verified on 2026-11-15, on the judging laptop:**
+- Against **PiEEG's own script** (`python_quickstart.py --sim --lsl`): found on this computer, identified as the Octopus 16, 250.4 samples per second measured, contact reported for all 16 pins.
+- With a stream that claims 250 Hz but **really sends 244**, as some boards do: the full check still passes.
+- Host names are matched without case or domain, and a same-named stream from another computer is refused.
+- The laptop's Bluetooth LE adapter can scan (it's what PiEEG's script uses to reach the board).
+
+**Flow verified:** the self-test stream on the judging laptop, end to end. It found the one flat pin and the one railed pin, used the other 14, had 0 false triggers, and gave one confirm per closure in about 1.3 s. **Not verified:** a real Octopus 16, its Bluetooth link, or whether one small spot gives enough alpha on a real person. Some boards sample at 244.1 Hz instead of 250; PiEEG says that's fine for band power, and the check prints the measured rate.

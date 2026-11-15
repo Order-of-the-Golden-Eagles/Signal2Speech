@@ -13,6 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+board = ["bleak>=1.0"]   # Bluetooth LE, only to run PiEEG's own starter script for a real board (#150)
 # MCP server for AI assistants (#110): python -m signal2speech.mcp
 mcp = ["mcp>=2.3,<3"]
 
