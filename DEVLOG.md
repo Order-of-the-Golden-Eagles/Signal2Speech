@@ -481,7 +481,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `python -m signal2speech --help` lists the same tools, and `python -m signal2speech demo-keyboard` runs one directly. The README quickstart uses it now
 - Checked on a Mac: the buttons start the right commands, and the evidence view is grayed out here because g.Pype isn't installed. The smoke check correctly shows FAIL for the same reason. It should pass on the judging laptop
 
-## 11/14/26 - 11:08 PM - MagicJester2764 - #153 Science note for the Beyond the Horizon judges (PR pending)
+## 11/14/26 - 11:08 PM - MagicJester2764 - #153 Science note for the Beyond the Horizon judges ([PR #159](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/159))
 - Wrote down exactly what the NASA and EPA data is and what we do and don't claim, for judges who know the science: `docs/openorbit-data/science-note.md`
 - Found a subtle point a scientist would catch: Washtenaw's "before" air quality (32) was set by ozone, not by smoke particles. The app now says which pollutant set each number, and the note explains why the comparison still holds
 - The June 26 satellite image is mostly cloud, and the screen now says so, so nobody reads white cloud as clean air
