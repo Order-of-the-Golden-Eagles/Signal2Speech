@@ -348,6 +348,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - With no headset, it now stops within about 15 seconds with pairing steps, instead of freezing forever (the headset library waits indefinitely when no device is there)
 - Rehearse the exact same path without the headset: `--input simulated --p300`. That run worked end to end (one preview, one eye-closure confirm, one spoken line). Nothing has been tried on a real wearer yet
 - After two code reviews: a failed calibration switches that part off and the on-screen hints say so (keys still work); closing the window, a busy headset, a missing driver, or a crash all exit cleanly and release the headset; if the brain gives no answer, the tiles flash again, then hand over to the keys
+
 ## 11/14/26 - 8:07 PM - Long Le - #5 AI demo shows the map for map suggestions ([PR #118](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/118))
 - When Claude suggests a map answer (from #106), the AI demo window now shows the map and speaks the line once, just like the main app
 - Why: the AI demo had no map on purpose, because replies used to be spoken words only. With #106, picking "Compare counties (shows the map)" would have spoken the line but shown nothing, and logged a BUG line
@@ -366,6 +367,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The hook itself now clears git's variables before running the tests, so no other test or tool can do the same thing
 - Verified by pushing through the real pre-push hook: the tests passed, and the repo's settings, history, and staged files were unchanged afterwards. A new test also checks this on every run, in both ways a hook can set git's variables
 - If you pushed with the hooks turned on, check your repo with the steps in `docs/MEMORY.md`
+
 ## 11/14/26 - 8:13 PM - Vasanth Anbukumar - #23 Plain-language prompts in the live-run guide ([PR #127](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/127))
 - The guided headset test (`python -m signal2speech.eeg.live --source hybridblack`) now speaks to the wearer in plain words: "WEARER: look at the tile with the YELLOW border… count it silently", "If YES, close your eyes for about 2 seconds"
 - Steps read as what's happening ("checking the signal", "learning how your brain reacts to the flashes", "learning your eyes-closed YES signal") instead of jargon
@@ -412,13 +414,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The report is ready to paste into the rehearsal log, so every practice run leaves evidence behind
 - Found and fixed two bugs while testing: the map time got overwritten in the strip, and closing the app could raise an error from the sound player. Tests use a fake clock. Not yet measured on the judging laptop
 
-## 11/14/26 - 9:36 PM - Vasanth Anbukumar - #142 Real recorded brain data in the evidence view (PR pending)
-- Judges can now see a real human P300 even though our headset was lost in transit: `python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat`
-    - It plays g.tec's own hackathon recording (five people, 8 channels at 250 Hz like the Unicorn, but with different electrode positions: P3 and P4 where the Unicorn has C3 and C4) through our filters and averaging. The red target line pulls away from the blue non-target line around 300–500 ms within a minute
-    - The banner always says "RECORDED… recorded by g.tec, not our headset or wearer". It's never shown as live or as ours
-- `python -m signal2speech.evidence.dataset path/to/p300-speller` prints the numbers: a 7–11 µV target vs non-target difference in all five people, and our chooser's method classifies single flashes at 0.59–0.85 balanced accuracy (chance is 0.50)
-- The dataset stays out of git. The docs say where to download it; cite g.tec and don't redistribute it
-- Verified: the window on the judging laptop with subject S4, and tests that build a small fake file in the same format and check the flashes line up to the sample. Still not a result for our wearer or our two-tile layout
 ## 11/14/26 - 9:20 PM - In Young Song - #138 PiEEG's simulator drives the eye-closure confirm ([PR #144](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/144))
 - PiEEG's own simulated EEG now runs through our g.Pype pipeline: a keyboard preview, then PiEEG's "eyes closed" alpha burst confirms it, and the map changes and the line is spoken once
     - `python python_quickstart.py --sim --lsl` (PiEEG's starter), then `python -m signal2speech.eeg.pieeg_lsl --demo`. Setup is in `docs/eeg-hardware/pieeg.md`
@@ -426,6 +421,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - PiEEG's simulators have no P300, so the choice is made by keyboard here. The P300 chooser stays on `--input simulated --p300`
 - Only the stream from this laptop is used, under a name unique to it, so another team's PiEEG simulator on the venue Wi-Fi can't drive our app
 - Verified on Windows with PiEEG's real starter: 250.0 Hz, calibration ratio 26.2, one confirm and one spoken line. The new tests use a fake stream and skip without `pylsl`, which isn't in the team install yet (Vasanth's call, #19). Not tried on the judging laptop, and not in the evidence view yet
+
 ## 11/14/26 - 9:26 PM - Long Le - #133 Crash-safe launcher for the judging table ([PR #145](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/145))
 - One command starts the demo fullscreen and brings it back by itself if it crashes: `python tools/demo_launcher.py --input keyboard`
     - Restarts after 1 s, then every 2 s, up to 5 times. Closing the window normally just ends it
@@ -437,3 +433,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - They're drawn by a script, so changing a name or a line is one command: `python docs/demo-submission/make_graphics.py`
 - The diagram shows the real path: headset → g.Pype (OSCAR) → P300 to choose and alpha to confirm → selection contract → speech and map, with keyboard and simulator input going through the same contract
 - Checked by eye at full size, and a test makes sure all three stay 1920×1080, under 500 KB, and linked from the shot list
+
+## 11/14/26 - 9:36 PM - Vasanth Anbukumar - #142 Real recorded brain data in the evidence view (PR pending)
+- Judges can now see a real human P300 even though our headset was lost in transit: `python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat`
+    - It plays g.tec's own hackathon recording (five people, 8 channels at 250 Hz like the Unicorn, but with different electrode positions: P3 and P4 where the Unicorn has C3 and C4) through our filters and averaging. The red target line pulls away from the blue non-target line around 300–500 ms within a minute
+    - The banner always says "RECORDED… recorded by g.tec, not our headset or wearer". It's never shown as live or as ours
+- `python -m signal2speech.evidence.dataset path/to/p300-speller` prints the numbers: a 7–11 µV target vs non-target difference in all five people, and our chooser's method classifies single flashes at 0.59–0.85 balanced accuracy (chance is 0.50)
+- The dataset stays out of git. The docs say where to download it; cite g.tec and don't redistribute it
+- Verified: the window on the judging laptop with subject S4, and tests that build a small fake file in the same format and check the flashes line up to the sample. Still not a result for our wearer or our two-tile layout
