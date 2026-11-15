@@ -147,3 +147,36 @@ def test_voice_helper_failure_never_stops_the_session(monkeypatch):
     v._sapi = None
     v.say("Close your eyes.")                                 # printed, not spoken, no exception
     assert v.log == ["Close your eyes."]
+
+
+def test_natural_voice_speaks_cues_and_falls_back_when_a_line_fails(monkeypatch):
+    """With the natural voice installed, cues use it. A cue it can't make still gets spoken."""
+    class Clip:
+        why = ""
+        def __init__(self, ok): self.ok, self.wav = ok, "cue.wav"
+        def state(self): return "ready" if self.ok else "failed"
+
+    class FakeNatural:
+        name = "test-voice"
+        def __init__(self): self.asked = []
+        def request(self, text):
+            self.asked.append(text)
+            return Clip("broken" not in text)
+        def warm(self, lines):
+            for line in lines: self.request(line)
+        def pump(self): pass
+
+    helper = []
+    monkeypatch.setattr(bs.subprocess, "run", lambda args, **k: helper.append(args[-1]) or type("D", (), {"returncode": 0})())
+    natural = FakeNatural()
+    v = bs.Voice(enabled=True, neural=natural)
+    v._sapi = None
+    played = []
+    v._neural, v._play = natural, played.append      # as on Windows, where a waiting player exists
+    assert v.audible and "test-voice" in v.name
+    v.warm(["One: Yes.", "Two: No."])
+    assert natural.asked == ["One: Yes.", "Two: No."] and not played     # made ahead, no sound
+    v.say("One: Yes.")
+    assert played == ["cue.wav"] and not helper
+    v.say("A broken line.")
+    assert played == ["cue.wav"] and helper == ["A broken line."]        # fell back for that cue

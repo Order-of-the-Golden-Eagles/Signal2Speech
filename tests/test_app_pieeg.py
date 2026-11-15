@@ -212,3 +212,43 @@ def test_cli_without_a_stream_exits_3_with_board_help(qapp, monkeypatch, capsys)
     assert app_module.main(["--input", "pieeg", "--pieeg", "live", "--mute", "--no-report"]) == 3
     err = capsys.readouterr().err
     assert "no LSL stream 'Octopus16'" in err and "power bank" in err
+
+
+def test_eye_check_is_followable_with_closed_eyes_and_says_very_little():
+    """One spoken sentence, then beeps (low: close, high: open), then one result line."""
+    from signal2speech.eeg.app_live import SpokenCheck, check_cue
+
+    assert check_cue("Channel check: keep your eyes OPEN and relaxed for 8 s") is None
+    assert check_cue("Calibration: CLOSE your eyes for 10 s") == "close"
+    assert check_cue("Closure 2/3: CLOSE your eyes now for 2 s") == "close"
+    assert check_cue("Open your eyes") == "open" and check_cue("Open") == "open"
+    assert check_cue("Rest: keep your eyes OPEN for 20 s (counting false triggers)") is None
+    assert check_cue("false triggers 0, confirms per closure [1, 1, 1] -> armed") is None
+
+    class FakeVoice:
+        def __init__(self): self.out = []
+        def say(self, text): self.out.append(("say", text))
+        def beep(self, kind): self.out.append(("beep", kind))
+
+    voice = FakeVoice()
+    spoken = SpokenCheck(voice)
+    screen = []
+    show = lambda big, small: screen.append(big)
+    for text in ("Channel check: keep your eyes OPEN and relaxed for 8 s",
+                 "Channel check: CLOSE your eyes for 8 s", "Open your eyes",
+                 "Closure 1/3: CLOSE your eyes now for 2 s", "Open"):
+        spoken(text, show)
+    spoken.result(True, show, "detail")
+    # The screen's big line says what the wearer hears: the spoken sentence, then each cue.
+    assert screen == [SpokenCheck.INTRO, "Keep your eyes open", "Close your eyes  (low beep)",
+                      "Open your eyes  (high beep)", "Close your eyes  (low beep)",
+                      "Open your eyes  (high beep)", SpokenCheck.PASSED]
+    intro = [("say", "Setup. Keep your eyes open. On each low beep,"), ("beep", "go"),   # the example
+             ("say", "close your eyes. On the high beep,"), ("beep", "stop"),            # the example
+             ("say", "open them.")]
+    assert voice.out == intro + [("beep", "go"), ("beep", "stop"), ("beep", "go"), ("beep", "stop"),
+                                 ("say", SpokenCheck.PASSED), ("beep", "ok")]
+    assert [w for kind, w in voice.out[len(intro):] if kind == "say"] == [SpokenCheck.PASSED]
+    failed = FakeVoice()
+    SpokenCheck(failed).result(False)
+    assert failed.out == [("say", SpokenCheck.FAILED), ("beep", "stop")]
