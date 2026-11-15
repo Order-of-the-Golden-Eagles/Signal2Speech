@@ -538,3 +538,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - It said live input was switched off, which stopped being true when #103's code merged. A judge reading it would undersell the demo
 - Eye-closure confirm is still off on a real headset and key 1 confirms instead. That still needs one wearer run (#23, #103)
 - Docs only. Nothing new was run
+
+## 11/15/26 - 1:21 AM - Vasanth Anbukumar - #150 Voice-guided test and recording session for the board (PR pending)
+- One command now runs the whole library session and the wearer only has to listen: `python -m signal2speech.eeg.board_session --input live --consent`
+    - Every instruction is spoken, then a beep starts the timed part, so timing doesn't depend on how fast anyone reads
+    - Six phases in about 5 minutes: pin contact, which pins respond, calibration, false triggers at rest, a closure test, and a four-choice test
+- The four-choice test reads numbered choices in turn ("One: Yes. Two: No…"). The wearer closes their eyes on the one they want, then once more to confirm. This board gives one dependable signal, so stepping through the choices is how one signal picks from many
+- Raw data is recorded from the first second and saved after every phase, so a failure midway loses nothing. `--verify <folder>` checks a saved recording is complete before you leave the board
+- Why Windows' own voice: the speech library the app uses for replies spoke the first cue and silently skipped the rest
+- Checked on our simulated 16-pin stream, on the judging laptop: with the real voice, at 244 samples per second, with slow uneven reactions, with almost no eyes-closed response (stops with a clear reason), and with the board dropping out (stops within 3 seconds). Measured there: about 19 seconds for a full pick-and-confirm from four choices
+- Not yet run on a real board or a real person
