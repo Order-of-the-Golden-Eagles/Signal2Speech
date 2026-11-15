@@ -9,7 +9,7 @@ Own the two-minute walkthrough, live recording, and submission checklist.
 | Doc | Use it for |
 | --- | --- |
 | [Stage script](stage-script.md) | **The** two-minute table demo, second by second: roles, the live and keyboard tracks, exact label lines, and a fallback for every beat |
-| [Shot list](shot-list.md) | **The** submission video (under 3:00), the Recorded backup using g.Pype replay, and an AI Answering alternate shot |
+| [Shot list](shot-list.md) | Points to **the** submission video plan in [#160](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/160) (screen recording, 2:30 or less). Keeps the original wearer-on-camera cut, the Recorded backup using g.Pype replay, and an AI Answering alternate shot |
 | [Rehearsal](rehearsal.md) | Launch commands, timing targets, the test matrix (both options, cancel, duplicate, late, disconnect), and the failure-recovery script |
 | [Judge Q&A](judge-qa.md) | Short answers mapped to g.tec's must-have and bonus criteria |
 | [Pre-flight](preflight.md) | What to do before and during the 8:15 PM headset slot |

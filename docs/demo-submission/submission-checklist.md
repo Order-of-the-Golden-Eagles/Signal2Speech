@@ -20,15 +20,17 @@ Deadlines are Eastern time: **draft on Devpost and the event app by Saturday mid
 
 ### AI disclosure (draft)
 
-Paste one of these into "Generative AI in your hack", and select Claude under "AI tools used". **#116 merged on 11/14, so use the second version** (Sonnet, grounded). The first is kept for the record.
+Paste this into "Generative AI in your hack", and select Claude under "AI tools used". It matches `main` since #116 merged on 11/14 (Sonnet 5.5, grounded prompt):
 
-**While #116 is open** (what `main` does today: `claude-opus-5-5`, replies not grounded):
+> We used Claude (Anthropic) as a coding assistant during the hackathon. In the app, AI Answering uses Claude (`claude-sonnet-5-5`, through the Anthropic API) to suggest two short reply options for a typed question. Its prompt carries only our verified NASA/EPA facts and tells it not to state any others. When it picks a map answer, the app speaks our own fixed line instead of the model's words, and any AQI numbers in that line come from the dataset. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with an LDA classifier, and the alpha switch) is our own g.Pype signal-processing pipeline, not a generative model.
+
+Why this wording: an ordinary reply is the model's own text, so the prompt keeps it to the facts but can't guarantee it. Only map answers speak fixed text: the county comparison is built from the dataset, and the satellite line comes from `contracts/demo-round.json` (`signal2speech/ai/replies.py`). Earlier drafts said it "can't invent numbers". Don't use that.
+
+<details><summary>Superseded: the version from before #116 (Opus, not grounded)</summary>
 
 > We used Claude (Anthropic) as a coding assistant during the hackathon. In the app, AI Answering uses Claude (`claude-opus-5-5`, through the Anthropic API) to suggest two short reply options for a typed question. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with an LDA classifier, and the alpha switch) is our own g.Pype signal-processing pipeline, not a generative model.
 
-**Only after #116 merges:**
-
-> We used Claude (Anthropic) as a coding assistant during the hackathon. In the app, AI Answering uses Claude (`claude-sonnet-5-5`, through the Anthropic API) to suggest two short reply options for a typed question, grounded in our verified NASA/EPA dataset so it can't invent numbers. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with an LDA classifier, and the alpha switch) is our own g.Pype signal-processing pipeline, not a generative model.
+</details>
 
 ## Devpost draft tonight (#105)
 
@@ -48,13 +50,13 @@ Paste one of these into "Generative AI in your hack", and select Claude under "A
    - Prizes: only the ones we qualify for.
    - Schools.
    - AI tools: Claude.
-   - The AI answer above. **Check #116 first:** if it's still open, use the first AI answer and leave the story's AI bullet as written. If it has merged, use the second answer and add the grounding sentence from the note under the story.
+   - The AI answer above. The story's AI bullet already matches it.
 6. **Submit.** Review the team, links, and prizes. Tick the terms box, click **Submit project**, and check that the confirmation appears. Then add the project to the **event app**.
 7. **Log it** in the status log below: when, who, and the result.
 
 ### Paste-ready story
 
-Fact-checked against `main` at `758f830` (see the table after the story).
+Fact-checked against `main` at `da6e00d` (see the table after the story).
 
 **Inspiration**
 People who can't speak or type still have things to say. Most assistive tools either take a long time to spell a sentence or put words in the user's mouth. We wanted a brain-computer interface where the person stays in control: the app suggests, and the wearer decides exactly what gets said.
@@ -70,12 +72,12 @@ Communication without speech or movement, with consent built in. Every answer is
 - **One selection contract:** keyboard, simulated signals, recorded sessions, and live EEG all feed the same small state machine (choose → preview → confirm), which rejects stale, duplicate, and late inputs.
 - **App:** one offline Python process with a PySide6 interface, offline speech, and bundled NASA and EPA data.
 - **Evidence view:** live scopes, the frequency spectrum, and the averaged target vs. non-target brain response, so judges can see the signal and not just the result.
-- **AI Answering:** Claude suggests two short replies. The wearer still previews and confirms.
-- **Engineering:** over 280 automated tests, CI on Windows, macOS, and Linux for every change, and git hooks that block secrets and raw EEG.
+- **AI Answering:** Claude suggests two short replies from our verified facts. Map answers speak our own fixed lines, with numbers from the dataset, not the model's words. The wearer still previews and confirms.
+- **Engineering:** over 400 automated tests, CI on Windows, macOS, and Linux for every code change, and git hooks that block secrets and raw EEG.
 
 **Challenges we ran into**
 - We switched from Unity/C# to Python and g.Pype mid-hackathon to get a visible, cross-platform signal pipeline.
-- Our headset was lost in transit, so the judged demo runs on simulated brain signals through the real pipeline. Every screen labels its input (Keyboard, Simulated, Recorded, Live EEG). The live path is built: `python -m signal2speech.app --input live` calibrates and runs the demo on a Unicorn.
+- Our headset was lost in transit, so the judged demo runs on simulated brain signals through the real pipeline. Every screen labels its input (Keyboard, Simulated, Recorded, Live EEG). The live path is built: `python -m signal2speech.app --input live` calibrates and runs the demo on a Unicorn. Until a wearer run checks the eye-closure confirm, a key press confirms instead.
 - Flash timing: the P300 needs the marker to line up with the real on-screen flash within milliseconds. We built a tool to measure it, and measured 0.03 ms of jitter on the judging laptop.
 - Four people were merging fast, so we used CI on every pull request, auto-merge, and a shared contract so the tracks didn't collide.
 
@@ -90,32 +92,29 @@ How P300 and alpha signals work in practice, why stimulus timing matters, how to
 **What's next**
 Verify on a real wearer with the Unicorn, add more than two choices per round, stream decisions to other apps over UDP or LSL so any g.tec device can drive any app, and test with people who use assistive communication.
 
-**Note, not part of the paste:** if #116 has merged when you submit, add this sentence to the AI Answering bullet above: "The replies are grounded in our verified dataset, so it can't state a fact that isn't in the data."
-
-### Fact check (against `main` at `758f830`)
+### Fact check (against `main` at `da6e00d`)
 
 | Claim | Status | Source |
 | --- | --- | --- |
-| Live path built | ✅ On main | #124 (`--input live`, #103). **Not run on a wearer.** The text never claims it was. |
+| Live path built | ✅ On main. On live input, eye-closure confirm stays off and key 1 confirms until #23. The Challenges bullet says so. | #124 (`--input live`, #103). **Not run on a wearer.** The text never claims it was. |
 | 0.03 ms flash jitter on the judging laptop | ✅ Measured with `--tiles gl` on Vasanth's laptop, which he confirmed is the judging laptop | #101 |
-| Over 280 tests; CI on Windows, macOS, and Linux | ✅ 283 collected. Every PR and every push to `main` runs on Windows, Ubuntu, and macOS. PRs run the full suite on Windows and Ubuntu (py3.12), and the fast suite on macOS and Ubuntu (py3.13). `main` runs the full suite everywhere. | `.github/workflows/tests.yml` |
+| Over 400 tests; CI on Windows, macOS, and Linux for every code change | ✅ 408 collected. Every PR and every push to `main` runs CI on Windows, Ubuntu, and macOS. PRs run the full suite on Windows and Ubuntu (py3.12), and the fast suite on macOS and Ubuntu (py3.13). `main` runs the full suite everywhere. A docs-only change skips the test steps (#184), so the story says "every code change". | `.github/workflows/tests.yml` |
 | Alpha confirm is a different signal from the P300 choice | ✅ The story doesn't claim one can't affect the other, only that a confirm counts only in its own separate step | `SelectionHandler` rounds |
-| "Required CI" | ❌ Not used. `main` has no branch protection, so the story says "CI on every pull request". Auto-merge is enabled. | repo settings |
-| Grounded replies, Sonnet 5.5 | ✅ #116 merged 11/14. Use the second AI answer, and add the grounding sentence to the story's AI bullet. | #116 |
+| "Required CI" | ✅ Now true: the `main` ruleset requires a pull request, linear history, and the four `ci` jobs (Windows, Ubuntu, macOS on py3.12, Ubuntu py3.13). The story says "CI on every pull request", which holds either way. | repo ruleset `main` |
+| Grounded replies, Sonnet 5.5 | ✅ #116 merged 11/14. The prompt carries only the verified facts, and map answers speak fixed lines (the comparison from the dataset, the satellite line from the contract). An ordinary reply is still model text, so the story and the AI answer don't claim it can't invent numbers. | #116, `signal2speech/ai/replies.py` |
 | Spoken calibration cues | ✅ In the guided live run | `signal2speech/eeg/live.py` (#78) |
 | Headset lost in transit | Team statement (Vasanth). Not something the repo can check. | #105 plan |
-> We used Claude (Anthropic) as a coding assistant during the hackathon. In the app, AI Answering can suggest reply options using Claude (`claude-sonnet-5-5`) when an API key is configured. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with LDA, the alpha switch) is our own g.Pype pipeline, not an AI model.
 
 ## Before the final
 
 - [ ] Judging commit frozen and tagged (#42). Put the hash here: `________`
 - [ ] Security review of that commit and the video passed (#33): no keys, personal data, raw EEG, or trained models
 - [ ] `python -m signal2speech.app --smoke=judging` passes on the judging laptop with Wi-Fi off (#41)
-- [ ] Video reviewed: every non-live EEG shot labelled, under 3:00, real AQI numbers only
+- [ ] Video reviewed: every non-live EEG shot labelled, 2:30 or less (g.tec's cap, #160), real AQI numbers only
 - [ ] The repo README run command matches the judging build
 - [ ] Video link added to Devpost (#34)
 - [ ] All four teammates show on the project (In Young accepts in the morning)
-- [ ] The story still matches `main` at the frozen commit. Re-run the fact check above: #116 status, test count, and any live EEG result
+- [ ] The story still matches `main` at the frozen commit. Re-run the fact check above: test count, CI rules, and any live EEG result
 - [ ] Re-open **Additional info** and re-check the prizes and required answers (the organizers' guide says to revisit it after an early submit)
 - [ ] Mind and Machine: hardware teams also submit to g.tec's GitHub by Nov 30 (#108)
 

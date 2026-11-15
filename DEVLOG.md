@@ -533,3 +533,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Nothing is spoken until the ring is full. On the keyboard, hold 1 for 2 seconds (a tap no longer confirms). With EEG, the ring follows the eye-closure signal and empties if the eyes open early. After confirming, a "✓ Spoken" state shows until the next question
 - The alpha switch got a read-only progress signal for the ring, and its decision logic didn't change. Scripted simulated input fills the same ring
 - Checked with tests for each ring state (filling, emptying on early release, completing exactly once) and in screenshots. The live eye-closure ring needs g.Pype, so it hasn't been seen on this Mac
+## 11/15/26 - 12:34 AM - MagicJester2764 - #34 Submission checklist matches main again ([PR #188](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/188))
+- The Devpost checklist now has one AI answer to paste, and the story's AI bullet already matches it
+- The old wording said Claude "can't invent numbers". That's only true for map answers, which speak our own fixed lines. Ordinary replies are the model's own words, kept to the facts by the prompt, so the text now says exactly that
+- Every video length check now says 2:30 or less, g.tec's cap (#160). The fact check was redone at `da6e00d`: 408 tests, and `main` now requires the four CI jobs before a merge
+- Docs only. If the Devpost draft was already submitted with the old AI answer, replace it before the final
+## 11/15/26 - 12:32 AM - MagicJester2764 - #103 README: live input status ([PR #187](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/187))
+- The README status table now says the app already takes live headset input (`python -m signal2speech.app --input live`)
+- It said live input was switched off, which stopped being true when #103's code merged. A judge reading it would undersell the demo
+- Eye-closure confirm is still off on a real headset and key 1 confirms instead. That still needs one wearer run (#23, #103)
+- Docs only. Nothing new was run
