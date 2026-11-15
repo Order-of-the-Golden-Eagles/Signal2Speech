@@ -271,7 +271,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Added team and data credits (NASA GIBS MODIS, EPA AirData) and a short AI-use note. The screenshot is 180 KB in `docs/demo-submission/media/`
 - Checked: every relative link resolves, and `tools/release_check.py --quick` passes apart from the known commit-email warning (#33)
 
-## 11/14/26 - 7:25 PM - Long Le - #94 Fits the judging laptop screen, plus fullscreen and key help (PR pending)
+## 11/14/26 - 7:25 PM - Long Le - #94 Fits the judging laptop screen, plus fullscreen and key help ([PR #111](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/111))
 - The app now fits a 1080p laptop at 150% scaling (1280×720) without cutting anything off. Before, it needed 1400 px of width
     - `python -m signal2speech.app --fullscreen`. F11 toggles fullscreen, and F1 shows the keys for whoever runs the demo
 - The input label in the bottom strip always shows in full, so simulated input can't look live on a small screen. Longer connection and outcome text clips instead, and the transcript keeps it
