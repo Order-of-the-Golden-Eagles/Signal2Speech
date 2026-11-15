@@ -2,6 +2,7 @@
 
     python -m signal2speech.app --input keyboard|simulated [--sim 2,1] [--mute]
     python -m signal2speech.app --input live          # Unicorn; key 1 confirms until #23
+    python -m signal2speech.app --input pieeg --pieeg live   # keys choose, PiEEG eyes confirm (#172)
 
 One flow: Choose -> Preview (no output) -> Confirm (one map action + one spoken line) or
 Cancel (nothing). Every input goes InputAdapter -> SelectionHandler. Only AppSink.execute
@@ -16,6 +17,9 @@ Dependencies still missing on main are labelled, never faked:
 - Speech lives in signal2speech/speech/ (bundled OpenOrbit clip, else the offline OS voice).
 - #103 live EEG: --input live runs signal2speech.eeg.app_live.LiveEegInput. Eye-closure
   confirm stays disarmed (key 1 confirms) until #23 passes (--arm-live-confirm).
+- #172 PiEEG confirm: --input pieeg keeps the keyboard choosing and takes the eye-closure confirm
+  from a PiEEG board over LSL (signal2speech.eeg.app_live.PiEEGConfirm), armed only after the
+  #150 check passes in this session.
 - #48 recorded replay: refused with a clear message.
 """
 from __future__ import annotations
@@ -249,11 +253,10 @@ class App:
                  p300: bool = False, arm_live_confirm: bool = False,
                  live_options: Optional[dict] = None,
                  pieeg: Optional[dict] = None,
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic, cues: bool = False):
         if pieeg is not None and input_source != InputSources.KEYBOARD:
             raise ValueError("--input pieeg chooses by keyboard: the board gives the eyes-closed "
                              "confirm only (#172)")
-                 clock: Callable[[], float] = time.monotonic, cues: bool = False):
         if input_source in BLOCKED_INPUTS:
             raise ValueError(BLOCKED_INPUTS[input_source])
         if input_source not in (InputSources.KEYBOARD, InputSources.SIMULATED,
@@ -389,7 +392,9 @@ class App:
                 ("F1", "Show or hide this help")]
         if hasattr(self.sim, "set_next"):
             rows.insert(3, ("Ctrl+1 / Ctrl+2", "Pick for the simulated decoder"))
-        self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {INPUT_LABELS[input_source]}")
+        help_input = ("keyboard chooses, PiEEG eye closure confirms" if pieeg is not None
+                      else INPUT_LABELS[input_source])
+        self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {help_input}")
         for seq, fn in (("F1", self.help.toggle), ("F11", self.toggle_fullscreen),
                         ("F2", self.toggle_log)):
             s3 = QShortcut(QKeySequence(seq), self.root)
@@ -403,6 +408,7 @@ class App:
         if hasattr(self.sim, "strip_text"):
             return self.sim.strip_text()
         return INPUT_LABELS[self.input_source]
+
     def toggle_log(self) -> None:
         """F2: swap the readable conversation and the developer log (#176)."""
         show_log = not self.transcript_view.isVisibleTo(self.root)
