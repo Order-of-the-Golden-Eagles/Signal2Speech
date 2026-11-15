@@ -63,3 +63,7 @@ If AI Answering is in the demo, copy `.env` into that folder too. It's gitignore
 | 11/14 | InYoung-Song's Windows laptop | `aec013f` → `eecc31a` | Same | — | `release_check.py` passes on both; one map change and one spoken line per action |
 | 11/14 6:39 PM | Long Le's Mac (macOS 12, no g.Pype) | `main` → `eecc31a` with `git switch` | Same | 3 s to the first reveal | One `compare_air_quality` reveal (keyboard 2, 1) |
 | | **Judging laptop** | `judging-final` → `judging-draft` | | | **Still needed** |
+
+## Crash-safe launch at the table (#133)
+
+`python tools/demo_launcher.py --input keyboard` (or `--input simulated --sim 2,1`) starts the app fullscreen. If the app exits with an error, the launcher restarts it after 1 s, then every 2 s, up to 5 times (`--max-restarts`). Each start and exit goes to `logs/launcher-<time>.log`. Closing the window normally ends the launcher, and Ctrl+C stops both. If it gives up, it says to switch to the [fallback build](#offline-safe-fallback-copy). App flags pass through, and anything that clashes with a launcher flag goes after `--`, for example `python tools/demo_launcher.py --windowed -- --mute`.
