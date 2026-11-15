@@ -1,14 +1,14 @@
 # Text-to-Speech
 
-Speak the approved reply once after confirmation. Use offline audio for OpenOrbit. Generated-reply speech TBD.
+Speak the approved reply once after confirmation, offline. A natural neural voice (Piper) when it is installed, the operating system's voice otherwise.
 
 **Active work** · [#4](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/4)
 
 **Consolidated issues** · [#6](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/6)
 
-## Bundled clips for the OpenOrbit lines (#97)
+## Bundled clip for the comparison line (#97)
 
-`data/openorbit/audio/show_satellite.wav` and `compare_air_quality.wav` give the two fixed lines the same voice on every laptop. `signal2speech/speech/` plays a clip only for those two actions. Generated replies (`speak_reply`) always use the offline OS voice, because a recording can't match words the wearer just approved.
+`data/openorbit/audio/compare_air_quality.wav` gives the fixed comparison line the same voice on every laptop that doesn't have the natural voice. `signal2speech/speech/` plays a clip only for that action. The satellite line's clip (`show_satellite.wav`) was retired on 2026-11-15: its words changed when the satellite view became a day-by-day sequence, and a clip must never say different words from the ones the wearer approved. With the natural voice installed, every line uses that voice and no clip plays. Generated replies (`speak_reply`) always use the offline OS voice, because a recording can't match words the wearer just approved.
 
 - **Regenerate** after changing a line in `contracts/demo-round.json`: `brew install espeak-ng` (or apt or the Windows installer), then `python data/openorbit/audio/make_audio.py`. The voice is robotic but clear, and the licence is clean.
 - **Check:** `python data/openorbit/audio/make_audio.py --check`. `tests/test_audio.py` runs the same check in CI.
@@ -38,3 +38,10 @@ curl -L -o voices/en_US-hfc_female-medium.onnx.json https://huggingface.co/rhass
 **Licences. Check these before reusing the project elsewhere.**
 - Piper (`piper-tts`) is GPL-3.0. We run its command line as a separate program and never import it.
 - The `hfc_female` voice was trained on the Hi-Fi-CAPTAIN dataset, which is CC BY-NC-SA 4.0: non-commercial use, with credit. The voice file is never committed (`voices/` is gitignored).
+
+## One sound player, and what we checked (2026-11-15)
+
+- **One player for the whole session.** `OfflineSpeaker` reuses a single `QSoundEffect` for every line, where it used to create a new one each time.
+- **Measured on the judging laptop:** 52 lines in a row, and separately an eight-question recorded-mode run with three guidance lines, all reached the speakers for their full length (level meter on the default output device).
+- **Unexplained:** during one earlier session the voice was reported to stop after a while. We could not reproduce it, and that session's log shows every reply as playing. Restart the app between judges.
+- **Walkthrough guidance** in recorded mode is spoken with the same voice as the replies (`--no-narration` turns it off). It is never the wearer's reply and is not logged as output.

@@ -704,3 +704,19 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The satellite and fire images have rounded corners and a thin border
 - Each launch of recorded mode now draws the recorded brain responses in a fresh order, so two runs can differ. Before, every launch replayed the same ones
 - Verified by screenshots of every screen on the judging laptop and by the interface tests. The opening animation ran without errors; Vasanth watched it once and it looked right
+
+## 11/15/26 - 9:43 AM - Vasanth Anbukumar - #228 Docs refresh, team briefing, recorded EEG in the phrase demo ([PR #229](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/229))
+- Everyone on the team can now read one page before judging: [docs/TEAM-BRIEFING.md](docs/TEAM-BRIEFING.md). It covers what we built, what is real and what is scripted, the numbers to know, the questions judges will ask, and where each topic lives in the repo
+- The phrase selection demo can now be driven by g.tec's recorded brain data, like the NASA demo
+    - `python -m signal2speech.ai --input recorded`, wait about 90 seconds, then type a question and press Enter
+    - It only picks after a question is asked or the Saved phrases button is clicked. Ctrl+1 or Ctrl+2 sets which reply the scripted wearer looks at next
+- The README and the area docs now describe the judging-day build: the recorded walkthrough, the fixed layout and status pills, the June 24 to 28 image sequence, the natural voice, and a new video cut in `docs/demo-submission/shot-list.md`
+- Verified: the recorded phrase demo picked and spoke a reply on the judging laptop with stand-in replies, and calibrated with Claude as the reply source. A full run with Claude's replies being picked hasn't been watched yet
+
+## 11/15/26 - 10:08 AM - Vasanth Anbukumar - #232 One app with replies as the main screen ([PR #233](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/233))
+- Signal2Speech is now one app. The main screen is a question box and two replies, and the top of the window says what the app is and the three steps to use it
+    - `python -m signal2speech.ai`, with `--input recorded` for g.tec's recorded brain data or `--input live` for the Unicorn headset
+- The NASA air-quality question is an example inside it: click `Example: NASA air quality`. The map takes the side panel only for that question, and the conversation is shown the rest of the time
+- Nothing about choosing, previewing, confirming or speaking changed. Only the screen layout and the way in
+- The launcher (`python -m signal2speech`) lists the main app first. The stand-alone NASA run still works
+- Verified by screenshots at the judging laptop's window size and by the tests. The headset path was rehearsed on simulated signals and picked a reply; it has not run on a real headset. With a headset the Yes / No cards flash before any question is asked, which still needs a decision

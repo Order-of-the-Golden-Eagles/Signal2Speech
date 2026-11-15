@@ -395,3 +395,49 @@ def test_ai_demo_logs_where_saved_phrases_came_from(qapp):
     demo = AnsweringDemo(provider=FixedProvider(), provider_note="test", speaker=FakeSpeaker(),
                          echo=False, view=FakeView())
     assert any(l.endswith("saved phrases: phrases.json (6 pairs)") for l in demo.app.log.lines)
+
+
+def test_one_app_chat_first_with_the_nasa_example_inside(qapp):
+    """The main screen is the question and the conversation. The NASA map takes the side panel
+    only while a NASA choice is on offer, and the built-in question is one click away."""
+    from signal2speech.ai.__main__ import NASA_QUESTION, AnsweringDemo
+    from signal2speech.app import MAP_ACTIONS
+
+    demo = AnsweringDemo(provider_kind="stub", mute=True, echo=False)
+    try:
+        demo.root.show()
+        demo.start()
+        assert "Signal2Speech" in demo.banner.text() and "Close your eyes" in demo.banner.text()
+        assert not demo.app.view.isVisibleTo(demo.root) and demo.app.conversation.isVisibleTo(demo.root)
+        assert not demo.app.conversation.latest_only
+        demo.panel.nasa_btn.click()
+        assert {c.action_id for c in demo.app.choices} <= MAP_ACTIONS
+        assert demo.app.view.isVisibleTo(demo.root) and not demo.banner.isVisibleTo(demo.root)
+        assert demo.app.conversation.entries[-2] == ("question", NASA_QUESTION, None)
+        assert demo.panel.question.text() == NASA_QUESTION    # prefilled in the question box
+        assert "Back" in demo.panel.nasa_btn.text()
+        demo.panel.nasa_btn.click()                           # the same button leads back
+        assert "NASA" in demo.panel.nasa_btn.text() and demo.panel.question.text() == ""
+        assert not demo.app.view.isVisibleTo(demo.root) and demo.banner.isVisibleTo(demo.root)
+    finally:
+        demo.app.close()
+        demo.root.close()
+
+
+def test_question_box_empties_once_the_question_is_answered(qapp):
+    from signal2speech.ai.__main__ import AnsweringDemo
+    from signal2speech.core import TargetIds
+
+    demo = AnsweringDemo(provider_kind="stub", mute=True, echo=False)
+    try:
+        demo.root.show()
+        demo.start()
+        demo.panel.question.setText("Would you like some water?")
+        demo._show(demo.suggester.suggest("Would you like some water?"))
+        demo.app.window.press_target(TargetIds.TARGET_1)      # pick
+        assert demo.panel.question.text() == "Would you like some water?"   # still there at the preview
+        demo.app.window.press_target(TargetIds.TARGET_1)      # confirm
+        assert demo.panel.question.text() == "" and not demo.panel.alt_btn.isEnabled()
+    finally:
+        demo.app.close()
+        demo.root.close()

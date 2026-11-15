@@ -60,8 +60,7 @@ REVEAL_SPLIT = (2, 3)     # the same on a reveal: columns that change width make
 #: Height of the one-line conversation box, before the text scale.
 CONVERSATION_HEIGHT = 132      # the label line plus a reply that wraps onto two lines
 PANEL_TITLE = (f"<span style='color:{T.ACTION_TINT[ActionIds.SHOW_SATELLITE]}'>OpenOrbit</span>"
-               " &nbsp;·&nbsp; NASA and EPA data"
-               f" &nbsp;·&nbsp; <span style='color:{T.QUIET}'>F2: developer log</span>")
+               " &nbsp;·&nbsp; NASA and EPA data")
 
 BLOCKED_INPUTS: dict = {}     # every input is wired in: recorded runs since #104
 
@@ -400,6 +399,12 @@ class App:
                                         **(live_options or {}))
             sim_label = self.sim.connection_label()
             self.window.set_input_text(self.sim.strip_text(), InputSources.RECORDED)
+            if own_voice:
+                # Someone with their eyes closed can't read "Open your eyes": a low beep to close,
+                # a high beep to open, the same sounds as the board session's eye check.
+                from signal2speech.eeg.board_session import Voice
+                cue_voice = Voice()
+                self.sim.eye_cue = lambda kind: cue_voice.beep("go" if kind == "close" else "stop")
             alpha = getattr(self.sim, "alpha", None)
             if alpha is not None and hasattr(alpha, "progress"):
                 alpha.progress.connect(self.window.set_eye_progress, Qt.ConnectionType.QueuedConnection)
@@ -413,6 +418,12 @@ class App:
                 script=sim_script or [2, 1], arm_live_confirm=arm_live_confirm,
                 **(live_options or {}))
             sim_label = self.sim.connection_label()
+            if own_voice:
+                # Someone with their eyes closed can't read "Open your eyes": a low beep to close,
+                # a high beep to open, the same sounds as the board session's eye check.
+                from signal2speech.eeg.board_session import Voice
+                cue_voice = Voice()
+                self.sim.eye_cue = lambda kind: cue_voice.beep("go" if kind == "close" else "stop")
             alpha = getattr(self.sim, "alpha", None)
             if alpha is not None and hasattr(alpha, "progress"):
                 # #175: the ring follows the alpha switch (queued: emitted on a g.Pype thread).
