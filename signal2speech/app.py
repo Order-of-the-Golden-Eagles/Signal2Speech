@@ -46,7 +46,7 @@ from signal2speech.speech.neural import PiperVoice
 from signal2speech.ui import INPUT_LABELS, KeyHelpOverlay, SelectionWindow
 from signal2speech.ui import theme as T
 from signal2speech.ui.conversation import KINDS, ConversationView
-from signal2speech.ui.__main__ import load_demo_choices
+from signal2speech.ui.__main__ import DEMO_QUESTION, load_demo_choices
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -433,7 +433,6 @@ class App:
         right.addWidget(self.transcript_view, 2)
         self.transcript_view.setVisible(False)
         # #178: a header across the top: the name, the tagline, and where we are.
-        from signal2speech.ui.__main__ import DEMO_QUESTION
         from signal2speech.ui.stepper import StepBar, StepTracker
         self.window.question = DEMO_QUESTION if question is None else question
         self.header_title = QLabel("Signal2Speech")
@@ -548,6 +547,7 @@ class App:
         if h.current is not None:
             h.cancel("practice")
             self._reopen.stop()
+        self.step_tracker.clear()                    # practice isn't a question (#178)
         self.log("practice: started (nothing is sent until it ends)")
         self.practice.start()
         return True

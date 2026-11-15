@@ -103,6 +103,7 @@ def window_qss() -> str:
 QMainWindow, QWidget#root {{ background: {BG}; }}
 QLabel {{ color: {TEXT}; }}
 QLabel#prompt {{ font-size: {px(HEADING)}px; font-weight: 600; color: {MUTED}; }}
+QLabel#question {{ font-size: {px(HEADING)}px; font-weight: 700; color: {TEXT}; }}
 QLabel#preview {{ font-size: {px(PREVIEW)}px; font-weight: 700; color: {ACCENT}; padding: {M}px;
                   background: {SURFACE}; border-left: 6px solid {ACCENT}; border-radius: {RADIUS_M}px; }}
 QLabel#hint {{ font-size: {px(BODY)}px; color: {MUTED}; }}

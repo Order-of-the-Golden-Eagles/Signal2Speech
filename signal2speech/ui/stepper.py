@@ -5,7 +5,8 @@ selection handler's own events, never a timer of their own:
 
 - a Choose round opens -> **Choose**
 - a preview is shown (the Confirm round opens) -> **Preview**
-- while that round's confirm ring fills (a held key 1, or the eyes closing) -> **Confirm**
+- while that round's confirm ring fills to confirm (key 1 held, or the eyes closing; not
+  key 2 held to cancel) -> **Confirm**
 - the handler confirms and the output runs -> **Spoken**
 - a cancel, timeout, or disconnect clears the round -> no step until the next question
 """
@@ -13,7 +14,6 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from signal2speech.core import Outcome, Round, RoundKind
@@ -43,10 +43,11 @@ class StepBar(QWidget):
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(P.XS)
         self.labels: List[QLabel] = []
+        self.separators: List[QLabel] = []
         for i, name in enumerate(STEPS):
             if i:
                 sep = QLabel("›")
-                sep.setStyleSheet(f"color:{P.QUIET}; font-size:{P.px(P.CAPTION + 2)}px;")
+                self.separators.append(sep)
                 row.addWidget(sep)
             lbl = QLabel(f"{i + 1} {name}")
             self.labels.append(lbl)
@@ -55,10 +56,15 @@ class StepBar(QWidget):
         self.restyle()
 
     def set_step(self, step: Optional[str]) -> None:
+        if step == self.current:
+            return                                  # nothing to redraw
         self.current = step
         self.restyle()
 
     def restyle(self) -> None:
+        """Colours for the current step, sizes for the current text scale (#195)."""
+        for sep in self.separators:
+            sep.setStyleSheet(f"color:{P.QUIET}; font-size:{P.px(P.CAPTION + 2)}px;")
         at = STEPS.index(self.current) if self.current in STEPS else -1
         for i, lbl in enumerate(self.labels):
             base = f"font-size:{P.px(P.CAPTION + 2)}px; padding:2px {P.S}px; border-radius:{P.RADIUS_S}px;"
@@ -71,7 +77,8 @@ class StepBar(QWidget):
 
 
 class StepTracker:
-    """Moves a StepBar along with the handler (#178). ``ring`` is the window's confirm ring."""
+    """Moves a StepBar along with the handler (#178). ``ring`` is the window's confirm ring;
+    its model tells us when it starts or stops filling, so nothing polls."""
 
     def __init__(self, handler, bar: StepBar, ring=None):
         self.bar, self.ring = bar, ring
@@ -81,34 +88,37 @@ class StepTracker:
         handler.on_preview.append(lambda _c: self._update())
         handler.on_handled.append(self._handled)
         handler.on_cleared.append(self._cleared)
-        self._poll = QTimer(interval=100)              # the ring fills between handler events
-        self._poll.timeout.connect(self._update)
+        self._model = getattr(ring, "model", None)
+        if self._model is not None and hasattr(self._model, "listeners"):
+            self._model.listeners.append(self._update)
 
     def _ring_active(self) -> bool:
-        model = getattr(self.ring, "model", None)
-        return bool(model is not None and (model.holding or model.progress > 0))
+        m = self._model
+        if m is None or m.source == "cancel":        # holding 2 to cancel isn't confirming
+            return False
+        return bool(m.holding or m.progress > 0)
 
     def _opened(self, rnd: Round) -> None:
         self.kind, self.confirmed = rnd.kind, False
-        if rnd.kind is RoundKind.CONFIRM:
-            self._poll.start()
-        else:
-            self._poll.stop()
         self._update()
 
     def _handled(self, _e, outcome: Outcome) -> None:
         if outcome is Outcome.Confirmed:
             self.confirmed, self.kind = True, None
-            self._poll.stop()
             self._update()
 
     def _cleared(self, _reason: str) -> None:
         self.kind, self.confirmed = None, False
-        self._poll.stop()
+        self._update()
+
+    def clear(self) -> None:
+        """No step: a practice round or another screen that isn't a question (#196)."""
+        self.kind, self.confirmed = None, False
         self._update()
 
     def _update(self) -> None:
         self.bar.set_step(step_for(self.kind, self.confirmed, self._ring_active()))
 
     def stop(self) -> None:
-        self._poll.stop()
+        if self._model is not None and self._update in getattr(self._model, "listeners", []):
+            self._model.listeners.remove(self._update)

@@ -266,6 +266,12 @@ class SelectionWindow(QMainWindow):
         self.prompt = WrapWhenLong("Waiting for a round", objectName="prompt")
         self.question = ""                   # the partner's question; the app sets it (#178)
         col.addWidget(self.prompt)
+        # #178: the question in large type. It takes the prompt's place in a Choose round, so the
+        # prompt keeps its own style for "Say this?", practice, and the rest.
+        self.question_label = QLabel("", objectName="question")
+        self.question_label.setWordWrap(True)
+        self.question_label.setVisible(False)
+        col.addWidget(self.question_label)
         # #175: the consent screen. What will happen, the exact words, and the confirm ring.
         self.preview_box = QWidget()
         pcol = QVBoxLayout(self.preview_box)
@@ -463,6 +469,7 @@ class SelectionWindow(QMainWindow):
         self._last_round = rnd
         if rnd.kind is RoundKind.CONFIRM:
             self.prompt.setText("Say this?")
+            self.question_label.setVisible(False)
             self.preview_header.setText(self._preview_header())
             self.preview.setText(f"“{self._preview_text()}”")
             self.ring.reset()
@@ -473,11 +480,10 @@ class SelectionWindow(QMainWindow):
         else:
             self._preview = None
             # #178: the partner's question, in large type, instead of "Choose a reply".
-            self.prompt.setText(self.question or "Choose a reply")
-            self.prompt.setProperty("question", bool(self.question))
-            self.prompt.setStyleSheet(
-                f"font-size:{P.px(P.HEADING)}px; font-weight:700; color:{P.TEXT};"
-                if self.question else "")
+            self.prompt.setText("Choose a reply")
+            self.question_label.setText(self.question)
+            self.question_label.setVisible(bool(self.question))
+            self.prompt.setVisible(not self.question)
             self.set_countdown(None)
             self.ring.reset()
             self.preview_box.setVisible(False)
@@ -505,6 +511,7 @@ class SelectionWindow(QMainWindow):
         self.hint.setText("")
         self.prompt.setText("Waiting for a round")
         self.prompt.setVisible(True)
+        self.question_label.setVisible(False)
         self._set_round_text(None)
         if reason:
             self.outcome_label.setText(f"Last: Cleared ({reason})")
@@ -583,7 +590,7 @@ class SelectionWindow(QMainWindow):
         # "Say this?" prompt during a preview so everything fits a 1280x720 screen.
         if self.preview_box.isVisibleTo(self) and self.prompt.text() == "Say this?":
             self.prompt.setVisible(P.SCALE <= 1.2)
-        elif not self.prompt.isVisibleTo(self):
+        elif not self.prompt.isVisibleTo(self) and not self.question_label.isVisibleTo(self):
             self.prompt.setVisible(True)
 
     def _preview_header(self) -> str:

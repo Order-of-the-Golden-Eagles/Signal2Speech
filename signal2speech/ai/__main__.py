@@ -34,7 +34,9 @@ class AnsweringDemo:
             provider, provider_note = make_provider(provider_kind)
         self.provider_note = provider_note or ""
         # view=None gives the real OpenOrbit view, so map suggestions (#106) reveal the map.
-        self.app = App(input_source, view=view, speaker=speaker, mute=mute, echo=echo, cues=cues)
+        # No demo question here: the partner types theirs (#178).
+        self.app = App(input_source, view=view, speaker=speaker, mute=mute, echo=echo, cues=cues,
+                       question="")
         self.suggester = ReplySuggester(provider, saved_phrases_from_file())   # #134
         self.async_ = AsyncSuggester(self.suggester, deadline_s, parent=self.app.window)
         self.panel = QuestionPanel()
@@ -123,6 +125,7 @@ class AnsweringDemo:
 
     def saved(self) -> None:
         self.app.log("judge: saved phrases")
+        self.app.window.question = ""                 # saved phrases answer no particular question
         self._show(self.suggester.saved.next_page("chosen by judge"))
 
     def _request(self, avoid) -> None:
@@ -141,6 +144,7 @@ class AnsweringDemo:
 
     def _after_handled(self, _e, outcome: Outcome) -> None:
         if outcome is Outcome.Confirmed:
+            self.app.window.question = ""             # answered: the next round is saved phrases
             rs = self.suggester.saved.current("after confirm")
             self.current = rs
             self.panel.show_origin(rs)
