@@ -6,7 +6,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from signal2speech.ui import palette as P  # noqa: E402
+from signal2speech.ui import theme as P  # noqa: E402
 
 UI = Path(__file__).resolve().parents[1] / "signal2speech" / "ui"
 
@@ -62,7 +62,10 @@ def test_every_input_source_has_a_checked_colour():
 
 
 def test_ui_code_takes_colours_from_the_palette():
-    """A raw #rrggbb in the window or overlay code would bypass this check."""
-    for name in ("window.py", "help_overlay.py"):
-        code = [ln for ln in (UI / name).read_text(encoding="utf-8").splitlines() if not ln.lstrip().startswith("#")]
-        assert not re.findall(r"#[0-9a-fA-F]{6}\b", "\n".join(code)), name
+    """A raw #rrggbb in any screen's code would bypass this check (#135, #174)."""
+    pkg = UI.parent
+    screens = [UI / "window.py", UI / "help_overlay.py", pkg / "app.py", pkg / "ai" / "qt.py",
+               pkg / "__main__.py"]                     # #174: every screen uses theme.py
+    for path in screens:
+        code = [ln for ln in path.read_text(encoding="utf-8").splitlines() if not ln.lstrip().startswith("#")]
+        assert not re.findall(r"#[0-9a-fA-F]{6}\b", "\n".join(code)), path.name

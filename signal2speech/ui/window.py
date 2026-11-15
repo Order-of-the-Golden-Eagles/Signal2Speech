@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Callable, Dict, Optional
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QKeySequence, QShortcut
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QKeySequence, QPainter, QPainterPath, QPen, QShortcut
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QMainWindow, QSizePolicy,
                                QVBoxLayout, QWidget)
 
@@ -18,85 +18,159 @@ from signal2speech.core import (Choice, InputAdapter, InputSources, Outcome, Rou
 
 from .fit import fit_pixel_size
 from .flash import FlashScheduler
-from . import palette as P
+from .icons import draw_icon
+from . import theme as P
 
 INPUT_LABELS = {InputSources.KEYBOARD: "Keyboard", InputSources.SIMULATED: "Simulated",
                 InputSources.RECORDED: "Recorded", InputSources.LIVE_EEG: "Live EEG"}
 _INPUT_COLORS = P.INPUT_COLORS
 _TILE_ORDER = (TargetIds.TARGET_1, TargetIds.TARGET_2)
 
-_STYLE = f"""
-QMainWindow, QWidget#root {{ background: {P.BG}; }}
-QLabel {{ color: {P.TEXT}; }}
-QLabel#prompt {{ font-size: 32px; font-weight: 600; color: {P.MUTED}; }}
-QLabel#preview {{ font-size: 44px; font-weight: 700; color: {P.ACCENT}; padding: 16px; }}
-QLabel#hint {{ font-size: 24px; color: {P.MUTED}; }}
-QLabel#countdown {{ font-size: 22px; color: {P.QUIET}; }}
-QFrame#strip {{ background: {P.STRIP_BG}; border-top: 2px solid {P.STRIP_BORDER}; }}
-QLabel.strip {{ font-size: 20px; font-family: Menlo, Consolas, monospace; color: {P.STRIP_TEXT}; }}
-"""
+_STYLE = P.window_qss()
 
 
 class Tile(QLabel):
-    """One frozen choice tile. Flashing changes colour only: no resize, move, or relabel.
+    """One frozen choice tile, drawn by hand (#174): icon, title, one-line description, and
+    the key as a corner badge.
 
-    Long labels shrink to fit (56 px down to 32 px, #95). The size is chosen on relabel and
-    resize only, never on a flash, so flash timing stays steady.
+    States: idle, flashing (lit), selected (the confirmed choice), and waiting (no round open).
+    Flashing looks exactly as before: plain white with black content, so the stimulus the
+    P300 classifier sees is unchanged. Flashing never relabels, moves, or resizes a tile.
+    Long titles shrink to fit (56 px down to 32 px, #95), recomputed on relabel and resize only.
     """
 
-    MAX_PX = 56
-    INSET = 28   # 4 px border + 24 px padding, each side
+    MAX_PX = P.DISPLAY
+    INSET = P.BORDER_W + P.L          # border + padding, each side
+    TOP = 64                          # icon and key badge row
+    BOTTOM = 40                       # one-line description
 
     def __init__(self, target_id: str, key: str, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.target_id = target_id
         self.key = key
         self.lit = False
+        self.selected = False
         self._label = ""
+        self.action_id: Optional[str] = None
+        self.icon: Optional[str] = None
+        self.description = ""
         self.font_px = self.MAX_PX
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setWordWrap(True)
         self.setMinimumSize(300, 220)   # fits two tiles plus the map at 1280x720 (#94)
-        self._apply()
 
     @property
     def label(self) -> str:
         return self._label
 
-    def set_label(self, label: str) -> None:
+    @property
+    def state(self) -> str:
+        if not self._label:
+            return "waiting"
+        if self.lit:
+            return "lit"
+        return "selected" if self.selected else "idle"
+
+    def set_label(self, label: str, action_id: Optional[str] = None) -> None:
         self._label = label
-        self.setText(f"{label}\n [{self.key}]" if label else "")
+        self.action_id = action_id
+        self.icon, self.description = P.ACTION_INFO.get(action_id, (None, "")) if label else (None, "")
+        self.selected = False
+        self.setText(label)
         self._fit()
-        self._apply()
+        self.update()
 
-    def resizeEvent(self, event) -> None:
-        super().resizeEvent(event)
-        if self._fit():
-            self._apply()
-
-    def _fit(self) -> bool:
-        """Recompute font_px for the current text and size. True if it changed."""
-        font = QFont(self.font())
-        font.setBold(True)
-        px = fit_pixel_size(self.text(), font, self.width() - 2 * self.INSET,
-                            self.height() - 2 * self.INSET, self.MAX_PX)
-        changed, self.font_px = px != self.font_px, px
-        return changed
+    def set_selected(self, on: bool) -> None:
+        self.selected = on
+        self.update()
 
     def set_lit(self, lit: bool) -> None:
         self.lit = lit
-        self._apply()
+        self.update()
 
-    def _apply(self) -> None:
-        if not self._label:
-            bg, fg, border = P.TILE_EMPTY_BG, P.TILE_EMPTY_BG, P.TILE_EMPTY_BORDER
-        elif self.lit:
-            bg, fg, border = P.TILE_LIT_BG, P.TILE_LIT_TEXT, P.TILE_LIT_BG
+    def title_rect(self) -> QRectF:
+        r = QRectF(self.rect()).adjusted(self.INSET, self.INSET, -self.INSET, -self.INSET)
+        return r.adjusted(0, self.TOP, 0, -self.BOTTOM)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._fit()
+
+    def _fit(self) -> bool:
+        """Recompute font_px for the current title and size. True if it changed."""
+        font = QFont(self.font())
+        font.setBold(True)
+        r = self.title_rect()
+        px = fit_pixel_size(self._label, font, int(r.width()), int(max(r.height(), 40)),
+                            self.MAX_PX, P.TILE_TITLE_MIN)
+        changed, self.font_px = px != self.font_px, px
+        return changed
+
+    def paintEvent(self, event) -> None:
+        state = self.state
+        bg, fg, border, sub = {
+            "waiting": (P.TILE_DISABLED_BG, P.TILE_DISABLED_TEXT, P.TILE_DISABLED_BORDER, P.TILE_DISABLED_TEXT),
+            "lit": (P.TILE_LIT_BG, P.TILE_LIT_TEXT, P.TILE_LIT_BG, P.TILE_LIT_TEXT),
+            "selected": (P.TILE_SELECTED_BG, P.TILE_SELECTED_TEXT, P.TILE_SELECTED_BORDER, P.TILE_SELECTED_TEXT),
+            "idle": (P.TILE_BG, P.TILE_TEXT, P.TILE_BORDER, P.MUTED),
+        }[state]
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        half = P.BORDER_W / 2
+        body = QRectF(self.rect()).adjusted(half, half, -half, -half)
+        path = QPainterPath()
+        path.addRoundedRect(body, P.RADIUS_L, P.RADIUS_L)
+        p.fillPath(path, QColor(bg))
+        p.setPen(QPen(QColor(border), P.BORDER_W))
+        p.drawPath(path)
+        inner = QRectF(self.rect()).adjusted(self.INSET, self.INSET, -self.INSET, -self.INSET)
+        if state == "waiting":
+            p.setPen(QColor(fg))
+            f = QFont(self.font())
+            f.setPixelSize(P.BODY)
+            p.setFont(f)
+            p.drawText(inner, int(Qt.AlignmentFlag.AlignCenter), "Waiting for the next question")
+            p.end()
+            return
+        # Top row: icon on the left, key badge on the right.
+        if self.icon:
+            draw_icon(p, "check" if state == "selected" else self.icon,
+                      QRectF(inner.left(), inner.top(), 48, 48), fg)
+        badge = QRectF(inner.right() - 48, inner.top(), 48, 48)
+        if state == "lit":     # keep the flash plain white: outline only, no filled block
+            p.setPen(QPen(QColor(P.TILE_LIT_TEXT), 3))
+            p.setBrush(Qt.BrushStyle.NoBrush)
         else:
-            bg, fg, border = P.TILE_BG, P.TILE_TEXT, P.TILE_BORDER
-        self.setStyleSheet(f"background:{bg}; color:{fg}; border:4px solid {border};"
-                           f"border-radius:18px; font-size:{self.font_px}px; font-weight:700;"
-                           "padding:24px;")
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(P.ACCENT))
+        p.drawRoundedRect(badge, P.RADIUS_S, P.RADIUS_S)
+        p.setPen(QColor(P.TILE_LIT_TEXT if state == "lit" else P.ON_ACCENT))
+        f = QFont(self.font())
+        f.setPixelSize(P.CAPTION + 8)
+        f.setBold(True)
+        p.setFont(f)
+        p.drawText(badge, int(Qt.AlignmentFlag.AlignCenter), self.key)
+        # Title, centred and fitted.
+        f = QFont(self.font())
+        f.setPixelSize(self.font_px)
+        f.setBold(True)
+        p.setFont(f)
+        p.setPen(QColor(fg))
+        p.drawText(self.title_rect(), int(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap),
+                   self._label)
+        # One-line description at the bottom, elided if too long.
+        description = "Sent to output" if state == "selected" else self.description
+        if description:
+            f = QFont(self.font())
+            for px in range(P.CAPTION + 2, 14, -1):        # shrink a little before eliding
+                f.setPixelSize(px)
+                if QFontMetrics(f).horizontalAdvance(description) <= inner.width():
+                    break
+            p.setFont(f)
+            p.setPen(QColor(sub))
+            text = QFontMetrics(f).elidedText(description, Qt.TextElideMode.ElideRight,
+                                              int(inner.width()))
+            p.drawText(QRectF(inner.left(), inner.bottom() - self.BOTTOM + 8, inner.width(), self.BOTTOM - 8),
+                       int(Qt.AlignmentFlag.AlignCenter), text)
+        p.end()
 
 
 class SelectionWindow(QMainWindow):
@@ -120,8 +194,8 @@ class SelectionWindow(QMainWindow):
 
         root = QWidget(objectName="root")
         col = QVBoxLayout(root)
-        col.setContentsMargins(32, 24, 32, 0)
-        col.setSpacing(20)
+        col.setContentsMargins(P.XL, P.L, P.XL, 0)
+        col.setSpacing(P.M)
 
         self.prompt = QLabel("Waiting for a round", objectName="prompt")
         self.preview = QLabel("", objectName="preview")
@@ -137,7 +211,7 @@ class SelectionWindow(QMainWindow):
         col.addWidget(self.countdown)
 
         row = QHBoxLayout()
-        row.setSpacing(32)
+        row.setSpacing(P.XL)
         self.tiles: Dict[str, Tile] = {}
         for key, target in zip("12", _TILE_ORDER):
             tile = Tile(target, key)
@@ -151,8 +225,8 @@ class SelectionWindow(QMainWindow):
 
         strip = QFrame(objectName="strip")
         srow = QHBoxLayout(strip)
-        srow.setContentsMargins(16, 10, 16, 10)
-        srow.setSpacing(28)
+        srow.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
+        srow.setSpacing(P.L)
         self.input_label = self._strip_label()
         self.connection_label = self._strip_label()
         self.round_label = self._strip_label()
@@ -241,8 +315,9 @@ class SelectionWindow(QMainWindow):
         self.flasher.stop()
         for target, tile in self.tiles.items():
             c = rnd.find(target)
-            tile.set_label(c.label if c else "")
+            tile.set_label(c.label if c else "", c.action_id if c else None)
         self._set_round_text(rnd)
+        self._last_round = rnd
         if rnd.kind is RoundKind.CONFIRM:
             self.prompt.setText("Say this?")
             self.preview.setText(self._preview_text())
@@ -283,11 +358,17 @@ class SelectionWindow(QMainWindow):
         self.outcome_label.setText(f"Last: {outcome.value}{detail}")
         self.outcome_label.setToolTip(self.outcome_label.text())
         if outcome is Outcome.Confirmed:   # handler closed the round without on_cleared
+            last = getattr(self, "_last_round", None)
             self.reset()
             self.prompt.setText("Confirmed · sent to output")
+            chosen = last.find(e.targetId) if (last is not None and e is not None) else None
+            tile = self.tiles.get(e.targetId) if e is not None else None
+            if chosen is not None and tile is not None:
+                tile.set_label(chosen.label, chosen.action_id)
+                tile.set_selected(True)
 
     # ── Helpers ──────────────────────────────────────────────
-    PREVIEW_MAX_PX = 44
+    PREVIEW_MAX_PX = P.PREVIEW
 
     def add_outcome_note(self, note: str) -> None:
         """Append e.g. "map 3 ms · speech 180 ms" to the last outcome in the strip (#130)."""
@@ -314,10 +395,10 @@ class SelectionWindow(QMainWindow):
             return
         font = QFont(self.preview.font())
         font.setBold(True)
-        width = max(self.width() - 64 - 32, 1)      # window margins, then label padding
+        width = max(self.width() - 2 * P.XL - 2 * P.M - 6, 1)   # margins, padding, accent bar
         height = max(int(self.height() * 0.28), 80)
         self.preview_px = fit_pixel_size(self.preview.text(), font, width, height,
-                                         self.PREVIEW_MAX_PX)
+                                         self.PREVIEW_MAX_PX, P.TILE_TITLE_MIN)
         self.preview.setStyleSheet(f"font-size: {self.preview_px}px;")
 
     def _preview_text(self) -> str:

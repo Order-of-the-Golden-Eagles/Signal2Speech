@@ -490,3 +490,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Re-tested the AI demo window on the current code (Claude Sonnet 5.5 with grounded replies): a fresh question got two good replies in about 2 seconds, and the confirmed one was spoken once
 - The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
 - With the AI provider unreachable, saved phrases appear right away, labelled offline. A real Wi-Fi-off run is still part of the judging-laptop session
+
+## 11/15/26 - 11:59 PM - Long Le - #174 One visual design and redesigned tiles (PR pending)
+- The app now has one visual design: `signal2speech/ui/theme.py` sets the colours, text sizes, spacing, and corners, and every screen we built uses it
+- The two choice tiles are redesigned: an icon, a clear title, a one-line "what happens" line, and the key as a small badge in the corner instead of "[1]" in the title. They have distinct idle, flashing, selected (green check after a confirm), and waiting states
+- The flash looks the same as before (plain white with black content), so the brain-signal stimulus doesn't change. The flash timing check still passes, and the new tiles repaint in about 3 ms
+- All text still meets WCAG AA. A test fails if any screen uses a colour outside the theme. Before and after screenshots are in `docs/accessibility-ui/README.md`
