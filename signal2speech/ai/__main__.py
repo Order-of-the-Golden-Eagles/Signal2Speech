@@ -29,7 +29,7 @@ from .replies import (HELP_PHRASES, TIMEOUT_S, ReplySet, ReplySuggester, languag
 #: The main screen: the reply cards get more of the width than the conversation beside them.
 CHAT_SPLIT = (3, 2)
 CHAT_TILE_HEIGHT = 330
-CHAT_TILE_PX = (34, 24)        # title size on the reply cards: from, and down to for long replies
+CHAT_TILE_PX = (30, 20)        # title size on the reply cards: from, and down to for long replies
 CHAT_LOG_HEIGHT = 300          # the conversation box: room for one question and its answer
 NASA_QUESTION = "Which county's AQI rose more when wildfire smoke reached southeast Michigan?"
 
@@ -304,6 +304,10 @@ class AnsweringDemo:
             self.panel.show_origin(rs)
             self.app.choices = list(rs.choices)
             self.app.options_origin = rs.origin.lower()      # never "from Claude" for saved phrases
+            # The question is answered: empty the box for the next one.
+            self.question = ""
+            self.panel.question.clear()
+            self.panel.alt_btn.setEnabled(False)
 
 
 def main(argv=None) -> int:

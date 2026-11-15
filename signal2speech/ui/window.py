@@ -77,8 +77,8 @@ class Tile(QLabel):
     INSET = P.BORDER_W + P.L          # border + padding, each side
     TOP = 64                          # icon and key badge row
 
-    MAX_PX = P.TILE_TITLE             # tile titles at full size, before the text scale (#195)
-    MIN_PX = P.TILE_TITLE_MIN         # and the size long titles shrink to
+    MAX_PX = 34                       # tile titles at full size, before the text scale (#195)
+    MIN_PX = 20                       # long titles shrink this far, so the words are never cut off
     HEIGHT = 250                      # a tile is a target to look at, not a poster
 
     @property

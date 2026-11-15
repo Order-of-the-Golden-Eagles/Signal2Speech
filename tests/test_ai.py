@@ -422,3 +422,22 @@ def test_one_app_chat_first_with_the_nasa_example_inside(qapp):
     finally:
         demo.app.close()
         demo.root.close()
+
+
+def test_question_box_empties_once_the_question_is_answered(qapp):
+    from signal2speech.ai.__main__ import AnsweringDemo
+    from signal2speech.core import TargetIds
+
+    demo = AnsweringDemo(provider_kind="stub", mute=True, echo=False)
+    try:
+        demo.root.show()
+        demo.start()
+        demo.panel.question.setText("Would you like some water?")
+        demo._show(demo.suggester.suggest("Would you like some water?"))
+        demo.app.window.press_target(TargetIds.TARGET_1)      # pick
+        assert demo.panel.question.text() == "Would you like some water?"   # still there at the preview
+        demo.app.window.press_target(TargetIds.TARGET_1)      # confirm
+        assert demo.panel.question.text() == "" and not demo.panel.alt_btn.isEnabled()
+    finally:
+        demo.app.close()
+        demo.root.close()

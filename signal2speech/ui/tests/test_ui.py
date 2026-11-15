@@ -209,9 +209,9 @@ def test_tile_shrinks_long_label_and_fits(app):
     t = Tile("target-1", "1")
     t.resize(300, 300)
     t.set_label(LONG_REPLY + " " + LONG_REPLY)
-    assert MIN_PX <= t.font_px < Tile.MAX_PX
+    assert Tile.MIN_PX <= t.font_px < Tile.MAX_PX
     w, h = 300 - 2 * Tile.INSET, 300 - 2 * Tile.INSET
-    assert _fits(t.text(), t.font_px, w, h) or t.font_px == MIN_PX
+    assert _fits(t.text(), t.font_px, w, h) or t.font_px == Tile.MIN_PX
 
 
 def test_tile_short_label_stays_full_size_and_flash_keeps_size(app):
@@ -237,9 +237,9 @@ def test_window_fits_twelve_word_reply_at_1280x720(ui):
     app = QApplication.instance()
     app.processEvents()
     for tile in w.tiles.values():
-        assert tile.font_px >= MIN_PX
+        assert tile.font_px >= Tile.MIN_PX
         assert _fits(tile.text(), tile.font_px, tile.width() - 2 * Tile.INSET,
-                     tile.height() - 2 * Tile.INSET) or tile.font_px == MIN_PX
+                     tile.height() - 2 * Tile.INSET) or tile.font_px == Tile.MIN_PX
     w.press_target(T1)
     app.processEvents()
     assert w.PREVIEW_MIN_PX <= w.preview_px <= w.PREVIEW_MAX_PX
