@@ -39,8 +39,9 @@ from . import dataset as gtec
 
 WARMUP_S = 10.0          # OSCAR adapts at the start; leave it out of every number
 MAX_LAG = 250            # samples (1 s): the delay search range
+DELAY_SEARCH_S = 60.0    # how much of the recording the delay search compares
 ARTIFACT_SHARE = 0.05    # the top 5% of 1 s windows by peak-to-peak count as artifact stretches
-FZ = 0
+FZ = gtec.CHANNELS.index("Fz")      # the frontal channel, where blinks are largest
 
 
 @dataclass
@@ -71,17 +72,18 @@ class Result:
 
 # ── Replay through g.Pype ────────────────────────────────────
 def replay(session: gtec.Session, extra_s: float = 3.0):
-    """Play the recording once through g.Pype; return (before, after) as (samples, channels)."""
-    import gpype as gp
-
+    """Play the recording once through the evidence view's own graph (the recording plus its
+    OSCAR branch, #142/#164) and return (before, after OSCAR) as (samples, channels)."""
     from signal2speech.eeg.alpha_confirm import _Tap
 
-    from .pipeline import oscar_node
+    from .pipeline import SourceKind, build_evidence_graph
 
-    osc = oscar_node()
-    if osc is None:
+    g = build_evidence_graph(SourceKind.GENERATOR, dataset=session, oscar=True)
+    if g.oscar_node is None:
+        g.pipeline.close()
         raise RuntimeError("this g.Pype has no standalone OSCAR node "
-                           "(gpype.backend.core._private.oscar.Oscar)")
+                           "(gpype.backend.core._private.oscar.Oscar), so OSCAR can't run on "
+                           "replayed data here")
     got = {"before": [], "after": []}
     rows = {"before": 0, "after": 0}
 
@@ -91,38 +93,41 @@ def replay(session: gtec.Session, extra_s: float = 3.0):
             rows[which] += len(block)
         return on_rows
 
-    p = gp.Pipeline()
-    clock = gp.Generator(name="eeg", sampling_rate=session.fs, channel_count=session.eeg.shape[1],
-                         noise_amplitude=0.0, signal_amplitude=0.0)
-    eeg, _flashes = gtec.make_player_nodes(session)
     before, after = _Tap(name="before"), _Tap(name="after")
     before.on_rows, after.on_rows = keep("before"), keep("after")
-    p.connect(clock, eeg)
-    p.connect(eeg, before)
-    p.connect(eeg, osc)
-    p.connect(osc, after)
+    g.pipeline.connect(g.raw, before)
+    g.pipeline.connect(g.oscar_node, after)
     need = len(session.eeg) + int(extra_s * session.fs)
-    p.start()
+    g.pipeline.start()
     try:
         deadline = time.monotonic() + session.seconds * 1.5 + 30
         while min(rows.values()) < need and time.monotonic() < deadline:
             time.sleep(0.2)
     finally:
-        p.stop()
-        p.close()
-    b, a = np.vstack(got["before"]), np.vstack(got["after"])
-    if len(b) < len(session.eeg):
-        raise RuntimeError(f"only {len(b)} of {len(session.eeg)} samples arrived")
-    return b, a
+        g.pipeline.stop()
+        g.pipeline.close()
+    for which in ("before", "after"):
+        if rows[which] < need:
+            raise RuntimeError(f"{session.name}: only {rows[which]} of {need} samples came out "
+                               f"{which} OSCAR in time; the replay fell behind real time")
+    return np.vstack(got["before"]), np.vstack(got["after"])
 
 
 # ── Offline measures (pure, unit-tested) ─────────────────────
-def find_delay(before: np.ndarray, after: np.ndarray, start: int, max_lag: int = MAX_LAG) -> int:
-    """The lag (samples) where ``after`` best matches ``before``: OSCAR's processing delay."""
-    n = min(len(before), len(after)) - max_lag
+def find_delay(before: np.ndarray, after: np.ndarray, start: int, max_lag: int = MAX_LAG,
+               span: int = int(DELAY_SEARCH_S * 250)) -> int:
+    """The lag (samples) where ``after`` best matches ``before``: OSCAR's processing delay.
+    Raises if the best match sits at the edge of the search, where it can't be trusted."""
+    n = min(len(before), len(after), start + span + max_lag) - max_lag
     seg = slice(start, n)
     errs = [np.mean(np.abs(before[seg] - after[start + k:n + k])) for k in range(max_lag)]
-    return int(np.argmin(errs))
+    lag = int(np.argmin(errs))
+    # A real delay gives one lag that fits far better than the rest. If none stands out, or the
+    # best is at the edge, the delay is past the search limit (or the streams don't match).
+    if lag >= max_lag - 1 or errs[lag] > 0.8 * float(np.median(errs)):
+        raise ValueError(f"no clear OSCAR delay within the {max_lag}-sample search limit; "
+                         "raise MAX_LAG or check the streams")
+    return lag
 
 
 def bandpass(x: np.ndarray, fs: float) -> np.ndarray:
@@ -139,7 +144,7 @@ def window_ptp(x: np.ndarray, fs: float) -> np.ndarray:
 def measure(session: gtec.Session, before: np.ndarray, after: np.ndarray) -> Result:
     fs = session.fs
     start = int(WARMUP_S * fs)
-    delay = find_delay(before, after, start)
+    delay = find_delay(before, after, start, span=int(DELAY_SEARCH_S * fs))
     n = min(len(session.eeg), len(after) - delay)
     raw = before[start:n]
     clean = after[start + delay:n + delay]
@@ -161,10 +166,14 @@ def measure(session: gtec.Session, before: np.ndarray, after: np.ndarray) -> Res
                   rep_u.lda_balanced_accuracy, rep_b.peak_uv, rep_a.peak_uv)
 
 
-def run_one(path: str) -> Result:
-    session = gtec.load(path)
-    before, after = replay(session)
-    return measure(session, before, after)
+def run_one(path: str):
+    """One subject. Returns a Result, or the error text, so one bad file can't lose the rest."""
+    try:
+        session = gtec.load(path)
+        before, after = replay(session)
+        return measure(session, before, after)
+    except Exception as err:                       # report it and keep the other subjects
+        return f"{Path(path).name}: {type(err).__name__}: {err}"
 
 
 def table(results: List[Result]) -> str:
@@ -193,13 +202,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ap.error(f"no S*.mat in {root}")
     print(f"Recorded ({gtec.LABEL_DETAIL}): {len(files)} subject(s), replayed through g.Pype in "
           f"real time, about {len(files) * 4 / max(1, args.jobs):.0f} min", flush=True)
-    with ProcessPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-        results = list(pool.map(run_one, [str(f) for f in files]))
-    for r in results:
-        print(json.dumps(asdict(r)) if args.json else r.line(), flush=True)
-    print()
-    print(table(results))
-    return 0
+    paths = [str(f) for f in files]
+    if args.jobs <= 1 or len(paths) == 1:
+        outcomes = [run_one(p) for p in paths]
+    else:
+        with ProcessPoolExecutor(max_workers=args.jobs) as pool:
+            outcomes = list(pool.map(run_one, paths))
+    results = [r for r in outcomes if isinstance(r, Result)]
+    for r in outcomes:
+        if isinstance(r, Result):
+            print(json.dumps(asdict(r)) if args.json else r.line(), flush=True)
+        else:
+            print(f"FAILED {r}", file=sys.stderr, flush=True)
+    if results:
+        print()
+        print(table(results))
+    return 0 if len(results) == len(outcomes) else 1
 
 
 if __name__ == "__main__":

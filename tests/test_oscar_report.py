@@ -59,3 +59,30 @@ def test_oscar_runs_on_a_replayed_recording():
     assert np.allclose(before[:len(s.eeg)], s.eeg, atol=1e-3)      # the player is exact
     assert len(after) >= len(s.eeg)
     assert not np.allclose(after[:len(s.eeg)], s.eeg)                 # OSCAR changed something
+
+
+def test_a_delay_at_the_search_edge_is_refused():
+    s = fake_session(30)
+    after = np.vstack([np.zeros((400, 8)), s.eeg])[:len(s.eeg)]      # 1.6 s: past the 1 s range
+    with pytest.raises(ValueError, match="search limit"):
+        rep.find_delay(s.eeg, after, start=int(rep.WARMUP_S * FS))
+
+
+def test_the_standalone_oscar_branch_is_never_epoched():
+    """Its delay would put the P300 ~320 ms late; averages and the classifier use OSCAR-off."""
+    from signal2speech.evidence.pipeline import SourceKind, build_evidence_graph, oscar_node
+    if oscar_node() is None:
+        pytest.skip("this g.Pype has no standalone OSCAR node")
+    g = build_evidence_graph(SourceKind.HYBRIDBLACK, oscar=True, average_oscar=True)
+    try:
+        assert g.oscar is not None and g.oscar_node is not None
+        assert g.epoch_input is g.filtered and g.epoch_input is not g.oscar
+        assert "epochs use the OSCAR-off stream" in g.oscar_note
+    finally:
+        g.pipeline.close()
+
+
+def test_one_bad_subject_doesnt_lose_the_others(tmp_path, capsys, monkeypatch):
+    (tmp_path / "S1.mat").write_bytes(b"not a mat file")
+    assert rep.main([str(tmp_path / "S1.mat")]) == 1
+    assert "FAILED S1.mat" in capsys.readouterr().err

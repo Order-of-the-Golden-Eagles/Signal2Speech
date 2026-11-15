@@ -63,8 +63,8 @@ def test_headset_graph_builds_without_hardware(model):
         assert ev.graph.label is InputLabel.LIVE
         assert ev.nodes.synth is None and ev.graph.raw is ev.graph.source
         assert ev.adapter.source == "live-eeg"
-        if ev.graph.oscar is not None:   # classifier and averages use the OSCAR branch
-            assert ev.graph.epoch_input is ev.graph.oscar
+        if ev.graph.oscar is not None:   # #164: OSCAR is shown, but never epoched (its delay)
+            assert ev.graph.epoch_input is ev.graph.filtered
     finally:
         ev.graph.pipeline.close()
 

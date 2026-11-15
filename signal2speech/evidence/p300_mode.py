@@ -86,8 +86,9 @@ def build_p300_evidence(kind: SourceKind | str = SourceKind.GENERATOR, *,
         kind: Generator (simulated, with the chooser's synthetic P300) or
             HybridBlack (live).
         label: Input label; defaults as in ``build_evidence_graph``.
-        oscar: Headset only. The classifier and the averages use the OSCAR
-            branch when it exists.
+        oscar: Headset only. OSCAR is shown on its own branch; the classifier and the
+            averages use the OSCAR-off stream, because the branch's ~324 ms delay
+            misaligns epochs with the flash markers (#164).
         model: Fitted model for the online scorers. g.Pype refuses to start
             unfitted scorers, so by default a small synthetic placeholder is
             fitted; calibration in the run replaces it.
