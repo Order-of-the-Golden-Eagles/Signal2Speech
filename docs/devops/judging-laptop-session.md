@@ -22,14 +22,14 @@ Turn Wi-Fi **off** (and unplug Ethernet). Activate the main folder's `.venv`. Se
 
 | # | Do | Expect | Closes |
 | --- | --- | --- | --- |
-| B1 | `python tools/demo_launcher.py --input keyboard` (fullscreen, and it restarts the app if it crashes; F1 shows the keys, F11 leaves fullscreen). Press **2**, then **1**. | The county comparison fills most of the window for 8 s, and **one** line is spoken: "Washtenaw's AQI rose 186 points. Wayne's rose 168 points." | #39 |
-| B2 | When the next question appears, press **1**, then **1**. | The June 28 satellite view appears, and **one** line is spoken | #39 |
+| B1 | `python tools/demo_launcher.py --input keyboard` (fullscreen, and it restarts the app if it crashes; F1 shows the keys, F11 leaves fullscreen). Press **2**, then hold **1** for 2 s. | The county comparison fills most of the window for 8 s, and **one** line is spoken: "Washtenaw's AQI rose 186 points. Wayne's rose 168 points." | #39 |
+| B2 | When the next question appears, press **1**, then hold **1** for 2 s. | The June 28 satellite view appears, and **one** line is spoken | #39 |
 | B3 | Press **2** (preview), then **2** (cancel). Then press **2**, then **D** (disconnect during preview). | Nothing appears and nothing is spoken, both times. The transcript shows `cleared (cancel)` and `cleared (disconnect)`. | #39, #26 |
 | B4 | Close the app. Run `python -m signal2speech.app --input simulated --sim 2,1`. | The bottom strip says **Input: Simulated** and **Connection: g.Pype Generator stream**. If it says "scripted", g.Pype didn't load: stop and note it. The tiles flash, then the preview shows, then the comparison appears with **one** spoken line. | **#4** |
 | B5 | Close it. Run `python -m signal2speech.app --input simulated --sim 2,2`. | Preview, then cancel. Nothing appears and nothing is spoken. | #4 |
-| B6 | `python -m signal2speech.ai --question "Are you comfortable?"` | Without a key: tiles labelled **Replies: Stub**. With a key in `.env`: **Replies: Saved phrases · offline…** within about 9 s. Press **1**, then **1**: the reply is spoken **once**. | #5 (offline fallback) |
+| B6 | `python -m signal2speech.ai --question "Are you comfortable?"` | Without a key: tiles labelled **Replies: Stub**. With a key in `.env`: **Replies: Saved phrases · offline…** within about 9 s. Press **1**, then hold **1** for 2 s: the reply is spoken **once**. | #5 (offline fallback) |
 | B7 | `python -m signal2speech.evidence --source generator --seconds 20` | The scopes open and move. The banner says **Simulated**. | #48 |
-| B8 | **Switch-back rehearsal.** Start a timer, close everything, then: `cd ..\Signal2Speech-fallback`, `.venv\Scripts\activate`, `python -m signal2speech.app --input keyboard`, and press **2**, then **1**. Stop the timer at the spoken line. Then `cd ..\Signal2Speech`. | One reveal and one spoken line from the fallback build, **under 60 s** | #42 |
+| B8 | **Switch-back rehearsal.** Start a timer, close everything, then: `cd ..\Signal2Speech-fallback`, `.venv\Scripts\activate`, `python -m signal2speech.app --input keyboard`, and press **2**, then hold **1** for 2 s. Stop the timer at the spoken line. Then `cd ..\Signal2Speech`. | One reveal and one spoken line from the fallback build, **under 60 s** | #42 |
 | B9 | Stand where the judges will be. Run B1 once more. | The line is clearly audible, and the AQI table is readable from there | #39 |
 
 Turn Wi-Fi back **on**.
