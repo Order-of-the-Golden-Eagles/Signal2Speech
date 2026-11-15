@@ -404,7 +404,10 @@ def wait_for_start(window, source: str) -> bool:
     watch.start()
     loop.exec()
     watch.stop()
+    veil.hide()                 # gone now: a deferred delete alone waits for the main event loop,
+    veil.setParent(None)        # which doesn't run until calibration is over
     veil.deleteLater()
+    window.repaint()
     return started["ok"]
 
 
