@@ -851,18 +851,14 @@ class App:
         lines += ["", "## Help phrase", ""]
         lines += ([f"- {c['time']} · {c['source']}: “{c['text']}”" for c in self.sink.help_calls]
                   or ["Not used this session."])
-<<<<<<< HEAD
         extra = [f"- **Practice rounds:** {self.practice.runs}",
                  f"- **Restarts (R):** {self.restarts}"]
-=======
-        extra = [f"- **Practice rounds:** {self.practice.runs}"]
         if hasattr(self.sim, "usage"):                 # #104: recorded responses, counted
             u = self.sim.usage()
             extra.append(f"- **Recorded responses played:** {u['target_responses']} attended and "
                          f"{u['nontarget_responses']} unattended, from {u['recording']}. "
                          f"Played more than once: {u['played_twice']}. Which tile was attended "
                          "followed the script; the classifier's picks are real.")
->>>>>>> origin/main
         if self.attract is not None:
             extra.append(f"- **Attract-mode loops:** {self.attract.runs} (simulated, left out of the counts)")
         lines += ["", "## Other", ""] + extra
