@@ -480,3 +480,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Each tool runs as its own process, so one crashing can't take the launcher down. The smoke check runs inside it and shows PASS or FAIL
 - `python -m signal2speech --help` lists the same tools, and `python -m signal2speech demo-keyboard` runs one directly. The README quickstart uses it now
 - Checked on a Mac: the buttons start the right commands, and the evidence view is grayed out here because g.Pype isn't installed. The smoke check correctly shows FAIL for the same reason. It should pass on the judging laptop
+
+## 11/14/26 - 11:03 PM - Long Le - #128 Judge Q&A cites the response times ([PR #157](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/157))
+- The judge Q&A now answers "How fast does it respond?" with the measured times: map change in 2–30 ms and speech starting in about 15–50 ms after a confirm
+- It's honest about where the time really goes: the P300 choice takes a flash sequence (about 2.5–3.5 s), and the alpha confirm lands about 1.2–1.5 s after the eyes close. Those EEG numbers come from simulated data until the headset run
+- With the fuzz test answer already in the Q&A, every sub-issue of #128 is done and its "done when" is met
