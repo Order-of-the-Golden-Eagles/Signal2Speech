@@ -63,7 +63,7 @@ Use this if live capture fails or is too noisy to read. It's honest as long as e
 
 ## Capture settings
 
-- Screen at 1920×1080. Use OBS or the OS recorder. Turn off notifications and Wi-Fi (the demo runs offline).
+- Screen at 1920×1080. Use OBS or the OS recorder. Turn off notifications. Keep Wi-Fi on for the shot with Claude's reply suggestions; the rest runs without it.
 - Record app audio directly, not through a microphone near the speakers.
 - Record each shot on its own and assemble afterwards. Keep two good takes of shots 3 to 7.
 - Export as H.264 MP4. Check that the length is under 3:00 (2:30 or less for g.tec) and that the audio is in sync on the confirm-to-speech cut.

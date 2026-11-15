@@ -8,9 +8,9 @@ A conversation partner asks a question and the app offers two answers. The weare
 
 ![The app after a confirmed answer: NASA imagery and EPA county AQI on the right, the transcript below, and the input label "Keyboard" in the bottom strip](docs/demo-submission/media/app-compare-reveal.jpg)
 
-## Try it offline in three commands
+## Try it in three commands
 
-Python 3.12. Works with Wi-Fi off once installed.
+Python 3.12. Reply suggestions come from Claude over the internet. Without a connection or an API key the app offers saved phrases instead. Everything else runs on the laptop: the EEG pipeline, the voice, and the NASA example.
 
 ```
 python -m venv .venv && .venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
@@ -73,7 +73,7 @@ keyboard / simulator ─────┘
 
 - **Choose with P300, confirm with alpha.** They're different brain signals, so a leftover flash response can't confirm by accident.
 - **One selection contract** for every input. Rounds, late or duplicate signals, and cancels are handled in one place ([selection contract](docs/architecture/selection-contract.md)).
-- **One Python process**, fully offline: PySide6 for the screens, offline speech (a natural neural voice when [Piper is installed](docs/text-to-speech/README.md#a-natural-voice-piper-optional), the operating system's voice otherwise), and bundled NASA and EPA data. CI runs the tests on Windows, macOS, and Linux.
+- **One Python process.** The only thing that needs the internet is the AI reply suggestions (Claude); without it the app falls back to saved phrases. Local: PySide6 for the screens, offline speech (a natural neural voice when [Piper is installed](docs/text-to-speech/README.md#a-natural-voice-piper-optional), the operating system's voice otherwise), and bundled NASA and EPA data. CI runs the tests on Windows, macOS, and Linux.
 
 <details><summary><b>The real g.Pype graph</b> behind <code>--input live</code>, generated from the code (#166)</summary>
 

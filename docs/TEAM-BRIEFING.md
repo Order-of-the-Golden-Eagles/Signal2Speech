@@ -6,7 +6,7 @@ Updated 2026-11-15 for the judging-day build.
 
 ## The thirty-second version
 
-Signal2Speech is a voice for people who can't speak or type. A partner asks a question. The app offers two replies. The wearer picks one by looking at it, sees exactly what will be said, and confirms by closing their eyes for two seconds. Only then does the app speak. It runs offline on one laptop.
+Signal2Speech is a voice for people who can't speak or type. A partner asks a question. The app offers two replies. The wearer picks one by looking at it, sees exactly what will be said, and confirms by closing their eyes for two seconds. Only then does the app speak. It runs on one laptop. The reply suggestions come from Claude and need the internet; everything else, including the NASA example, runs without it.
 
 **What is main and what is an example.** The product is the conversation: any question in, two suggested replies, one chosen by brain signal and spoken. The NASA air-quality question is one example inside the same app. It shows the app can also do something on screen, not only speak. Lead with the conversation and bring up NASA second.
 
@@ -87,9 +87,10 @@ Longer answers are in [judge Q&A](demo-submission/judge-qa.md). The short ones:
 - **"So is it faked?"** The brain responses and the classification are real. What is scripted is which card counts as the one being looked at, and the screen says so.
 - **"Would it work on a real person?"** The same code runs with a Unicorn headset plugged in (`--input live`). We have tested that path on simulated signals only. We haven't measured it on a person, so we don't claim an accuracy for it.
 - **"Why only two choices?"** Two choices are fast and reliable with few flashes. A yes/no or A/B answer covers a lot of real conversation, and the AI step turns any question into two choices.
-- **"What does the AI do?"** It suggests two replies to a typed question (Claude, with saved phrases as the offline fallback). It never decides. The wearer previews and confirms the exact words. The EEG decoding is not AI-generated: it is a standard classifier in our g.Pype pipeline. Details: [AI answering](ai-answering/README.md).
+- **"What does the AI do?"** It suggests two replies to a typed question (Claude, over the internet, with saved phrases as the fallback when there is no connection). It never decides. The wearer previews and confirms the exact words. The EEG decoding is not AI-generated: it is a standard classifier in our g.Pype pipeline. Details: [AI answering](ai-answering/README.md).
 - **"How fast is it?"** About five seconds of flashing to choose, two seconds to confirm. After the confirm the map and voice respond in well under a second.
-- **"What about privacy?"** Everything runs offline except the optional reply suggestions. Raw EEG is saved only with the wearer's consent and never leaves the laptop or goes in the repo. Details: [security and privacy](security-privacy/README.md).
+- **"Does it work offline?"** Partly, and say so plainly. The reply suggestions need the internet. Without it the app offers saved phrases. The EEG pipeline, the voice and the NASA example all run on the laptop.
+- **"What about privacy?"** The typed question goes to Claude to get suggestions. EEG never leaves the laptop. Raw EEG is saved only with the wearer's consent and never leaves the laptop or goes in the repo. Details: [security and privacy](security-privacy/README.md).
 - **"Why NASA data?"** It is an example, not the product. It is a concrete question with a checkable answer, and it shows the app doing something, not only speaking. NASA imagery shows the smoke from orbit. EPA data measures it on the ground.
 - **"What did you use from g.tec?"** g.Pype for the whole signal pipeline, their P300 Speller dataset for the recorded EEG, and the Unicorn Hybrid Black as the target device.
 - **"What didn't work?"** The headset didn't arrive. A second board we tried gave no usable EEG on two people, and we wrote that up as a negative result ([findings](eeg-hardware/README.md#pieeg-octopus-16-on-real-people-no-usable-eeg-2026-11-15)). One reported audio dropout was never reproduced.
