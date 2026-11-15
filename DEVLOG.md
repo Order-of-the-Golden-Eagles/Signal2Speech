@@ -340,7 +340,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Only the tests that really need g.Pype are skipped. The rest of `test_diagnostics.py` and `test_recovery.py` still runs everywhere, and CI still runs all of them on Windows, macOS, and Linux
 - Checked on macOS 12 without g.Pype: 183 passed, 0 failed, and the push hook passes again
 
-## 11/14/26 - 8:01 PM - MagicJester2764 - #103 Live EEG inside the app ([PR #120](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/120))
+## 11/14/26 - 8:01 PM - MagicJester2764 - #103 Live EEG inside the app ([PR #124](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/124))
 - The headset can now drive the real demo app: `python -m signal2speech.app --input live`
     - It calibrates on the app's own tiles first (look at the named tile, then eyes open and eyes closed), then the brain's response picks a tile and closing your eyes confirms
 - The P300 chooser and the eye-closure switch share one headset connection, because the Unicorn can only be opened once
