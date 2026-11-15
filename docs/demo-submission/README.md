@@ -18,3 +18,4 @@ Own the two-minute walkthrough, live recording, and submission checklist.
 **Honest status (2026-11-15):** keyboard and simulated runs work end to end, including the OpenOrbit map (#30). Live EEG runs in the app (`--input live`, #103): the P300 chooser picks and key 1 confirms. Eye-closure confirm inside the app stays off until #23. The alpha confirm (#47) also runs standalone (`python -m signal2speech.eeg.alpha_confirm --source hybrid-black`). A real-wearer P300 average needs the P300 chooser's tiles to drive the evidence view's markers (the #46 ↔ #48 seam). Nothing here has been run with a real headset yet.
 
 **Still open:** recording the video waits on live input (#23). The team still has to confirm the exact track names on the event page and sign off on the AI disclosure.
+- [Q&A bank](qa-bank.md): suggested spoken answers to judges' questions, and questions to type into the app

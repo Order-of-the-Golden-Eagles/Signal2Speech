@@ -104,6 +104,7 @@ If you don't know an answer, say "I'd have to check, it's in our repo" and point
 | --- | --- |
 | The overview and commands | [README](../README.md) |
 | What to say at the table, minute by minute | [stage script](demo-submission/stage-script.md) |
+| **Answers to say out loud, question by question** | [Q&A bank](demo-submission/qa-bank.md) |
 | Judge questions with full answers | [judge Q&A](demo-submission/judge-qa.md) |
 | The video plan | [shot list](demo-submission/shot-list.md) |
 | Devpost text, deadlines, AI disclosure | [submission checklist](demo-submission/submission-checklist.md) |
