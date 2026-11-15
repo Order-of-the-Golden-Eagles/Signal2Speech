@@ -96,3 +96,18 @@ def test_realtime_recording_average_separates(tmp_path):
     n = np.asarray(nontarget.result.data)[..., -1]
     window = slice(int((0.2 + 0.25) * FS), int((0.2 + 0.35) * FS))    # 250-350 ms after the flash
     assert t[window].mean() - n[window].mean() > 3.0, (t[window].mean(), n[window].mean())
+
+
+def test_curve_rises_with_more_flashes_and_is_chance_without_a_response(tmp_path, capsys):
+    """#151: accuracy at picking the attended item out of two, by flashes averaged."""
+    weak = gtec.curve(gtec.load(make_file(tmp_path / "S1.mat", seconds=120, bump_uv=0.3)), draws=200)
+    assert set(weak) == set(gtec.CURVE_FLASHES)
+    assert 0.5 < weak[1] < weak[3] < weak[10] and weak[10] > 0.85      # more flashes, more often right
+    none = gtec.curve(gtec.load(make_file(tmp_path / "S2.mat", seconds=120, bump_uv=0.0)), draws=200)
+    assert all(0.3 < v < 0.7 for v in none.values())                   # no response: about chance
+    plot = tmp_path / "flashes.svg"
+    assert gtec.main([str(tmp_path), "--plot", str(plot)]) == 0
+    out = capsys.readouterr().out
+    assert "Recorded (" in out and "separate blocks of time" in out and "mean" in out
+    assert plot.read_text(encoding="utf-8").startswith("<svg") and "S1" in plot.read_text(encoding="utf-8")
+    assert gtec.main([str(tmp_path), "--plot"]) == 2

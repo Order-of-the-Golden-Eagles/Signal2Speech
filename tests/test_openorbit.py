@@ -70,13 +70,31 @@ def test_view_starts_blank_and_switches_modes(qapp):
     from signal2speech.openorbit.view import BLANK_HINT
     view = OpenOrbitView()
     assert view.data_error is None
-    assert view.mode == "blank" and visible_texts(view) == [BLANK_HINT]
+    assert view.mode == "blank" and BLANK_HINT in visible_texts(view)
     view.show_satellite()
     assert view.mode == "satellite"
     view.compare_air_quality()
     assert view.mode == "compare"
     view.reset()
-    assert view.mode == "blank" and visible_texts(view) == [BLANK_HINT]
+    assert view.mode == "blank" and BLANK_HINT in visible_texts(view)
+
+
+def test_idle_panel_shows_a_dimmed_region_and_no_results(qapp):
+    """#182: before any confirm the panel isn't an empty box, but it must not look like a reveal."""
+    from signal2speech.openorbit import OpenOrbitView
+    from signal2speech.openorbit.view import BLANK_HINT, IDLE_OPACITY
+    view = OpenOrbitView()
+    texts = visible_texts(view)
+    assert BLANK_HINT in texts and any("southeast Michigan" in t for t in texts)
+    assert any("NASA" in t for t in texts)                                # attribution stays visible
+    ds = view.dataset
+    numbers = {str(v) for c in ds.changes for v in (c.before, c.after)}
+    assert not any(n in t for t in texts for n in numbers)                # no AQI values before a confirm
+    assert not any("Biggest jump" in t or "Highest" in t for t in texts)
+    assert view.idle_image.opacity == IDLE_OPACITY and IDLE_OPACITY <= 0.4
+    assert view.idle_image.graphicsEffect() is None                       # an effect here crashed macOS
+    missing = OpenOrbitView(data_root=Path("no-such-folder"))             # no data: the plain hint only
+    assert visible_texts(missing) == [BLANK_HINT]
 
 
 def test_missing_data_shows_a_labelled_panel_instead_of_crashing(qapp, tmp_path):
@@ -198,7 +216,7 @@ def test_images_load_with_matching_sizes_and_render(qapp):
     view.compare_air_quality()
     assert not view.grab().isNull()
     maps = [m for m in view.findChildren(MapImage) if m.isVisibleTo(view)]
-    assert sorted(m.date for m in maps) == [BEFORE, AFTER]
+    assert [m.date for m in maps] == [AFTER]              # one flowing image, resting on the smoke
     for m in maps:
         rect = m.image_rect()
         assert all(rect.contains(point) for _, point in m.marker_points())
@@ -299,9 +317,11 @@ def test_cloudy_before_image_is_captioned(qapp):
     from signal2speech.openorbit.view import MapImage, OpenOrbitView
     view = OpenOrbitView(load_dataset())
     view.compare_air_quality()
-    captions = [m.caption for m in view.findChildren(MapImage)]
-    assert any(c and c.endswith("mostly cloud") and "June 26" in c for c in captions)
-    assert not any(c and "June 28" in c and "cloud" in c for c in captions)
+    # The comparison now flows through the days; each overcast day's caption says cloud.
+    captions = {d: view._lapse_caption(d, note) for d, note in view.dataset.timelapse}
+    assert captions[BEFORE].endswith("mostly cloud") and "June 26" in captions[BEFORE]
+    assert "cloud" not in captions[AFTER] and "June 28" in captions[AFTER]
+    assert "cloud" not in view.cmp_image.caption          # at rest it shows June 28
 
 
 def test_pollutant_line_is_stable_and_never_overclaims(qapp):
@@ -332,3 +352,37 @@ def test_long_caption_falls_back_to_the_date_on_a_small_image(qapp):
         assert m.image_rect().contains(box), width
     m.resize(1440, 800)
     assert m.caption_text() == "June 26, 2023 · mostly cloud"
+
+
+def test_satellite_view_plays_the_days_in_order_and_ends_on_the_smoke(qapp, monkeypatch):
+    """The satellite view steps through June 24 to 28 and stops on June 28. The fire map beside
+    it shows only what had been detected by each day."""
+    from signal2speech.openorbit import OpenOrbitView
+    from signal2speech.ui import fade
+    ds = load_dataset()
+    dates = [d for d, _ in ds.timelapse]
+    assert dates == sorted(dates) and dates[-1] == AFTER and len(dates) >= 3
+    assert all(ds.images[d].exists() for d in dates)
+
+    view = OpenOrbitView()
+    view.show_satellite()                                   # fades off (tests): straight to the last day
+    assert view.sat_image.date == AFTER and "wildfire smoke" in view.sat_image.caption
+    view.compare_air_quality()                              # the comparison flows the same way
+    from signal2speech.openorbit.view import COMPARE_SCOPE_NOTE
+    assert COMPARE_SCOPE_NOTE in visible_texts(view)        # images cover five days, numbers two
+    assert "June 26" in COMPARE_SCOPE_NOTE and "June 28" in COMPARE_SCOPE_NOTE and "June 24" in COMPARE_SCOPE_NOTE
+    assert view.cmp_image.date == AFTER and view._lapse_image is view.cmp_image
+    view.show_satellite()
+    assert view.fires_map.until is None                     # every detection shown at the end
+
+    monkeypatch.setattr(fade, "ENABLED", True)              # as on screen: start on the first day
+    view.reset()
+    view.show_satellite()
+    assert view.sat_image.date == dates[0] and view.fires_map.until == dates[0]
+    seen = [view.sat_image.date]
+    while view.lapse_index < len(dates) - 1:
+        view._lapse_next()
+        seen.append(view.sat_image.date)
+    assert seen == dates and view.fires_map.until is None and not view._lapse_timer.isActive()
+    hidden_early = [d for d, _ in view.fires_map.dot_points() if d > dates[0]]
+    assert hidden_early                                     # there were detections to hold back

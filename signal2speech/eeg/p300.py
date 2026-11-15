@@ -318,16 +318,20 @@ class RecordedResponses:
     ``target`` are responses to the stimulus the recorded person was attending, ``nontarget`` to
     the others. Both are (trials, samples, channels) in microvolts, starting at the flash. Each is
     used once, in a shuffled order; ``reused`` counts how many had to be played a second time.
+    The order is different on every launch unless a ``seed`` is given, so each run is a fresh
+    draw of real responses and can come out differently, including wrong.
     """
 
     def __init__(self, target: np.ndarray, nontarget: np.ndarray, name: str = "recording",
-                 seed: int = 0):
+                 seed: Optional[int] = None):
         target, nontarget = np.asarray(target, float), np.asarray(nontarget, float)
         if target.ndim != 3 or nontarget.ndim != 3 or not len(target) or not len(nontarget):
             raise ValueError("need (trials, samples, channels) target and non-target responses")
         if target.shape[2] != EEG_CHANNELS or nontarget.shape[2] != EEG_CHANNELS:
             raise ValueError(f"responses need {EEG_CHANNELS} channels")
         self.name = name
+        #: A short form for the status strip, which has little room.
+        self.short_name = name.replace("P300 Speller dataset, ", "dataset ")
         self.pools = {True: target, False: nontarget}
         self._rng = random.Random(seed)
         self._order = {True: [], False: []}
@@ -336,7 +340,7 @@ class RecordedResponses:
         self._lock = threading.Lock()
 
     @classmethod
-    def from_gtec(cls, path, seed: int = 0) -> "RecordedResponses":
+    def from_gtec(cls, path, seed: Optional[int] = None) -> "RecordedResponses":
         """From one subject file of g.tec's P300 Speller dataset (``S4.mat``), band-passed
         1-30 Hz and baseline-corrected the way the evidence report does it."""
         from signal2speech.evidence import dataset
@@ -553,6 +557,12 @@ def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
     a realtime pipeline with an unfitted scorer, so to calibrate and select in one run pass a
     placeholder model and refit with ``P300Chooser.finish_calibration()``.
     """
+    # Check the arguments before building anything: a half-built pipeline that is never started
+    # or closed crashed the interpreter at exit on Linux (a segfault after every test had passed).
+    if source not in ("generator", "recorded", "hybridblack"):
+        raise ValueError(f"Unknown source {source!r}: use generator, recorded or hybridblack")
+    if source == "recorded" and recorded is None:
+        raise ValueError("source 'recorded' needs RecordedResponses")
     p = gp.Pipeline()
     marker = gp.Marker(name="p300_flash")
     synth = None
@@ -564,8 +574,6 @@ def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
         p.connect(marker, synth[SyntheticP300.PORT_TRIGGER])
         upstream = synth
     elif source == "recorded":
-        if recorded is None:
-            raise ValueError("source 'recorded' needs RecordedResponses")
         # The Generator only sets the clock: RecordedP300 replaces its output with recorded EEG.
         src = gp.Generator(sampling_rate=RATE, channel_count=EEG_CHANNELS, signal_frequency=10,
                            signal_amplitude=0, noise_amplitude=1, name="p300_source")
@@ -573,11 +581,9 @@ def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
         p.connect(src, synth)
         p.connect(marker, synth[SyntheticP300.PORT_TRIGGER])
         upstream = synth
-    elif source == "hybridblack":
+    else:
         src = gp.HybridBlack(enable_oscar=enable_oscar, name="p300_source")
         upstream = src
-    else:
-        raise ValueError(f"Unknown source {source!r}: use generator, recorded or hybridblack")
     bandpass = gp.Bandpass(f_lo=1, f_hi=30, name="p300_bandpass")
     p.connect(upstream, bandpass)
 

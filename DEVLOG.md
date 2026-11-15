@@ -652,3 +652,60 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Flashes are half a second apart in this mode. Faster than that, the recorded responses overlap and the classifier gets worse: measured offline, the right tile was picked 95 % of the time at the usual speed and 100 % at this one (best subject), and 90 to 100 % across all five subjects
 - Why now: the PiEEG board was tested on two people tonight and gave no usable EEG, so g.tec's data is the brain signal we can honestly show
 - Verified end to end on the judging laptop with subject S4: the recorded responses picked the scripted tile, then the map and the spoken line followed. Three new tests; the automated one uses a made-up recording because CI has no dataset. Not yet run for many choices in a row in the app
+
+## 11/15/26 - 6:41 AM - Vasanth Anbukumar - #150 We tested the PiEEG board on two people: it records, but shows no usable brain signal ([PR #216](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/216))
+- The borrowed PiEEG Octopus 16 is out of the demo. It connects, streams and records well, but on two people with good contact we found no eyes-closed alpha and no response to a flickering square, the two EEG signals we tried
+    - A jaw clench and a hard blink showed up only faintly at the back of the head, too faint to use as a switch
+    - Likely reason: the board's reference pin sits within 2 cm of its signal pins, which cancels a brain rhythm before it's measured. We didn't prove that; it's the explanation that fits
+- What this means for judging: the real EEG we show is g.tec's recorded data (#104, #142). Never call anything from this board live EEG. The app's `--input pieeg` mode is verified on simulated streams only
+- Two practical lessons are written down in `docs/eeg-hardware/README.md`: don't pair the board in Windows' Bluetooth settings (it then connects and drops in a loop), and seat the puck flat
+- New tool, tested on the real board: `python -m signal2speech.eeg.pieeg_keepalive` keeps the board's stream up and reconnects after a dropped link, which PiEEG's own script doesn't do
+- Verified by ten labelled recordings kept privately under `recordings/`, never committed. The full table of what was tried, where, and the numbers is in the hardware docs
+
+## 11/15/26 - 7:01 AM - Vasanth Anbukumar - #151 How many flashes our chooser needs, measured on real human EEG ([PR #218](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/218))
+- One command now shows how often our chooser picks the right tile out of two on g.tec's recorded data, by how many flashes it averages: `python -m signal2speech.evidence.dataset <folder> --curve`
+    - Across the five recorded people: 94 % from one flash, 97 % from two, 99 % from three, 100 % from five
+    - `--plot file.svg` saves the chart that's now in `docs/eeg-hardware/README.md`
+- Decision: the app keeps 5 flashes per tile. Three would do on clean data, but the weakest person needs five to reach 99 %, and in the app the responses overlap. No setting changed
+- How we kept it honest: each test uses a separate stretch of the recording from the one the classifier learned on, and with the labels scrambled the same code falls to chance (42 to 46 %)
+- This is offline analysis of five people who are not our wearer, labelled Recorded. It shows the method works on real human brain responses. It doesn't predict a live wearer's accuracy
+- Verified on the judging laptop against the real dataset; one new test uses a made-up recording, since the dataset is never committed
+
+## 11/15/26 - 7:12 AM - Vasanth Anbukumar - #182 The map panel shows the region before anything is confirmed ([PR #219](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/219))
+- Before a choice is confirmed, the right-hand panel used to be an empty box with one line of small text. It now shows a faint satellite view of southeast Michigan with both places marked, the two dates, and the same line: "The map appears after a confirmed choice."
+- It can't be mistaken for the result: the picture is dimmed to 30 %, carries no air-quality numbers, and the NASA credit stays visible
+- Why: on the judging laptop the app's first screen was half empty, which read as unfinished
+- This is the first part of #182 only. The animated reveal and the bar chart of the two counties aren't built
+- Verified by screenshot on the judging laptop's real display, and by one new test that checks no results appear before a confirm
+## 11/15/26 - 7:36 AM - Vasanth Anbukumar - #143 The two-minute script and judge answers now match what we can actually show ([PR #220](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/220))
+- `docs/demo-submission/stage-script.md` opens with a judging-day plan for no headset: one command to start, what to say second by second, and what never to say
+    - Start it before the judge arrives: `python -m signal2speech.app --input recorded --sim 2,1,1,1,2,1,1,1 --fullscreen`. Setup takes about 70 seconds and is silent
+    - That script gives four exchanges of about 15 seconds each. Restart for the next judge
+- `docs/demo-submission/judge-qa.md` has straight answers to the questions we'll get: is this live, is the choice faked, how accurate is it, did you try real hardware, and why not a blink
+- Why: the old script assumed someone wearing a g.tec headset. Reading from it at the table would have meant saying things that aren't true today
+- Checked on the judging laptop: the four-exchange command ran and the recorded data picked the scripted tile all four times (2, 1, 2, 1). The older live-wearer plan is kept below the new section for reference
+
+## 11/15/26 - 7:52 AM - Vasanth Anbukumar - #91 The app's screens hold still, show much bigger NASA images, and nothing is cut off ([PR #222](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/222))
+- The layout no longer jumps between screens: the heading stays at the top, the two cards stay at the bottom, and the columns keep the same width from question to result
+- The NASA images are about three times bigger. To make room, the box under the map shows only the latest thing chosen or said; F2 still shows the full log
+- Nothing is cut off any more. The status strip runs the full width of the window, and a long input label, such as recorded mode's, gets a line to itself
+    - Before, the strip was squeezed into the left column and showed "Last: Co" on the result screen
+- Smaller cards with smaller text, emojis in place of the drawn icons, and a colour for each kind of card: blue and violet for the two choices, green for Confirm, red for Cancel
+- A cleaner font, a calmer status strip, and short fades when the preview and the map appear. The card flashes are untouched: they stay instant and plain white, because the brain response is timed against them
+- Verified by screenshots on the judging laptop's real display in every screen, and by the interface tests. Not checked on macOS or Linux, where the font and emoji fall back to what's installed
+
+## 11/15/26 - 8:14 AM - Vasanth Anbukumar - #104 Recorded mode now runs like a session with a headset on, with an opening and a calmer look ([PR #223](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/223))
+- `python -m signal2speech.app --input recorded` now walks through a session the way a wearer would go through it: the wearer's own prompts ("look at this card and count its flashes", "close your eyes"), and the card the wearer would be looking at is outlined and marked
+    - It says what it is. Three guidance lines are spoken during setup, starting with "This is a walkthrough on recorded brain data. Nobody is wearing a headset", and the line under the cards repeats that
+    - `--no-gaze-mark` and `--no-narration` turn the outline and the spoken lines off
+- The app opens with the two cards alone, then they settle into place on the left and the map panel fades in. `--no-intro` skips it
+- The cards now stay centred in the same spot on every screen. The status bar is a row of pills. The heading and the "say this?" text are smaller, so a reply reads at about five words a line
+- Fixed a crash on macOS in the tests: the faint map on the idle screen used a drawing effect that macOS didn't tolerate
+- Why the outline matters for honesty: it shows where the scripted attention is, before the classifier answers. Say that aloud at the table, so nobody thinks the answer was given away
+- The satellite view now plays the days from June 24 to June 28 one after another: ground visible, three days of cloud, then the smoke. The fire map beside it adds each day's detections in step
+    - Three more NASA images were added for this (June 24, 25 and 27), same satellite and same framing. Cloudy days are shown as they were
+    - The line that is previewed and spoken changed to match: "NASA satellite images from June 24 to June 28, 2023: clear ground, then cloud, then wildfire smoke over southeast Michigan." Its old recorded clip is retired
+- The comparison screen flows through the same five days in one large image, in place of two still pictures, above the air-quality table. Its heading now reads "Wildfire smoke arrives: June 24 to 28, 2023"
+- The satellite and fire images have rounded corners and a thin border
+- Each launch of recorded mode now draws the recorded brain responses in a fresh order, so two runs can differ. Before, every launch replayed the same ones
+- Verified by screenshots of every screen on the judging laptop and by the interface tests. The opening animation ran without errors; Vasanth watched it once and it looked right

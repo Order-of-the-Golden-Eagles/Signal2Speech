@@ -63,14 +63,20 @@ ORIGIN_COLORS = {"Claude": "#22c55e", "Stub": "#f59e0b", "Saved phrases": "#60a5
 HELP_BG = BG              # the overlay is BG at 92% opacity over the window
 
 # ── Type scale (px) ──────────────────────────────────────────
-DISPLAY = 56              # tile titles at full size
+DISPLAY = 56              # the largest text on screen
+TILE_TITLE = 40           # tile titles at full size: readable, without filling the screen
 TITLE = 36                # screen titles
-PREVIEW = 44              # the words to be spoken
-HEADING = 28              # prompts, panel titles
+PREVIEW = 24              # the words to be spoken: small enough for five words a line
+PREVIEW_MIN = 20          # long replies shrink no further
+HEADING = 24              # prompts, panel titles
 BODY = 22                 # hints, buttons, descriptions
 CAPTION = 18              # strip, footers, small print
 TILE_TITLE_MIN = 32       # long tile and preview text shrinks no further (#95)
 MONO = "Menlo, Consolas, monospace"
+#: The interface font, first one installed wins. Segoe UI Variable is Windows 11's own.
+FONT_FAMILIES = ["Segoe UI Variable Display", "Segoe UI", "Inter", "SF Pro Display",
+                 "Helvetica Neue", "Noto Sans", "sans-serif"]
+FONT = ", ".join(f'"{f}"' if " " in f else f for f in FONT_FAMILIES)
 
 # ── Text size (#195) ─────────────────────────────────────────
 # Ctrl+= / Ctrl+- step SCALE through these; Ctrl+0 resets. Every text size on screen goes
@@ -107,12 +113,27 @@ BORDER_W = 4
 
 # ── What each tile does: (icon, one-line description) ────────
 ACTION_INFO = {
-    ActionIds.SHOW_SATELLITE: ("satellite", "Shows the June 28 satellite image"),
-    ActionIds.COMPARE_AIR_QUALITY: ("chart", "Compares county AQI, June 26 vs. 28"),
+    ActionIds.SHOW_SATELLITE: ("satellite", "June 24 to 28, day by day"),
+    ActionIds.COMPARE_AIR_QUALITY: ("chart", "County air quality"),
     ActionIds.SPEAK_REPLY: ("speech", "Says these exact words"),
     ActionIds.CONFIRM: ("check", "Hold 1, or close your eyes"),
     ActionIds.CANCEL: ("cross", "Nothing is said"),
 }
+
+
+#: A colour for each kind of tile, so the screen isn't all one grey-blue. It tints the border,
+#: the key badge and (faintly) the background. A flashing tile ignores it: the flash stays plain
+#: white, because the brain response is timed against that exact stimulus.
+ACTION_TINT = {
+    ActionIds.SHOW_SATELLITE: "#38bdf8",        # sky blue
+    ActionIds.COMPARE_AIR_QUALITY: "#c084fc",   # violet
+    ActionIds.SPEAK_REPLY: "#fbbf24",           # amber
+    ActionIds.CONFIRM: "#4ade80",               # green
+    ActionIds.CANCEL: "#fb7185",                # rose
+}
+TINT_BG_ALPHA = 0.10
+#: Corner radius of the status pills: half their height, so the ends are round.
+PILL_RADIUS = 15
 
 
 def window_qss() -> str:
@@ -120,15 +141,16 @@ def window_qss() -> str:
     return f"""
 QMainWindow, QWidget#root {{ background: {BG}; }}
 QLabel {{ color: {TEXT}; }}
-QLabel#prompt {{ font-size: {px(HEADING)}px; font-weight: 600; color: {MUTED}; }}
+QLabel#prompt {{ font-size: {px(HEADING)}px; font-weight: 600; color: {TEXT}; }}
 QLabel#preview {{ font-size: {px(PREVIEW)}px; font-weight: 700; color: {ACCENT}; padding: {M}px;
                   background: {SURFACE}; border-left: 6px solid {ACCENT}; border-radius: {RADIUS_M}px; }}
 QLabel#hint {{ font-size: {px(BODY)}px; color: {MUTED}; }}
 QLabel#previewHeader {{ font-size: {px(BODY)}px; font-weight: 600; color: {MUTED}; }}
 QLabel#countdown {{ font-size: {px(BODY)}px; color: {QUIET}; }}
-QFrame#strip {{ background: {STRIP_BG}; border-top: 2px solid {STRIP_BORDER}; }}
-QLabel.strip {{ font-size: {px(CAPTION + 2)}px; font-family: {MONO}; color: {STRIP_TEXT}; }}
-QLabel#stripSentence {{ font-size: {px(CAPTION + 2)}px; color: {STRIP_TEXT}; }}
+QFrame#strip {{ background: transparent; border: none; }}
+QLabel.strip {{ font-size: {px(CAPTION - 2)}px; font-family: {FONT}; color: {STRIP_TEXT};
+                background: {STRIP_BG}; border: 1px solid {STRIP_BORDER};
+                border-radius: {PILL_RADIUS}px; padding: 5px 14px; }}
 """
 
 
@@ -150,10 +172,10 @@ TEXT_PAIRS = [
     ("tile selected description", TILE_SELECTED_TEXT, TILE_SELECTED_BG, CAPTION + 2, False),
     ("tile waiting", TILE_DISABLED_TEXT, TILE_DISABLED_BG, BODY, False),
     ("key badge", ON_ACCENT, ACCENT, CAPTION + 2, True),
-    ("strip text", STRIP_TEXT, STRIP_BG, CAPTION + 2, False),
+    ("strip text", STRIP_TEXT, STRIP_BG, CAPTION - 2, False),
     *[(f"input label {name}", colour, STRIP_BG, CAPTION + 2, True)
       for name, colour in INPUT_COLORS.items()],
-    *[(f"input badge {name}", BADGE_TEXT[name], colour, CAPTION + 2, True)
+    *[(f"input badge {name}", BADGE_TEXT[name], colour, CAPTION - 2, True)
       for name, colour in BADGE_COLORS.items()],
     *[(f"evidence banner {name}", BADGE_TEXT[name], colour, 16, True)
       for name, colour in BADGE_COLORS.items()],

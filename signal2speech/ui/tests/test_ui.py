@@ -252,11 +252,13 @@ def test_tile_shrinks_long_label_and_fits(app):
     assert _fits(t.text(), t.font_px, w, h) or t.font_px == MIN_PX
 
 
-def test_tile_short_label_stays_56_and_flash_keeps_size(app):
+def test_tile_short_label_stays_full_size_and_flash_keeps_size(app):
     t = Tile("target-2", "2")
     t.resize(420, 400)
     t.set_label("Compare counties")
-    assert t.font_px == 56
+    # At or within a few pixels of full size: fonts differ by platform, and the title's box is
+    # shorter now that tiles are.
+    assert Tile.MAX_PX - 6 <= t.font_px <= Tile.MAX_PX
     t.set_label(LONG_REPLY * 3)
     px = t.font_px
     t.set_lit(True)
@@ -278,7 +280,7 @@ def test_window_fits_twelve_word_reply_at_1280x720(ui):
                      tile.height() - 2 * Tile.INSET) or tile.font_px == MIN_PX
     w.press_target(T1)
     app.processEvents()
-    assert MIN_PX <= w.preview_px <= w.PREVIEW_MAX_PX
+    assert w.PREVIEW_MIN_PX <= w.preview_px <= w.PREVIEW_MAX_PX
 
 
 # ── #174: redesigned tiles ───────────────────────────────────
@@ -311,7 +313,9 @@ def test_flash_still_looks_the_same(app):
     t.set_label("Compare counties", ActionIds.COMPARE_AIR_QUALITY)
     t.set_lit(True)
     img = t.grab().toImage()
-    corner = img.pixelColor(40, img.height() // 2)      # inside the border, away from text
+    # In the padding between the border and the content, where nothing is ever drawn. (A point
+    # further in can land on the title's edge now that tiles are smaller.)
+    corner = img.pixelColor(int(Tile.INSET) - 6, img.height() // 2)
     assert corner == QColor(theme.TILE_LIT_BG)
     assert (theme.TILE_LIT_BG, theme.TILE_LIT_TEXT) == ("#ffffff", "#000000")
 
