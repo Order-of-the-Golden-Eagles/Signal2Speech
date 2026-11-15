@@ -263,3 +263,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - One sitting produces the evidence to close #39 and #4 and rehearses #42's rollback. Each step has a ready-to-paste result comment for the right issue
 - Turned on GitHub's "delete branch after merge" setting, and cleaned up the merged branches
 - Not run yet: it needs the judging laptop
+
+## 11/14/26 - 7:12 PM - Vasanth Anbukumar - #37 Faster PR checks, required CI, auto-merge (PR pending)
+- PR checks are faster: the six slow real-time tests (live-run, evidence, alpha, and P300 pipelines, about 150 seconds) run on Windows and Ubuntu py3.12 for every PR, and on every OS when code lands on `main`
+    - Locally, `pytest -m "not slow"` runs the rest in about 40 seconds. Plain `pytest` still runs everything
+- `main` now requires all four CI jobs to pass before a PR can merge, and GitHub auto-merge is on: run `gh pr merge <n> --auto --squash` and GitHub merges once the checks are green
+- Why: the full suite had grown to about 3 minutes, and teammates merging during long CI runs kept forcing re-runs
+- The slow tests are listed in one place, `tests/conftest.py`, so no test files changed. Windows, the judging laptop, still runs everything on every PR
