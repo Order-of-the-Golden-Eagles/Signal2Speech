@@ -350,3 +350,31 @@ def test_long_caption_falls_back_to_the_date_on_a_small_image(qapp):
         assert m.image_rect().contains(box), width
     m.resize(1440, 800)
     assert m.caption_text() == "June 26, 2023 · mostly cloud"
+
+
+def test_satellite_view_plays_the_days_in_order_and_ends_on_the_smoke(qapp, monkeypatch):
+    """The satellite view steps through June 24 to 28 and stops on June 28. The fire map beside
+    it shows only what had been detected by each day."""
+    from signal2speech.openorbit import OpenOrbitView
+    from signal2speech.ui import fade
+    ds = load_dataset()
+    dates = [d for d, _ in ds.timelapse]
+    assert dates == sorted(dates) and dates[-1] == AFTER and len(dates) >= 3
+    assert all(ds.images[d].exists() for d in dates)
+
+    view = OpenOrbitView()
+    view.show_satellite()                                   # fades off (tests): straight to the last day
+    assert view.sat_image.date == AFTER and "wildfire smoke" in view.sat_image.caption
+    assert view.fires_map.until is None                     # every detection shown at the end
+
+    monkeypatch.setattr(fade, "ENABLED", True)              # as on screen: start on the first day
+    view.reset()
+    view.show_satellite()
+    assert view.sat_image.date == dates[0] and view.fires_map.until == dates[0]
+    seen = [view.sat_image.date]
+    while view.lapse_index < len(dates) - 1:
+        view._lapse_next()
+        seen.append(view.sat_image.date)
+    assert seen == dates and view.fires_map.until is None and not view._lapse_timer.isActive()
+    hidden_early = [d for d, _ in view.fires_map.dot_points() if d > dates[0]]
+    assert hidden_early                                     # there were detections to hold back

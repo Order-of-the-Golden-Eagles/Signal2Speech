@@ -58,7 +58,7 @@ CONFIRM_TIMEOUT_MS = 15_000   # longer than alpha calibration's ~1.5 s closure p
 CHOOSE_SPLIT = (2, 3)
 REVEAL_SPLIT = (2, 3)     # the same on a reveal: columns that change width make the screen jump
 #: Height of the one-line conversation box, before the text scale.
-CONVERSATION_HEIGHT = 104
+CONVERSATION_HEIGHT = 132      # the label line plus a reply that wraps onto two lines
 PANEL_TITLE = (f"<span style='color:{T.ACTION_TINT[ActionIds.SHOW_SATELLITE]}'>OpenOrbit</span>"
                " &nbsp;·&nbsp; NASA and EPA data"
                f" &nbsp;·&nbsp; <span style='color:{T.QUIET}'>F2: developer log</span>")
@@ -472,6 +472,7 @@ class App:
         # The map gets the height. The conversation shows only the latest line; the developer
         # log (F2) and the session report keep everything.
         self.conversation.latest_only = True
+        self.conversation.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.conversation.setFixedHeight(T.px(CONVERSATION_HEIGHT))
         right.addWidget(self.conversation, 0)
         right.addWidget(self.transcript_view, 2)

@@ -95,7 +95,7 @@ BORDER_W = 4
 
 # ── What each tile does: (icon, one-line description) ────────
 ACTION_INFO = {
-    ActionIds.SHOW_SATELLITE: ("satellite", "June 28 satellite image"),
+    ActionIds.SHOW_SATELLITE: ("satellite", "June 24 to 28, day by day"),
     ActionIds.COMPARE_AIR_QUALITY: ("chart", "County air quality"),
     ActionIds.SPEAK_REPLY: ("speech", "Says these exact words"),
     ActionIds.CONFIRM: ("check", "Hold 1, or close your eyes"),

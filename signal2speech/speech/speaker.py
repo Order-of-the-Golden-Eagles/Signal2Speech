@@ -31,7 +31,9 @@ NEURAL_WAIT_MS = 6000
 
 ROOT = Path(__file__).resolve().parents[2]
 AUDIO_DIR = ROOT / "data" / "openorbit" / "audio"
-BUNDLED_CLIPS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
+# The satellite line changed when the view became a day-by-day sequence, so its old recording
+# is retired: a clip must never say different words from the ones the wearer approved.
+BUNDLED_CLIPS = frozenset({ActionIds.COMPARE_AIR_QUALITY})
 ENGLISH_LINE = "english-line"   # clip hint: English text, use the English voice (#194)
 
 Log = Callable[[str], None]

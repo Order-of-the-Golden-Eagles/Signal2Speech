@@ -76,7 +76,7 @@ def test_show_satellite_path(qapp):
     app.window.press_target(T1)
     app.window.press_target(T1)
     assert view.calls == [ActionIds.SHOW_SATELLITE]
-    assert speaker.said[0].startswith("This is the June 28, 2023 NASA MODIS view")
+    assert speaker.said[0].startswith("NASA satellite images from June 24 to June 28, 2023")
 
 
 @pytest.mark.parametrize("stop", ["key2", "esc", "disconnect"])
