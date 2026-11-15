@@ -24,7 +24,7 @@ Verify confirmation, cancellation, duplicate events, disconnects, and offline la
 | Stale decision from the Choose round arriving in the Confirm round, late decision from a closed round | keyboard, recorded, simulated | `RejectedStaleRound` or dropped before the adapter. 0 outputs. |
 | Gauntlet: cancel, disconnect, stale, and duplicate, then one real confirm and a repeat | keyboard and recorded | Exactly 1 map action and 1 spoken line |
 
-Run: `QT_QPA_PLATFORM=offscreen pytest tests/test_recovery.py -v` (18 tests, about 8 s). Recorded input is the contract's sample events replayed with `source: recorded`. Live EEG recovery is #23.
+Run: `QT_QPA_PLATFORM=offscreen pytest tests/test_recovery.py -v` (23 tests, about 10 s). The g.Pype-only cases skip, with a reason, where g.Pype isn't installed. Key D is tested through its real `QShortcut`. A timeout in the Confirm round replays the simulator's choose+confirm pair, so a scripted rehearsal stays aligned. `App.close()` stops the confirm and reopen timers. Recorded input is the contract's sample events replayed with `source: recorded`. Live EEG recovery is #23.
 
 **Gap (not in #26):** nothing notices a stream that **stalls without stopping**, for example the headset going silent. Only an explicit stop or disconnect clears the round. A sample-count watchdog that calls `handler.disconnect()` belongs with the live run (#23).
 

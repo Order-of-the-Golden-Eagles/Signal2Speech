@@ -158,7 +158,9 @@ def test_generator_alpha_burst_confirms_once_through_gpype(rig):
     open_confirm_round(h)
     ac.collect(0.6)                                     # past settle_s, eyes open
     bursts.close_eyes()
-    ac.collect(2.0)
+    deadline = time.monotonic() + 6.0                   # wait for the edge, not a fixed window:
+    while not sink.actions and time.monotonic() < deadline:   # a loaded CI box runs late
+        ac.collect(0.2)
     bursts.open_eyes()
     ac.collect(1.0)
 

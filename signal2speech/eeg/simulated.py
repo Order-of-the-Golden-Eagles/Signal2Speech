@@ -113,6 +113,8 @@ class SimulatedDecoder(QObject):
         self._picks = deque(int(p) for p in picks)
         self._seq = 0
         self._pending_seq: Optional[int] = None  # the sequence whose decision we accept
+        self._pending_kind: Optional[RoundKind] = None   # the round kind it was armed for
+        self._preview_pick: Optional[int] = None  # the pick that produced the open preview
         self._pick: Optional[int] = None         # its pick; None = waiting for set_next()
         self._requested = False                  # the pick has been handed to the stream
         self._flashing = False                   # between on_sequence_started and _finished
@@ -207,6 +209,9 @@ class SimulatedDecoder(QObject):
         self._requested = False
         self._flashing = hold
         self.sink.cancel()
+        self._pending_kind = self.handler.current.kind
+        if self._pending_kind is RoundKind.CHOOSE:
+            self._preview_pick = None
         self._pick = self._picks.popleft() if self._picks else None   # None: set_next() decides
         if self._pick is not None and not hold:
             self._request(self.decision_s if delay_s is None else delay_s)
@@ -222,9 +227,24 @@ class SimulatedDecoder(QObject):
             self._picks.append(int(cls))
 
     def cancel_sequence(self, restore: bool = False) -> None:
-        """Forget the open sequence. ``restore`` puts its unused pick back for the next round."""
-        if restore and self._pending_seq is not None and self._pick is not None:
-            self._picks.appendleft(self._pick)
+        """Forget the open sequence. ``restore`` gives unused picks back for the next question.
+
+        The next round after any clear is a Choose round. A cleared Choose round gets its own
+        pick back. A cleared Confirm round replays the whole pair: the choose pick that made
+        the preview, then the unused confirm pick. If the keyboard made the preview, the
+        confirm pick is dropped, because the keyboard took over that question.
+        """
+        if restore:
+            unused = self._pick if self._pending_seq is not None else None
+            if self._pending_kind is RoundKind.CONFIRM:
+                if self._preview_pick is not None:
+                    if unused is not None:
+                        self._picks.appendleft(unused)
+                    self._picks.appendleft(self._preview_pick)
+            elif unused is not None:
+                self._picks.appendleft(unused)
+        self._preview_pick = None
+        self._pending_kind = None
         self._pending_seq = self._pick = None
         self._requested = self._flashing = False
         self.sink.cancel()
@@ -258,9 +278,16 @@ class SimulatedDecoder(QObject):
         if seq != self._pending_seq:
             self.dropped.append(seq)
             return
-        self._pending_seq = self._pick = None
+        kind = self._pending_kind
+        # Clear everything before the adapter call: it can re-enter (a preview opens the
+        # Confirm round, a scripted cancel clears it) and must not see this sequence as open.
+        self._pending_seq = self._pick = self._pending_kind = None
         self._requested = False
-        self.adapter.select_captured(self.classes.target_for(cls))
+        if kind is RoundKind.CONFIRM:
+            self._preview_pick = None    # the pair is decided; a later clear replays nothing
+        outcome = self.adapter.select_captured(self.classes.target_for(cls))
+        if kind is RoundKind.CHOOSE and outcome is Outcome.Previewed:
+            self._preview_pick = cls     # remembered in case the Confirm round is cleared
 
 
 # ── Standalone run ───────────────────────────────────────────
@@ -330,13 +357,16 @@ def main(argv=None) -> int:
         win.show()
     else:
         # Headless: reopen the question while picks remain; quit once they are spent.
+        quit_soon = QTimer(singleShot=True, interval=200)
+        quit_soon.timeout.connect(app.quit)
+        next_round = QTimer(singleShot=True, interval=100)
+        next_round.timeout.connect(lambda: handler.begin_choice_round(choices))
+        guards += [quit_soon, next_round]
+
         def after(_e, o):
             if o not in (Outcome.Confirmed, Outcome.Cancelled):
                 return
-            if decoder.idle:
-                QTimer.singleShot(200, app.quit)
-            else:
-                QTimer.singleShot(100, lambda: handler.begin_choice_round(choices))
+            (quit_soon if decoder.idle else next_round).start()
         handler.on_handled.append(after)
 
         def give_up():
