@@ -40,7 +40,8 @@ gp.Generator (8 ch, 250 Hz) -> DecisionSink (gp.INode, g.Pype worker thread)
 - **Drop stale decisions before the adapter.** Each sequence gets an ID. A decision whose ID isn't the pending sequence is dropped (`decoder.dropped`), so a late result can't be stamped with the next round's ID. `adapter.select_captured()` alone doesn't protect against this, because it uses the most recent arm.
 - **Picks:** `--picks` gives one class per round. With no picks queued, a sequence waits for `set_next(cls)` (Ctrl+1 / Ctrl+2 in `--ui`). In flash mode, a keyed pick still waits for the flashes to end. Class 2 in a Confirm round means Cancel.
 - **Pick alignment:**
-  - If the judge cancels or the headset disconnects before a decision, the pick goes back to the front of the queue, because the same step comes again.
+  - The next round after any clear (cancel, Esc, timeout, disconnect) is a Choose round. If a Choose round is cleared before its decision, its pick goes back.
+  - If a Confirm round is cleared, the whole pair replays: the choose pick that made the preview, then the unused confirm pick. A scripted Cancel (class 2) replays nothing.
   - If another input (keys 1/2) uses the round, that round's pick is dropped, so the next round still gets its own pick.
 - **Headless runner:**
   - It reopens the question while picks remain and exits 0 when they are spent.
