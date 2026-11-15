@@ -411,3 +411,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - When the app closes, it writes a short report to `logs/session-<time>.md`: commit, input, counts of previews, confirms, and cancels, the response times, and a timeline. It never contains EEG or keys. `--no-report` turns it off
 - The report is ready to paste into the rehearsal log, so every practice run leaves evidence behind
 - Found and fixed two bugs while testing: the map time got overwritten in the strip, and closing the app could raise an error from the sound player. Tests use a fake clock. Not yet measured on the judging laptop
+
+## 11/14/26 - 9:33 PM - MagicJester2764 - #105 Devpost draft text, fact-checked (PR pending)
+- The whole Devpost entry is ready to paste: tonight's steps, the story sections, Built with, the track, and the AI answer
+    - In `docs/demo-submission/submission-checklist.md`. A person still has to submit it on Devpost and in the event app before midnight
+- Every claim was checked against the code. Two were fixed: we don't have "required" CI checks (just CI on every change), and the AI-reply wording depends on whether #116 is merged when we submit
+- The text never says the headset was used on a real wearer, because it hasn't been yet
+- The status log has rows for who submitted and when
