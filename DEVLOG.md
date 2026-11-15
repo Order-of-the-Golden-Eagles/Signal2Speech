@@ -713,7 +713,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The README and the area docs now describe the judging-day build: the recorded walkthrough, the fixed layout and status pills, the June 24 to 28 image sequence, the natural voice, and a new video cut in `docs/demo-submission/shot-list.md`
 - Verified: the recorded phrase demo picked and spoke a reply on the judging laptop with stand-in replies, and calibrated with Claude as the reply source. A full run with Claude's replies being picked hasn't been watched yet
 
-## 11/15/26 - 10:08 AM - Vasanth Anbukumar - #232 One app with replies as the main screen (PR pending)
+## 11/15/26 - 10:08 AM - Vasanth Anbukumar - #232 One app with replies as the main screen ([PR #233](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/233))
 - Signal2Speech is now one app. The main screen is a question box and two replies, and the top of the window says what the app is and the three steps to use it
     - `python -m signal2speech.ai`, with `--input recorded` for g.tec's recorded brain data or `--input live` for the Unicorn headset
 - The NASA air-quality question is an example inside it: click `Example: NASA air quality`. The map takes the side panel only for that question, and the conversation is shown the rest of the time
