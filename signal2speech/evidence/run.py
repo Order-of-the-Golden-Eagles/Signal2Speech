@@ -55,7 +55,7 @@ def run(args: argparse.Namespace) -> int:
         def header(banner):
             return p300_mode.make_header(banner, box)
     elif kind_arg == "dataset":
-        graph = build_evidence_graph(kind, label=label, oscar=False, dataset=session_data)
+        graph = build_evidence_graph(kind, label=label, oscar=oscar, dataset=session_data)
     else:
         graph = build_evidence_graph(kind, label=label, oscar=oscar)
     graph.detail = detail

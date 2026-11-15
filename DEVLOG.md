@@ -558,6 +558,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - You have to say what is sending the signal (`--pieeg live`, `simulated` or `recorded`), because the stream itself can't prove it, so a simulator can never show up as Live EEG
 - The bottom strip names both inputs, for example "Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)"
 - Verified on our simulated 16-pin stream, end to end in the app and in `tests/test_app_pieeg.py`. Not yet tried with a real board on a person, which is the library session (step 7 in the hardware doc)
+
 ## 11/15/26 - 12:32 AM - Long Le - #175 Preview screen with a confirm ring ([PR #189](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/189))
 - The "Say this?" screen now shows what will happen ("This will be said aloud" or "This will show the map and say"), the exact words as a big quotation, and a ring that fills toward the confirm
 - Nothing is spoken until the ring is full. On the keyboard, hold 1 for 2 seconds (a tap no longer confirms). With EEG, the ring follows the eye-closure signal and empties if the eyes open early. After confirming, a "✓ Spoken" state shows until the next question
@@ -570,6 +571,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why it wasn't noticed: the judging laptop uses the main voice (Qt's Windows voice), which was never affected. Checked there: three replies in a row all spoke, each starting within a quarter of a second
 - How it was found: the voice-guided board session (#150) used the same library for its spoken cues, and the second and third cues were silent
 - Measured on the judging laptop: before the fix the backup spoke for 2.9 s, then 0.1 s and 0.1 s. After it: 2.7 s, 2.3 s, 2.2 s. A new test checks there is one helper per reply
+
 ## 11/15/26 - 1:15 AM - Long Le - #176 #177 Readable conversation and sound cues ([PR #192](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/192))
 - The panel under the map now reads like a conversation: Options (and where they came from), Previewed, Said aloud or Showed the map and said, or Nothing was said, each with the input that caused it
     - Press `F2` to swap to the developer log; the session report in `logs/` keeps both
@@ -587,6 +589,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `P` (or `--practice`) runs a 30 s "look at tile 1 and count its flashes" warm-up that never sends anything
 - Holding `H` for 2 s says "I need help, please." from any screen, at most once every 10 s, without touching the current question. `--help-by-eyes` adds a long eye closure as a trigger, off by default.
 - Verified with the keyboard and the simulated input in 27 new headless tests (no false help triggers in 400 random key taps; attract stops with no leftover speech; practice uses no simulated picks). Not yet tried: the Spanish voice on Windows, the eye-closure help trigger on the headset, and practice feeding live calibration (needs #23).
+
 ## 11/15/26 - 1:53 AM - Vasanth Anbukumar - #199 The board session's spoken cues work off Windows too ([PR #202](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/202))
 - On macOS or Linux, the voice-guided board session (`python -m signal2speech.eeg.board_session`) would have spoken its first instruction and gone silent for the rest. It now speaks every cue
     - Same cause and same fix as the app's backup voice: each cue is spoken from its own short-lived helper process
@@ -600,6 +603,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Nothing is drawn by hand. Each diagram is built by the same code the app uses, then read back from g.Pype's own record of nodes and connections. A test fails if someone changes a pipeline and forgets `--write`
 - The AI assistant's `pipeline_graph` tool (#110) now returns the same drawing
 - Checked offline with no headset: the live diagrams build the Unicorn's graph without opening the device. GitHub renders Mermaid, but I haven't looked at it on the rendered page yet
+
 ## 11/15/26 - 2:27 AM - Vasanth Anbukumar - #204 The app window now fits the judging laptop's screen ([PR #205](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/205))
 - The app used to open at a fixed 1700 × 900 and hang off the right and bottom of the judging laptop's screen. It now opens inside whatever screen it's on
     - The laptop is 1920 × 1080 at 125 % scaling, which leaves only 1536 × 864 for windows
@@ -645,6 +649,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - It goes through the same crash-safe launcher we'll use at the table, and kills the app once on purpose to prove it comes back
 - First full run (simulated input, dev machine, muted) passed: 169 confirms and 169 spoken lines with 0 doubles, 0 crashes, back within 1.1 s after the kill, selection time 3.1 s at the start and 3.2 s at the end
 - Still needed: the same hour on the judging laptop with Wi-Fi off and sound on (Part D of the judging laptop session). This was not live EEG
+## 11/15/26 - 4:25 AM - MagicJester2764 - #164 OSCAR shown and measured on g.tec's recorded EEG ([PR #212](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/212))
+- Judges can now see g.tec's OSCAR artifact removal working on real human EEG, before and after side by side, even without our headset
+    - `python -m signal2speech.evidence --source dataset path/to/p300-speller/S1.mat`, and the numbers with `python -m signal2speech.evidence.oscar_report path/to/p300-speller --jobs 5`
+- On all five of g.tec's recorded subjects, the biggest blink and movement swings got 14–65% smaller, while the rest of the signal barely changed. Classification stayed the same or improved (one subject went from 0.72 to 0.81)
+- We found that OSCAR delays the signal by about a third of a second and g.Pype doesn't shift the flash markers to match. Ignoring that costs up to 0.14 accuracy, so the docs say how to handle it, and the headset session should check it on the live path
+- Measured on g.tec's recordings replayed through g.Pype (Recorded, not our wearer, not live). The g.tec data stays out of git
+
 ## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
 - With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
     - Each tile flash is answered with one real recorded brain response. The same g.Pype pipeline and classifier as the live path calibrate on them and pick the tile
