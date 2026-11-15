@@ -18,6 +18,7 @@ Dependencies still missing on main are labelled, never faked:
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 import time
 from pathlib import Path
@@ -236,8 +237,11 @@ class App:
         self._confirm_timer = QTimer(singleShot=True, interval=max(1, confirm_timeout_ms))
         self._confirm_timer.timeout.connect(lambda: h.cancel("timeout"))
         h.on_round_opened.append(self._arm_confirm_timeout)
-        h.on_cleared.append(lambda _r: self._confirm_timer.stop())
-        h.on_handled.append(lambda _e, o: self._confirm_timer.stop() if o is Outcome.Confirmed else None)
+        h.on_cleared.append(lambda _r: self._stop_confirm_timeout())
+        h.on_handled.append(lambda _e, o: self._stop_confirm_timeout() if o is Outcome.Confirmed else None)
+        # The visible countdown reads the same timer, so it can't disagree with the cancel (#96).
+        self._countdown = QTimer(interval=250)
+        self._countdown.timeout.connect(self._tick_countdown)
 
         # Rule 4: the app opens the next question after a cancel, disconnect, or confirm.
         # A map reveal stays up longer (reveal_ms) so the audience can read it.
@@ -325,11 +329,28 @@ class App:
         self._row.setStretch(0, 1 if on else 3)
         self._row.setStretch(1, 3 if on else 2)
 
+    def _stop_confirm_timeout(self) -> None:
+        self._confirm_timer.stop()
+        self._countdown.stop()
+        self.window.set_countdown(None)
+
+    def _tick_countdown(self) -> None:
+        if not self._confirm_timer.isActive():
+            self._countdown.stop()
+            self.window.set_countdown(None)
+            return
+        # Coarse timers can report a few ms more than the interval right after start; never
+        # show more seconds than the timeout itself.
+        left_ms = min(self._confirm_timer.remainingTime(), self.confirm_timeout_ms)
+        self.window.set_countdown(math.ceil(left_ms / 1000))
+
     def _arm_confirm_timeout(self, rnd: Round) -> None:
         if rnd.kind is RoundKind.CONFIRM and self.confirm_timeout_ms > 0:
             self._confirm_timer.start()
+            self._countdown.start()
+            self._tick_countdown()
         else:
-            self._confirm_timer.stop()
+            self._stop_confirm_timeout()
 
     def _log_round(self, rnd: Round) -> None:
         labels = ", ".join(f"{c.target_id}={c.label}" for c in rnd.choices)

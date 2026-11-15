@@ -253,3 +253,48 @@ def test_main_fullscreen_flag(qapp, tmp_path):
     out = tmp_path / "full.png"
     assert main(["--fullscreen", "--keys", "2,1", "--mute", "--screenshot", str(out)]) == 0
     assert out.stat().st_size > 0
+
+
+# ── #96: Confirm countdown on the preview ────────────────────
+def _countdown(app):
+    c = app.window.countdown
+    return c.text() if c.isVisibleTo(app.window) else None
+
+
+def test_countdown_shows_on_preview_and_clears_on_confirm(qapp):
+    app = App(view=FakeView(), speaker=FakeSpeaker(), echo=False, confirm_timeout_ms=15000)
+    app.ask()
+    assert _countdown(app) is None                              # choose round: no countdown
+    app.window.press_target(T2)
+    assert _countdown(app) == "No answer cancels in 15 s"
+    app.window.press_target(T1)
+    assert _countdown(app) is None and not app._countdown.isActive()
+
+
+@pytest.mark.parametrize("stop", ["key2", "esc", "disconnect"])
+def test_countdown_clears_on_cancel_paths(qapp, stop):
+    app = App(view=FakeView(), speaker=FakeSpeaker(), echo=False, confirm_timeout_ms=15000)
+    app.ask()
+    app.window.press_target(T2)
+    {"key2": lambda: app.window.press_target(T2), "esc": app.window.press_cancel,
+     "disconnect": app.handler.disconnect}[stop]()
+    assert _countdown(app) is None and not app._countdown.isActive()
+
+
+def test_countdown_ticks_down_and_timeout_cancels(qapp):
+    app = App(view=FakeView(), speaker=FakeSpeaker(), echo=False, confirm_timeout_ms=2500,
+              reopen_ms=60000)
+    app.ask()
+    app.window.press_target(T2)
+    assert _countdown(app) == "No answer cancels in 3 s"
+    pump(qapp, lambda: _countdown(app) == "No answer cancels in 2 s", timeout=2.0)
+    assert _countdown(app) == "No answer cancels in 2 s"
+    pump(qapp, lambda: app.handler.current is None, timeout=3.0)  # the timeout fires
+    assert _countdown(app) is None
+
+
+def test_no_countdown_when_timeout_is_off(qapp):
+    app = App(view=FakeView(), speaker=FakeSpeaker(), echo=False, confirm_timeout_ms=0)
+    app.ask()
+    app.window.press_target(T2)
+    assert _countdown(app) is None

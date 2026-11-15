@@ -327,3 +327,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Before, every model answered "Wayne" to "Which county's AQI rose more?". That was wrong: Washtenaw rose 186 points and Wayne rose 168. Claude now offers the Compare counties map action for it
 - A reply can now be a map action (compare counties or show the satellite view). The spoken line for those comes from the dataset and the demo contract, never from Claude's words, so the numbers always match the map
 - Checked with real calls: the AQI question, "Do you want water or juice?", and a question the data can't answer, which got an honest "I don't know". All 247 tests pass
+## 11/14/26 - 7:44 PM - Long Le - #96 Confirm countdown on the preview ([PR #114](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/114))
+- The "Say this?" screen now shows how long is left before an unanswered preview cancels itself: "No answer cancels in 15 s"
+- It counts down from the same timer that does the cancelling (#26), so the number on screen always matches what happens
+- It disappears on confirm, cancel, disconnect, or the next question, and never appears with `--confirm-timeout 0`. Tests cover each case, including a real 2.5 s countdown that ends in the cancel. Fits 1280×720

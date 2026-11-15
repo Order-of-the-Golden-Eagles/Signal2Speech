@@ -31,6 +31,7 @@ QLabel { color: #f5f7fa; }
 QLabel#prompt { font-size: 32px; font-weight: 600; color: #cbd5e1; }
 QLabel#preview { font-size: 44px; font-weight: 700; color: #ffe066; padding: 16px; }
 QLabel#hint { font-size: 24px; color: #cbd5e1; }
+QLabel#countdown { font-size: 22px; color: #94a3b8; }
 QFrame#strip { background: #151a21; border-top: 2px solid #2a3340; }
 QLabel.strip { font-size: 20px; font-family: Menlo, Consolas, monospace; color: #e2e8f0; }
 """
@@ -128,6 +129,11 @@ class SelectionWindow(QMainWindow):
         self.preview.setVisible(False)
         col.addWidget(self.prompt)
         col.addWidget(self.preview)
+        # Seconds left before an unanswered Confirm round cancels (#26, #96). App drives it.
+        self.countdown = QLabel("", objectName="countdown")
+        self.countdown.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.countdown.setVisible(False)
+        col.addWidget(self.countdown)
 
         row = QHBoxLayout()
         row.setSpacing(32)
@@ -235,6 +241,7 @@ class SelectionWindow(QMainWindow):
         else:
             self._preview = None
             self.prompt.setText("Choose a reply")
+            self.set_countdown(None)
             self.preview.setVisible(False)
             self.hint.setText("Look at a tile, or press 1 or 2   ·   Esc clears")
             if self.flash_enabled:
@@ -246,6 +253,7 @@ class SelectionWindow(QMainWindow):
         self._preview = choice
 
     def reset(self, reason: str = "") -> None:
+        self.set_countdown(None)
         self.flasher.stop()
         self._preview = None
         for tile in self.tiles.values():
@@ -268,6 +276,15 @@ class SelectionWindow(QMainWindow):
 
     # ── Helpers ──────────────────────────────────────────────
     PREVIEW_MAX_PX = 44
+
+    def set_countdown(self, seconds) -> None:
+        """Show "Cancels in N s" under the preview, or hide it with None."""
+        if seconds is None:
+            self.countdown.setVisible(False)
+            self.countdown.setText("")
+            return
+        self.countdown.setText(f"No answer cancels in {int(seconds)} s")
+        self.countdown.setVisible(True)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
