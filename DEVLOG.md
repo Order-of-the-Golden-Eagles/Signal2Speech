@@ -384,3 +384,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - New `--show` flag: `python -m signal2speech.eeg.live --source generator --show` opens the same window and cues on simulated data, so judges can watch the flow without hardware. `--no-voice` keeps the banner but mutes speech
 - Tiles now read "Tile 1" and "Tile 2" instead of internal IDs
 - Only prompts and the window changed; the EEG decoding and safety rules are the same. Checked with a simulated run (2/2 correct, 0 false confirms) and the fast EEG tests (50 passed). Whether the voice is audible was checked by ear on the judging laptop
+
+## 11/14/26 - 8:51 PM - Long Le - #5 Live AI replies verified in the app ([PR #137](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/137))
+- A typed question now gets real Claude replies in the AI demo window in about 2 seconds, and the confirmed reply is spoken once
+    - `python -m signal2speech.ai`, with `ANTHROPIC_API_KEY` in `.env`
+- Found a demo risk: without #116's grounding, Claude answered the AQI question wrongly ("Wayne"), when Washtenaw rose more. Don't ask data questions in the AI demo until #116 merges
+- Verified with keyboard input on a Mac, with a fresh question and the demo question. Not yet tried on the judging laptop
