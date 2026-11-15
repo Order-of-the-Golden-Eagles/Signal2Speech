@@ -113,7 +113,7 @@ def placeholder_model() -> p300.P300Model:
 
 def build_live_graph(handler, source: str, input_source: str, *,
                      placeholder: Optional[p300.P300Model] = None, enable_oscar: bool = True,
-                     recorded: Optional[p300.RecordedResponses] = None):
+                     recorded: Optional[p300.RecordedResponses] = None, eye_mode: str = "alpha"):
     """Build (don't start) what ``--input live`` runs (#103): ``(P300Nodes, AlphaConfirm, bursts)``.
 
     Live, the alpha switch hangs off the P300 chooser's HybridBlack pipeline, because the Unicorn
@@ -131,7 +131,7 @@ def build_live_graph(handler, source: str, input_source: str, *,
         confirm = InputSources.SIMULATED if source == "recorded" else input_source
         return nodes, am.AlphaConfirm(handler, input_source=confirm, bursts=bursts), bursts
     return nodes, am.AlphaConfirm(handler, input_source=input_source, pipeline=nodes.pipeline,
-                                  upstream=nodes.eeg), None
+                                  upstream=nodes.eeg, mode=eye_mode), None
 
 
 class SimulatedEyes:
@@ -184,7 +184,7 @@ class LiveEegInput:
                  soa_s: float = p300.SOA_S, calibration_sequences: int = 10,
                  alpha_calib_s: float = 10.0, arm_live_confirm: bool = False,
                  placeholder: Optional[p300.P300Model] = None, open_timeout_s: float = 20.0,
-                 recorded: Optional[p300.RecordedResponses] = None):
+                 recorded: Optional[p300.RecordedResponses] = None, eye_mode: str = "alpha"):
         if source not in ("hybridblack", "unicorn-lsl", "generator", "recorded"):
             raise ValueError("source is hybridblack, unicorn-lsl, generator or recorded")
         script = [int(s) for s in script]
@@ -196,6 +196,9 @@ class LiveEegInput:
         self.simulated = source in ("generator", "recorded")
         self.enable_oscar = enable_oscar
         self.via_suite = source == "unicorn-lsl"
+        # The quiet switch only makes sense on a real headset: simulated eyes make alpha bursts.
+        eye_mode = eye_mode if source in ("hybridblack", "unicorn-lsl") else "alpha"
+        self.eye_mode = eye_mode
         self.input_source = (InputSources.RECORDED if self.recorded else
                              InputSources.SIMULATED if self.simulated else InputSources.LIVE_EEG)
         self.script = deque(script)
@@ -227,7 +230,7 @@ class LiveEegInput:
 
         self.nodes, self.alpha, self.bursts = build_live_graph(
             handler, source, self.input_source, placeholder=placeholder, enable_oscar=enable_oscar,
-            recorded=recorded)
+            recorded=recorded, eye_mode=eye_mode)
         # A display-only tap on the filtered EEG, for the app's small "Brain Activity" graph. It
         # reads the same 1-30 Hz signal the chooser cuts its epochs from and changes nothing.
         self.trace_tap = am._Tap(name="brain_activity_display")
@@ -268,6 +271,8 @@ class LiveEegInput:
                  "g.Pype Generator + synthetic P300 · alpha bursts" if self.simulated else
                  "Unicorn Hybrid Black via Unicorn Suite (Unicorn Recorder, LSL)" if self.via_suite else
                  f"Unicorn Hybrid Black · {'OSCAR on' if self.enable_oscar else 'OSCAR off'}"]
+        if not self.simulated and self.eye_mode == "quiet":
+            parts.append("eye switch: signal quiets when the eyes close")
         if self.p300_ok is False:
             parts.append("P300 off (calibration failed)")
         if self.alpha_ok is False:

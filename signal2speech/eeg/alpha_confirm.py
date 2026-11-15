@@ -200,6 +200,22 @@ class Calibration:
 
 
 # ── Decoder ──────────────────────────────────────────────────
+class Quietness(gp.IONode):
+    """Turns band power into "how quiet": 1000 / power. With this, a quieter signal is a higher
+    value, so the same calibration and Threshold (which fire on a rise) work for a drop."""
+
+    def step(self, data):
+        x = np.asarray(data[PORT_IN], dtype=float)
+        return {PORT_OUT: (1000.0 / (np.abs(x) + 1e-9)).astype(data[PORT_IN].dtype)}
+
+
+#: Eye-switch modes. ``alpha``: eyes closed raise the 8-13 Hz rhythm at the back of the head
+#: (textbook; what simulated and recorded runs use). ``quiet``: eyes closed make the whole signal
+#: quieter, because blinks and eye movements stop (what the judging-day headset showed: wavy
+#: with blinks, flatter with the eyes shut). ``quiet`` measures eye activity, not a brain rhythm.
+EYE_MODES = ("alpha", "quiet")
+
+
 class AlphaConfirm(QObject):
     """Alpha-switch confirm for the selection handler. Create and use it on the Qt main thread.
 
@@ -218,8 +234,13 @@ class AlphaConfirm(QObject):
                  source=None, pipeline=None, upstream=None, bursts: Optional[AlphaBursts] = None,
                  dwell_s: float = 1.0, settle_s: float = 1.0, auto: bool = True,
                  channels=OCCIPITAL, sampling_rate: float = SAMPLING_RATE,
-                 parent: Optional[QObject] = None):
+                 mode: str = "alpha", parent: Optional[QObject] = None):
         super().__init__(parent)
+        if mode not in EYE_MODES:
+            raise ValueError(f"mode is one of {EYE_MODES}")
+        self.mode = mode
+        #: How far apart eyes open and eyes closed must be for the switch to be trusted.
+        self.min_ratio = 2.0 if mode == "alpha" else 1.5
         if input_source == InputSources.KEYBOARD:
             raise ValueError("alpha confirm is EEG input: simulated, recorded, or live-eeg")
         self.handler = handler
@@ -261,17 +282,28 @@ class AlphaConfirm(QObject):
             raise ValueError("pass upstream= (a node in that pipeline) along with pipeline=")
         self.pipeline = pipeline
 
+        if mode == "quiet":
+            channels = range(8)                  # blinks and eye movements show on every channel
         select = gp.ChannelSelector(indices=list(channels))
         fft = gp.FFT(window_size=self.fft_window, overlap=FFT_OVERLAP)
-        power = gp.BandPower(bands=["alpha"])
-        mean = ChannelMean(expect_rate=self.frame_rate)
+        power = gp.BandPower(bands=["alpha"] if mode == "alpha" else [[1.0, 30.0]])
+        mean = ChannelMean(label="occipital:alpha" if mode == "alpha" else "all:quiet",
+                           expect_rate=self.frame_rate)
+        if mode == "quiet":
+            quiet = Quietness()
+            mean_out = quiet
+        else:
+            mean_out = mean
         self.threshold = gp.Threshold(level=UNCALIBRATED_LEVEL, release=UNCALIBRATED_LEVEL,
                                       dwell=self.dwell)
         self._power_tap, self._state_tap = _Tap(name="alpha_power"), _Tap(name="alpha_state")
         self._power_tap.on_rows = self._on_power_rows
         self._state_tap.on_rows = self._on_state_rows
-        for a, b in ((upstream, select), (select, fft), (fft, power), (power, mean),
-                     (mean, self._power_tap), (mean, self.threshold),
+        links = [(upstream, select), (select, fft), (fft, power), (power, mean)]
+        if mean_out is not mean:
+            links.append((mean, mean_out))
+        for a, b in (*links,
+                     (mean_out, self._power_tap), (mean_out, self.threshold),
                      (self.threshold, self._state_tap)):
             pipeline.connect(a, b)
 
@@ -363,8 +395,9 @@ class AlphaConfirm(QObject):
         self._note("calibrated", asdict(cal))
         return cal
 
-    def calibrate(self, open_values, closed_values, min_ratio: float = 2.0) -> Calibration:
-        return self.apply(Calibration.from_samples(open_values, closed_values, min_ratio))
+    def calibrate(self, open_values, closed_values, min_ratio: Optional[float] = None) -> Calibration:
+        ratio = self.min_ratio if min_ratio is None else min_ratio
+        return self.apply(Calibration.from_samples(open_values, closed_values, ratio))
 
     # ── Arming (main thread) ─────────────────────────────────
     @property

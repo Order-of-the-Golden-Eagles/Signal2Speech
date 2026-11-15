@@ -463,6 +463,10 @@ def main(argv=None) -> int:
                    help="live: the Unicorn Hybrid Black headset chooses (P300); see --arm-live-confirm")
     p.add_argument("--p300", action="store_true",
                    help="with --input simulated: rehearse the headset path on simulated signals")
+    p.add_argument("--eye-switch", choices=["quiet", "alpha"], default="quiet",
+                   help="headset: how a closed-eyes confirm is detected. quiet (default): the signal "
+                        "goes flatter when the eyes close, as blinks and eye movements stop. alpha: "
+                        "the 8-13 Hz rhythm at the back of the head rises")
     p.add_argument("--via-suite", action="store_true",
                    help="live: read the headset from Unicorn Suite's Unicorn Recorder over LSL (start its "
                         "LSL output first) instead of opening it directly")
@@ -523,6 +527,7 @@ def main(argv=None) -> int:
                              deadline_s=args.deadline, recording=recording,
                              p300=args.p300, arm_live_confirm=args.arm_live_confirm,
                              live_options={"calibration_sequences": args.calibration,
+                                           "eye_mode": args.eye_switch,
                                            **({"source": "unicorn-lsl"} if args.via_suite else {})})
     except Exception as err:
         if not eeg_path:
