@@ -336,3 +336,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The "Say this?" screen now shows how long is left before an unanswered preview cancels itself: "No answer cancels in 15 s"
 - It counts down from the same timer that does the cancelling (#26), so the number on screen always matches what happens
 - It disappears on confirm, cancel, disconnect, or the next question, and never appears with `--confirm-timeout 0`. Tests cover each case, including a real 2.5 s countdown that ends in the cancel. Fits 1280×720
+
+## 11/14/26 - 8:07 PM - Long Le - #5 AI demo shows the map for map suggestions (PR pending)
+- When Claude suggests a map answer (from #106), the AI demo window now shows the map and speaks the line once, just like the main app
+- Why: the AI demo had no map on purpose, because replies used to be spoken words only. With #106, picking "Compare counties (shows the map)" would have spoken the line but shown nothing, and logged a BUG line
+- Checked with a test that confirms a map suggestion: the map changes once and the line is spoken once, with nothing during the preview. Not yet run with a real Claude key in the window
