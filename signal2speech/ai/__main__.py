@@ -81,7 +81,7 @@ class AnsweringDemo:
         self.panel.ask_requested.connect(self.ask)
         self.panel.alternatives_requested.connect(self.alternatives)
         self.panel.saved_requested.connect(self.saved)
-        self.panel.nasa_requested.connect(self.nasa)
+        self.panel.nasa_requested.connect(lambda: self.back() if self._map_on else self.nasa())
         self.app.handler.on_round_opened.append(self._fit_side_panel)
         self.app.on_text_scale.append(self._style_banner)
         self._map_on = True
@@ -173,6 +173,10 @@ class AnsweringDemo:
         # With the map up, the chosen words are already on the left; the map gets the height.
         conv.setVisible(not on and not app.transcript_view.isVisibleTo(app.root))
         self.banner.setVisible(not on)        # the NASA screens need the banner's height too
+        # The same button leads into the example and back out of it.
+        self.panel.nasa_btn.setText("←  Back to the main screen" if on else "Example: NASA air quality")
+        self.panel.nasa_btn.setStyleSheet(
+            f"background:{T.ACCENT};color:{T.ON_ACCENT};font-weight:700;" if on else "")
         if on and isinstance(app.view, QWidget):
             app.view.setVisible(True)
         if on:
@@ -201,6 +205,13 @@ class AnsweringDemo:
             self.app.sim.script.clear()
             self.app.sim.script.extend([self.next_pick, 1])
             self.next_pick = 2 if self.next_pick == 1 else 1
+
+    def back(self) -> None:
+        """Leave the NASA example: the main screen again, with the saved phrases on the cards."""
+        self.app.log("judge: back to the main screen")
+        self.question = ""
+        self.panel.question.clear()
+        self._show(self.suggester.saved.current("back from the NASA example"))
 
     def nasa(self) -> None:
         """Ask the built-in NASA question: the same two map choices as the stand-alone demo."""

@@ -415,7 +415,9 @@ def test_one_app_chat_first_with_the_nasa_example_inside(qapp):
         assert demo.app.view.isVisibleTo(demo.root) and not demo.banner.isVisibleTo(demo.root)
         assert demo.app.conversation.entries[-2] == ("question", NASA_QUESTION, None)
         assert demo.panel.question.text() == NASA_QUESTION    # prefilled in the question box
-        demo.saved()                                          # back to replies: the conversation returns
+        assert "Back" in demo.panel.nasa_btn.text()
+        demo.panel.nasa_btn.click()                           # the same button leads back
+        assert "NASA" in demo.panel.nasa_btn.text() and demo.panel.question.text() == ""
         assert not demo.app.view.isVisibleTo(demo.root) and demo.banner.isVisibleTo(demo.root)
     finally:
         demo.app.close()
