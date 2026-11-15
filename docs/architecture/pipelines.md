@@ -60,9 +60,9 @@ flowchart LR
 ```mermaid
 flowchart LR
     n1(["eeg: HybridBlack<br/><small>250 Hz, 8 EEG channels, OSCAR off</small>"])
-    n2[["Bandpass<br/><small>1–30 Hz</small>"]]
+    n2["Bandpass<br/><small>1–30 Hz</small>"]
     n3["oscar: Oscar<br/><small>artifact removal</small>"]
-    n4["Bandpass<br/><small>1–30 Hz</small>"]
+    n4[["Bandpass<br/><small>1–30 Hz</small>"]]
     n5[["fft: FFT<br/><small>250 samples, 50% overlap</small>"]]
     n6["target_trigger: Trigger<br/><small>100 ms before to 700 ms after code 101</small>"]
     n7(["flashes: Marker"])
@@ -82,11 +82,11 @@ flowchart LR
     n1 --> n2
     n1 --> n3
     n1 --> n5
+    n2 --> n6
+    n2 --> n10
+    n2 --> n13
+    n2 --> n16
     n3 --> n4
-    n4 --> n6
-    n4 --> n10
-    n4 --> n13
-    n4 --> n16
     n6 --> n8
     n6 --> n19
     n7 -->|trigger| n6
