@@ -378,6 +378,8 @@ class Options:
     confirm: str = "auto"               # auto | alpha | keyboard
     seed: int = 0
     logs_dir: str = "logs"
+    show: bool = False                  # tile window + on-screen/spoken cues in simulated mode too
+    voice: bool = True                  # speak wearer cues (offline OS voice)
 
 
 class LiveHarness:
@@ -409,6 +411,30 @@ class LiveHarness:
     # ── plumbing ──
     def say(self, text: str) -> None:
         self.console.say(f"[live:{self.label}] {text}")
+
+    def cue(self, text: str, spoken: Optional[str] = None) -> None:
+        """Wearer instruction: banner on the tile window and, if enabled, spoken aloud."""
+        if self.tiles is not None:
+            self.tiles.set_message(text)
+        voice = getattr(self, "voice", None)
+        if voice is not None:
+            try:
+                voice.say(spoken or text)
+            except Exception:
+                pass
+        if self.app is not None:
+            self.app.processEvents()
+
+    @staticmethod
+    def _spoken_alpha(text: str) -> str:
+        t = text.lower()
+        if "close" in t:
+            return "Close your eyes."
+        if "rest" in t:
+            return "Keep your eyes open and relax."
+        if "open" in t:
+            return "Open your eyes."
+        return text
 
     @property
     def oscar(self) -> str:
@@ -490,8 +516,14 @@ class LiveHarness:
         self.chooser.bridge.listeners.append(self._on_p300)
         if self.alpha_mod is not None:
             self.alpha = self._build_alpha()
-        if not self.simulated:
+        if not self.simulated or self.opts.show:
             self.tiles = p300._TestTiles()
+            if self.opts.voice:
+                try:
+                    from signal2speech.speech.speaker import OfflineSpeaker
+                    self.voice = OfflineSpeaker(lambda _msg: None, use_qt_tts=True)
+                except Exception as err:   # no voice is fine: the banner still shows every cue
+                    self.say(f"(Spoken cues unavailable: {type(err).__name__}: {err})")
 
     def _build_alpha(self):
         """AlphaConfirm (#47). Live: hang its branch off the shared headset pipeline.
@@ -535,6 +567,8 @@ class LiveHarness:
         self.step(2, f"checking the signal for {self.opts.quality_s:g} seconds ({self.oscar})")
         if not self.simulated:
             self.say("WEARER: sit still with your eyes open. Relax your face and jaw, and don't talk.")
+        self.cue("Sit still with your eyes open. Relax your face and jaw.",
+                 "Sit still with your eyes open, and relax your jaw.")
         with self._ring_lock:
             self._ring.clear()
         self.pump(self.opts.quality_s)
@@ -571,6 +605,8 @@ class LiveHarness:
         self.step(3, f"learning how your brain reacts to the flashes ({self.opts.calibration} rounds)")
         if not self.simulated:
             self.say("WEARER: look at the tile with the YELLOW border. Every time it flashes, count it silently in your head. Ignore the other tile.")
+        self.cue("Look at the tile with the YELLOW border.\nCount its flashes silently.",
+                 "Look at the tile with the yellow border, and count its flashes.")
         t0 = time.monotonic()
         tiles = list(p300.FLASH_CODES)
         for i in range(self.opts.calibration):
@@ -605,8 +641,15 @@ class LiveHarness:
             return True
         self.step(4, f"learning your eyes-closed YES signal ({self.opts.alpha_calib_s:g} s eyes open, "
                      f"{self.opts.alpha_calib_s:g} s closed, {self.opts.alpha_rest_s:g} s rest)")
-        report = self.alpha_mod.measure(self.alpha, self.opts.alpha_calib_s,
-                                        self.opts.alpha_rest_s, closures=2)
+        _orig_prompt = getattr(self.alpha_mod, '_prompt', None)
+        if _orig_prompt is not None:
+            self.alpha_mod._prompt = lambda t: (_orig_prompt(t), self.cue(t, self._spoken_alpha(t)))
+        try:
+            report = self.alpha_mod.measure(self.alpha, self.opts.alpha_calib_s,
+            self.opts.alpha_rest_s, closures=2)
+        finally:
+            if _orig_prompt is not None:
+                self.alpha_mod._prompt = _orig_prompt
         self.log.write("confirm_calibration", method="alpha", report=_scalars(report))
         if "error" in report:
             self.say(f"Couldn't learn the eyes-closed signal ({report['error']}). Re-run with --confirm keyboard to say yes with a key instead.")
@@ -642,6 +685,8 @@ class LiveHarness:
         from signal2speech.eeg import p300
         if not self.simulated:
             self.say(f"Try {a.index} of {self.opts.attempts}: WEARER, look at {a.intended.replace('target-', 'tile ')} (the one with the YELLOW border) and count its flashes.")
+            self.cue(f"Try {a.index} of {self.opts.attempts}: look at the YELLOW tile and count its flashes.",
+                     f"Try {a.index}. Look at the yellow tile.")
         t0 = time.monotonic()
         self.handler.begin_choice_round(list(CHOICES))
         outcomes_before = len(self.chooser.bridge.outcomes)
@@ -686,6 +731,8 @@ class LiveHarness:
         bursts = getattr(self.alpha, "bursts", None)
         if not self.simulated:
             self.say("  Is that the tile you looked at? If YES, close your eyes for about 2 seconds. If NO, keep your eyes open.")
+            self.cue(f"The app picked {str(a.decoded).replace('target-', 'Tile ')}.\nRight? Close your eyes 2 seconds for YES. Keep them open for NO.",
+                     f"The app picked {str(a.decoded).replace('target-', 'tile ')}. If that's right, close your eyes.")
         elif bursts is not None:
             self.pump(self.alpha.settle_s + 0.3)   # eyes open after arming, as a wearer would
             if intend:
@@ -699,6 +746,8 @@ class LiveHarness:
         if self.simulated:
             self.keyboard.select_now(TargetIds.TARGET_1 if intend else TargetIds.TARGET_2)
             return
+        self.cue(f"The app picked {str(a.decoded).replace('target-', 'Tile ')}. Right? Press y then Enter for YES, Enter for NO.",
+                 f"The app picked {str(a.decoded).replace('target-', 'tile ')}. Is that right?")
         ans = self.console.ask(f"  The app picked {str(a.decoded).replace('target-', 'tile ')}. Is that right? Type y and press Enter for YES, or just press Enter for NO.", "")
         self.pump(0.05)
         self.keyboard.select_now(TargetIds.TARGET_1 if ans.lower().startswith("y")
@@ -707,6 +756,7 @@ class LiveHarness:
     # ── step 6 ──
     def finish(self) -> ArmingDecision:
         self.step(6, "summary")
+        self.cue("Done. Thank you! You can relax.", "Done. Thank you.")
         summary = self.stats.summary()
         decision = decide_arming(self.stats)
         self.log.write("summary", **summary, arming_safe=decision.safe,
@@ -816,12 +866,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--no-oscar", action="store_true", help="HybridBlack without OSCAR")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--logs", default="logs", help="log directory (gitignored)")
+    ap.add_argument("--show", action="store_true",
+                    help="show the tile window and on-screen/spoken cues in a simulated run too")
+    ap.add_argument("--no-voice", action="store_true", help="banner cues only, no speech")
     args = ap.parse_args(argv)
     opts = Options(source=args.source, attempts=args.attempts, quality_s=args.quality_s,
                    calibration=args.calibration, flashes=args.flashes, soa=args.soa,
                    confirm_timeout_s=args.confirm_timeout, alpha_calib_s=args.alpha_calib_s,
                    alpha_rest_s=args.alpha_rest_s, enable_oscar=not args.no_oscar,
-                   confirm=args.confirm, seed=args.seed, logs_dir=args.logs)
+                   confirm=args.confirm, seed=args.seed, logs_dir=args.logs,
+                   show=args.show, voice=not args.no_voice)
     harness = LiveHarness(opts)
     if args.confirm == "alpha" and harness.alpha_mod is None:
         harness.say("--confirm alpha needs signal2speech/eeg/alpha_confirm.py (#47); "
