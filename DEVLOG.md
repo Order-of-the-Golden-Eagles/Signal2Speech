@@ -397,3 +397,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - A long run of 3,000,000 operations found 0 violations. The judge Q&A now cites it
 - To prove the test isn't toothless, it also breaks the handler three ways on purpose (double output, a cancel that keeps the preview, ignored round IDs), and it catches each one
 - No product code changed. This is software evidence with keyboard and simulated input, not live-EEG accuracy
+
+## 11/14/26 - 9:20 PM - In Young Song - #138 PiEEG's simulator drives the eye-closure confirm (PR pending)
+- PiEEG's own simulated EEG now runs through our g.Pype pipeline: a keyboard preview, then PiEEG's "eyes closed" alpha burst confirms it, and the map changes and the line is spoken once
+    - `python python_quickstart.py --sim --lsl` (PiEEG's starter), then `python -m signal2speech.eeg.pieeg_lsl --demo`. Setup is in `docs/eeg-hardware/pieeg.md`
+- Why: the Mind and Machine track is led by g.tec with PiEEG, and judging runs on simulation, so this shows PiEEG's tools and g.Pype working together. It's labelled Simulated (PiEEG) everywhere
+- PiEEG's simulators have no P300, so the choice is made by keyboard here. The P300 chooser stays on `--input simulated --p300`
+- Only the stream from this laptop is used, under a name unique to it, so another team's PiEEG simulator on the venue Wi-Fi can't drive our app
+- Verified on Windows with PiEEG's real starter: 250.0 Hz, calibration ratio 26.2, one confirm and one spoken line. The new tests use a fake stream and skip without `pylsl`, which isn't in the team install yet (Vasanth's call, #19). Not tried on the judging laptop, and not in the evidence view yet
