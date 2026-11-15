@@ -423,3 +423,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - They're drawn by a script, so changing a name or a line is one command: `python docs/demo-submission/make_graphics.py`
 - The diagram shows the real path: headset → g.Pype (OSCAR) → P300 to choose and alpha to confirm → selection contract → speech and map, with keyboard and simulator input going through the same contract
 - Checked by eye at full size, and a test makes sure all three stay 1920×1080, under 500 KB, and linked from the shot list
+
+## 11/14/26 - 9:47 PM - Long Le - #134 Saved phrases you can edit (PR pending)
+- The offline saved phrases now come from `data/phrases.json`, so a user or caregiver can change them without touching code. One pair per line, and each pair is what the two tiles say
+- If the file is missing or has a mistake (a phrase too long, the same phrase twice, broken JSON), the app falls back to the built-in phrases and the transcript says exactly why
+- The file ships with the same six pairs as before, so nothing changes until someone edits it. Tests cover a good file, every kind of bad file, and no file
