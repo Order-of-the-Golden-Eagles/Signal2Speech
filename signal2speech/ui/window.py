@@ -264,6 +264,7 @@ class SelectionWindow(QMainWindow):
         # don't: a wrapping label asks for more height, and that pushed the preview screen over
         # 720 at the largest text size.
         self.prompt = WrapWhenLong("Waiting for a round", objectName="prompt")
+        self.question = ""                   # the partner's question; the app sets it (#178)
         col.addWidget(self.prompt)
         # #175: the consent screen. What will happen, the exact words, and the confirm ring.
         self.preview_box = QWidget()

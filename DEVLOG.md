@@ -638,3 +638,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The idle demo (#193) now stays off whenever a board is used, so it can't start over a wearer's 90-second eye check
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
+
+## 11/15/26 - 6:30 AM - MagicJester2764 - #178 The question and the step you're on, at a glance (PR pending)
+- A judge who walks up mid-demo now sees the partner's question in large type above the tiles, and a header with the project name and a 1-2-3-4 step bar: Choose, Preview, Confirm, Spoken
+- The steps follow the app's own events (a question opens, a preview shows, the confirm ring fills, the line is spoken), so they can't drift from what's really happening
+- In AI Answering the typed question shows instead of the demo question
+- Still fits the judging laptop's 1280 × 720 screen in every state. Checked offscreen with keyboard and simulated input; the text-size 1.6 check that fails on this Linux machine on main still fails here and passes in CI
