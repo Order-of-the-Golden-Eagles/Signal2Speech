@@ -21,7 +21,9 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 CONTRACT = ROOT / "contracts" / "demo-round.json"
 MANIFEST = HERE / "manifest.json"
-CLIPS = ("show_satellite", "compare_air_quality")
+# show_satellite was retired on 2026-11-15: its line changed when the view became a day-by-day
+# sequence, and a clip must never say different words from the ones the wearer approved.
+CLIPS = ("compare_air_quality",)
 VOICE = {"voice": "en-us", "words_per_minute": 145, "pitch": 45, "amplitude": 180}
 
 

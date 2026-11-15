@@ -117,7 +117,7 @@ def _qt_widget():
             self.label = ""
             self._timer = QTimer(self, interval=16)
             self._timer.timeout.connect(self._tick)
-            self.setFixedSize(150, 150)
+            self.setFixedSize(124, 124)
             self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
         def start_hold(self, source: str = "keyboard", seconds: float = HOLD_S) -> None:

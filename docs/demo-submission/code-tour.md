@@ -64,6 +64,8 @@ Judges may ask anyone on the team to walk through the code. This page is that wa
 
 ## 8. PiEEG's simulator
 
+**Say this only about the simulator.** On two real PiEEG boards we measured no usable EEG ([findings](../eeg-hardware/README.md#pieeg-octopus-16-on-real-people-no-usable-eeg-2026-11-15)). If a judge asks, say so: we tested it on two people, here is the data, and here is why a one-spot board with its reference 2 cm away can't see the signal.
+
 > "PiEEG's own simulator streams over Lab Streaming Layer into the same alpha confirm. The keyboard picks, and PiEEG's alpha burst confirms it."
 
 `python -m signal2speech.eeg.pieeg_lsl --demo` (#138), with PiEEG's starter `python python_quickstart.py --sim --lsl` running in another terminal. [`find_local_stream`](../../signal2speech/eeg/pieeg_lsl.py#L60) takes only this laptop's `Octopus16` stream, and [`PiEEGRelay`](../../signal2speech/eeg/pieeg_lsl.py#L77) republishes it under a unique name, so another team's simulator can't drive our app. `gp.LslReceiver` ([:109](../../signal2speech/eeg/pieeg_lsl.py#L109)) feeds it into `AlphaConfirm` ([:180](../../signal2speech/eeg/pieeg_lsl.py#L180)). PiEEG's simulators have no P300, so this path never drives the P300 chooser. It's labelled Simulated (PiEEG). The setup is in [pieeg.md](../eeg-hardware/pieeg.md).

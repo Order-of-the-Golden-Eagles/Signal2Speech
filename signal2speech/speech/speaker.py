@@ -31,7 +31,9 @@ NEURAL_WAIT_MS = 6000
 
 ROOT = Path(__file__).resolve().parents[2]
 AUDIO_DIR = ROOT / "data" / "openorbit" / "audio"
-BUNDLED_CLIPS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
+# The satellite line changed when the view became a day-by-day sequence, so its old recording
+# is retired: a clip must never say different words from the ones the wearer approved.
+BUNDLED_CLIPS = frozenset({ActionIds.COMPARE_AIR_QUALITY})
 ENGLISH_LINE = "english-line"   # clip hint: English text, use the English voice (#194)
 
 Log = Callable[[str], None]
@@ -196,18 +198,25 @@ class OfflineSpeaker(QObject):
         self._say_without_neural(made.text, clip)
 
     def _play_wav(self, wav: Path) -> None:
+        """Play a WAV on the speaker's one sound player. One player for the whole session: a new
+        QSoundEffect per line each held an audio channel that was never released, and after
+        about 35 lines Windows gave out no more. The app then went silent while still reporting
+        that it was playing."""
         from PySide6.QtMultimedia import QSoundEffect
-        self._sound = QSoundEffect(self)
-        sound = self._sound
-        if hasattr(sound, "playingChanged"):
-            def on_playing(sound=sound) -> None:
-                try:
-                    playing = sound.isPlaying()
-                except RuntimeError:          # Qt already deleted it (app quitting)
-                    return
-                if playing:
-                    self._started()
-            sound.playingChanged.connect(on_playing)
+        if self._sound is None:
+            self._sound = QSoundEffect(self)
+            sound = self._sound
+            if hasattr(sound, "playingChanged"):
+                def on_playing(sound=sound) -> None:
+                    try:
+                        playing = sound.isPlaying()
+                    except RuntimeError:          # Qt already deleted it (app quitting)
+                        return
+                    if playing:
+                        self._started()
+                sound.playingChanged.connect(on_playing)
+        else:
+            self._sound.stop()                    # a line still playing is cut off, never overlapped
         self._sound.setSource(QUrl.fromLocalFile(str(wav)))
         self._sound.play()
 
