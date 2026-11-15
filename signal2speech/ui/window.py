@@ -8,14 +8,15 @@ from __future__ import annotations
 
 from typing import Callable, Dict, Optional
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QEvent, QObject, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QKeySequence, QPainter, QPainterPath, QPen, QShortcut
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QMainWindow, QSizePolicy,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+                               QPlainTextEdit, QSizePolicy, QTextEdit, QVBoxLayout, QWidget)
 
-from signal2speech.core import (Choice, InputAdapter, InputSources, Outcome, Round, RoundKind,
+from signal2speech.core import (ActionIds, Choice, InputAdapter, InputSources, Outcome, Round, RoundKind,
                                 SelectionEvent, SelectionHandler, TargetIds)
 
+from .confirm_ring import HOLD_S, ConfirmRing
 from .fit import fit_pixel_size
 from .flash import FlashScheduler
 from .icons import draw_icon
@@ -27,6 +28,31 @@ _INPUT_COLORS = P.INPUT_COLORS
 _TILE_ORDER = (TargetIds.TARGET_1, TargetIds.TARGET_2)
 
 _STYLE = P.window_qss()
+
+
+_MAP_ACTIONS = {ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY}
+
+
+class _KeyOne(QObject):
+    """App-wide filter for key 1, so a hold can be told apart from a tap (#175). Typing a 1 in a
+    text field (the AI question box) is left alone."""
+
+    def __init__(self, window):
+        super().__init__(window)
+        self.window = window
+
+    def eventFilter(self, obj, event) -> bool:
+        t = event.type()
+        if t not in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
+            return False
+        if event.key() != Qt.Key.Key_1 or event.isAutoRepeat() or event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier:
+            return False
+        if isinstance(QApplication.focusWidget(), (QLineEdit, QTextEdit, QPlainTextEdit)):
+            return False
+        if not self.window.isVisible() and not getattr(self.window, "_test_keys", False):
+            return False
+        self.window.key_one(t == QEvent.Type.KeyPress)
+        return True
 
 
 class Tile(QLabel):
@@ -198,12 +224,26 @@ class SelectionWindow(QMainWindow):
         col.setSpacing(P.M)
 
         self.prompt = QLabel("Waiting for a round", objectName="prompt")
+        col.addWidget(self.prompt)
+        # #175: the consent screen. What will happen, the exact words, and the confirm ring.
+        self.preview_box = QWidget()
+        pcol = QVBoxLayout(self.preview_box)
+        pcol.setContentsMargins(0, 0, 0, 0)
+        pcol.setSpacing(P.S)
+        self.preview_header = QLabel("", objectName="previewHeader")
+        pcol.addWidget(self.preview_header)
+        prow = QHBoxLayout()
+        prow.setSpacing(P.L)
         self.preview = QLabel("", objectName="preview")
         self.preview.setWordWrap(True)
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview.setVisible(False)
-        col.addWidget(self.prompt)
-        col.addWidget(self.preview)
+        prow.addWidget(self.preview, 1)
+        self.ring = ConfirmRing()
+        self.ring.handlers["keyboard"] = lambda: self.press_target(TargetIds.TARGET_1)
+        prow.addWidget(self.ring, 0, Qt.AlignmentFlag.AlignVCenter)
+        pcol.addLayout(prow)
+        self.preview_box.setVisible(False)
+        col.addWidget(self.preview_box)
         # Seconds left before an unanswered Confirm round cancels (#26, #96). App drives it.
         self.countdown = QLabel("", objectName="countdown")
         self.countdown.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -254,13 +294,17 @@ class SelectionWindow(QMainWindow):
                                       on_sequence_finished=on_sequence_finished, parent=self)
 
         # Ambient keys; auto-repeat off so a held "2" can't preview and then cancel.
-        for seq, fn in (("1", lambda: self.press_target(TargetIds.TARGET_1)),
-                        ("2", lambda: self.press_target(TargetIds.TARGET_2)),
+        for seq, fn in (("2", lambda: self.press_target(TargetIds.TARGET_2)),
                         ("Esc", self.press_cancel)):
             sc = QShortcut(QKeySequence(seq), self)
             sc.setAutoRepeat(False)
             sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
             sc.activated.connect(fn)
+
+        # Key 1: a tap picks in a Choose round; in a Confirm round it must be HELD for HOLD_S
+        # seconds (#175), so it needs press and release events, not a shortcut.
+        self._key_filter = _KeyOne(self)
+        QApplication.instance().installEventFilter(self._key_filter)
 
         handler.on_round_opened.append(self.show_round)
         handler.on_preview.append(self.show_preview)
@@ -303,13 +347,38 @@ class SelectionWindow(QMainWindow):
     def confirm_hint(self) -> str:
         """The Confirm-round hint, matching what really confirms (#103)."""
         if self.eye_confirm is False:
-            return ("Confirm: key 1  (eye-closure confirm is off: its calibration failed)   ·   "
+            return ("Confirm: hold 1  (eye-closure confirm is off: its calibration failed)   ·   "
                     "Cancel: key 2 or Esc")
         if (self.input_source == InputSources.LIVE_EEG
                 and not self.handler.live_eeg_confirm_armed):
-            return ("Confirm: key 1  (eye-closure confirm is off until #23 says it's safe)   ·   "
+            return ("Confirm: hold 1  (eye-closure confirm is off until #23 says it's safe)   ·   "
                     "Cancel: key 2 or Esc")
-        return "Confirm: close your eyes for 2 s, or key 1   ·   Cancel: key 2 or Esc"
+        return "Confirm: close your eyes for 2 s, or hold 1   ·   Cancel: key 2 or Esc"
+
+    def eyes_can_confirm(self) -> bool:
+        """Whether an eye closure can confirm right now (mirrors confirm_hint)."""
+        if self.eye_confirm is False or self.input_source == InputSources.KEYBOARD:
+            return False
+        if self.input_source == InputSources.LIVE_EEG and not self.handler.live_eeg_confirm_armed:
+            return False
+        return True
+
+    def set_eye_progress(self, progress: float, source: str = "eyes") -> None:
+        """The alpha switch's progress towards a confirm (0-1), on the main thread (#175)."""
+        rnd = self.handler.current
+        if rnd is not None and rnd.kind is RoundKind.CONFIRM and self.eyes_can_confirm():
+            self.ring.set_external(progress, source)
+
+    def key_one(self, pressed: bool) -> None:
+        """Physical key 1. Choose round: a tap picks. Confirm round: hold to fill the ring."""
+        rnd = self.handler.current
+        if rnd is not None and rnd.kind is RoundKind.CONFIRM:
+            if pressed:
+                self.ring.start_hold("keyboard", HOLD_S)
+            else:
+                self.ring.release()
+        elif pressed:
+            self.press_target(TargetIds.TARGET_1)
 
     def show_round(self, rnd: Round) -> None:
         self.flasher.stop()
@@ -320,15 +389,19 @@ class SelectionWindow(QMainWindow):
         self._last_round = rnd
         if rnd.kind is RoundKind.CONFIRM:
             self.prompt.setText("Say this?")
-            self.preview.setText(self._preview_text())
+            self.preview_header.setText(self._preview_header())
+            self.preview.setText(f"“{self._preview_text()}”")
+            self.ring.reset()
+            self.ring.label = "Hold 1\nor close eyes" if self.eyes_can_confirm() else "Hold 1"
             self._fit_preview()
-            self.preview.setVisible(True)
+            self.preview_box.setVisible(True)
             self.hint.setText(self.confirm_hint())
         else:
             self._preview = None
             self.prompt.setText("Choose a reply")
             self.set_countdown(None)
-            self.preview.setVisible(False)
+            self.ring.reset()
+            self.preview_box.setVisible(False)
             self.hint.setText("Look at a tile, or press 1 or 2   ·   Esc clears" if self.flash_enabled
                               else "Press 1 or 2   ·   Esc clears")
             if self.flash_enabled:
@@ -345,8 +418,10 @@ class SelectionWindow(QMainWindow):
         self._preview = None
         for tile in self.tiles.values():
             tile.set_label("")
-        self.preview.setVisible(False)
+        self.ring.reset()
+        self.preview_box.setVisible(False)
         self.preview.setText("")
+        self.preview_header.setText("")
         self.hint.setText("")
         self.prompt.setText("Waiting for a round")
         self._set_round_text(None)
@@ -359,7 +434,15 @@ class SelectionWindow(QMainWindow):
         self.outcome_label.setToolTip(self.outcome_label.text())
         if outcome is Outcome.Confirmed:   # handler closed the round without on_cleared
             last = getattr(self, "_last_round", None)
+            spoken = self._preview
+            filled_by = self.ring.model.source or (e.source if e is not None else None)
             self.reset()
+            if spoken is not None:
+                self.preview_header.setText("✓ Shown and spoken" if spoken.action_id in _MAP_ACTIONS
+                                            else "✓ Spoken")
+                self.preview.setText(f"“{spoken.spoken_text or spoken.label}”")
+                self.ring.mark_confirmed(filled_by)
+                self.preview_box.setVisible(True)
             self.prompt.setText("Confirmed · sent to output")
             chosen = last.find(e.targetId) if (last is not None and e is not None) else None
             tile = self.tiles.get(e.targetId) if e is not None else None
@@ -395,11 +478,17 @@ class SelectionWindow(QMainWindow):
             return
         font = QFont(self.preview.font())
         font.setBold(True)
-        width = max(self.width() - 2 * P.XL - 2 * P.M - 6, 1)   # margins, padding, accent bar
+        width = max(self.width() - 2 * P.XL - 2 * P.M - 6 - 150 - P.L, 1)   # margins, accent bar, ring
         height = max(int(self.height() * 0.28), 80)
         self.preview_px = fit_pixel_size(self.preview.text(), font, width, height,
                                          self.PREVIEW_MAX_PX, P.TILE_TITLE_MIN)
         self.preview.setStyleSheet(f"font-size: {self.preview_px}px;")
+
+    def _preview_header(self) -> str:
+        c = self._preview
+        if c is not None and c.action_id in _MAP_ACTIONS:
+            return "This will show the map and say:"
+        return "This will be said aloud:"
 
     def _preview_text(self) -> str:
         c = self._preview

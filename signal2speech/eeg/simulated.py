@@ -256,7 +256,13 @@ class SimulatedDecoder(QObject):
 
     def _on_round_opened(self, rnd: Round) -> None:
         if rnd.kind is RoundKind.CONFIRM:
-            self.start_sequence(self.confirm_s)
+            gate = getattr(self, "confirm_gate", None)
+            if gate is not None and self._picks and self._picks[0] == 1:
+                # #175: hold the confirm pick until the app's confirm ring is full.
+                seq = self.start_sequence(hold=True)
+                gate(lambda seq=seq: self._release_held(seq))
+            else:
+                self.start_sequence(self.confirm_s)
         elif self.flasher is None:
             self.start_sequence(self.decision_s)
         # With a flasher, the Choose round arms in _flash_started.
@@ -266,6 +272,12 @@ class SimulatedDecoder(QObject):
 
     def _flash_started(self) -> None:
         self.start_sequence(hold=True)
+
+    def _release_held(self, seq: Optional[int]) -> None:
+        """Deliver a held Confirm pick (#175), if its sequence is still the current one."""
+        if seq is not None and seq == self._pending_seq:
+            self._flashing = False
+            self._request(0.0)
 
     def _flash_finished(self) -> None:
         self._flashing = False

@@ -18,7 +18,7 @@ pip install -r requirements-lock.txt
 python -m signal2speech
 ```
 
-A launcher opens with a button for each tool, and each button says which input it uses. Click **Demo · Keyboard**, then press **2** (Compare counties), then **1** (confirm). The map changes and one line is spoken. Press **2** at the preview, or **Esc**, to cancel, and nothing happens.
+A launcher opens with a button for each tool, and each button says which input it uses. Click **Demo · Keyboard**, then press **2** (Compare counties), then hold **1** for 2 s (confirm). The map changes and one line is spoken. Press **2** at the preview, or **Esc**, to cancel, and nothing happens.
 
 The same tools without the launcher (`python -m signal2speech --help` lists them):
 
