@@ -83,6 +83,10 @@ def test_recorded_responses_choose_the_tile_and_the_app_labels_it(qapp):
     app.handler.on_handled.append(lambda e, o: log.append((e, o)))
     try:
         assert isinstance(app.sim, app_live.RecordedEegInput)
+        said, gaze = [], []
+        app.sim.narrator = said.append                                 # the walkthrough's guidance
+        real_mark = app.sim._mark_gaze
+        app.sim._mark_gaze = lambda attended: (gaze.append(attended), real_mark(attended))[1]
         assert app.window.flash_enabled                                # the tiles must flash
         assert "Recorded (g.tec dataset, re-mapped to our tiles)" in app.input_summary()
         assert "Confirm: Simulated" in app.input_summary()
@@ -98,6 +102,11 @@ def test_recorded_responses_choose_the_tile_and_the_app_labels_it(qapp):
                             (Outcome.Confirmed, InputSources.SIMULATED, T1)]     # simulated eyes confirmed
         f = app.window.flasher
         assert f.flash_ms + f.isi_ms == int(p300.RECORDED_SOA_S * 1000)            # slower flashes
+        # The walkthrough: it says what it is, marks the card a wearer would look at while it
+        # flashes, and clears the mark afterwards.
+        assert "Nobody is wearing a headset" in said[0] and len(said) == 3
+        assert T1 in gaze and T2 in gaze and gaze[-1] is None
+        assert not any(t.highlight or t.note for t in app.window.tiles.values())
         used = app.sim.usage()
         assert used["target_responses"] > 0 and used["nontarget_responses"] > 0 and used["played_twice"] == 0
     finally:

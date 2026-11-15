@@ -392,8 +392,12 @@ class App:
                 raise ValueError("recorded input needs a recording: pass recording=<S4.mat>")
             responses = (recording if isinstance(recording, p300_mod.RecordedResponses)
                          else p300_mod.RecordedResponses.from_gtec(recording))
+            from signal2speech.speech.speaker import ENGLISH_LINE
+            # Guidance lines for the walkthrough, in the app's voice. Off in tests and with --mute.
+            narrator = (lambda text: self.speaker.say(text, ENGLISH_LINE)) if own_voice else None
             self.sim = RecordedEegInput(h, self.window, self.log, responses=responses,
-                                        script=sim_script or [2, 1], **(live_options or {}))
+                                        script=sim_script or [2, 1], narrator=narrator,
+                                        **(live_options or {}))
             sim_label = self.sim.connection_label()
             self.window.set_input_text(self.sim.strip_text(), InputSources.RECORDED)
             alpha = getattr(self.sim, "alpha", None)
