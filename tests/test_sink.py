@@ -174,6 +174,7 @@ def test_spoken_form_says_known_abbreviations_in_full_and_spells_unknown_ones():
     assert spoken_form("Send me the PDF.") == "Send me the P.D.F."          # no doubled full stop
     assert spoken_form("NASA imagery. OK? Yes, I am.") == "NASA imagery. OK? Yes, I am."
     assert spoken_form("Yes, please.") == "Yes, please."
+    assert spoken_form("MODIS Terra imagery") == "Moe-diss Terra imagery"   # a name the voice gets wrong
 
 
 def test_find_voice_honours_off_and_an_explicit_file(tmp_path, monkeypatch):
@@ -251,3 +252,47 @@ def test_speaker_falls_back_for_a_line_the_natural_voice_cannot_make(qapp, tmp_p
     sp._play_neural_when_ready()
     assert len(played) == 1
     assert any("couldn't make this line" in l for l in log) and any("NO OFFLINE VOICE" in l for l in log)
+
+
+def test_lines_made_ahead_are_made_two_at_a_time_and_a_held_file_is_retried(tmp_path, monkeypatch):
+    """Twelve lines at once slowed each other so much that the cue needed first arrived late and
+    the session fell back to the other voice. And a virus scanner can hold a new file briefly."""
+    from signal2speech.speech import neural
+    _FakePiper.made = []
+    monkeypatch.setattr(neural.subprocess, "Popen", _FakePiper)
+    voice = neural.PiperVoice(tmp_path / "v.onnx", cache_dir=tmp_path / "cache")
+    voice.warm([f"Line {n}." for n in "abcde"])
+    assert len(_FakePiper.made) == neural.WARM_AT_ONCE
+    _FakePiper.made[0].finish()
+    voice.pump()
+    assert len(_FakePiper.made) == neural.WARM_AT_ONCE + 1           # one finished, one more started
+
+    clip = voice.request("Held by a scanner.")
+    _FakePiper.made[-1].finish()
+    real_replace, calls = neural.os.replace, []
+
+    def held_once(src, dst):
+        calls.append(1)
+        if len(calls) == 1:
+            raise PermissionError("in use")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(neural.os, "replace", held_once)
+    assert clip.state() == "working"                                  # held: try again, don't fail
+    assert clip.state() == "ready"
+
+
+def test_dates_are_spoken_as_dates():
+    from signal2speech.speech.neural import day_words, pace, spoken_form, year_words
+    assert spoken_form("June 28, 2023") == "June twenty-eighth, twenty twenty-three"
+    assert spoken_form("Jun 26 AQI was 32.") == "June twenty-sixth air quality index was 32."
+    assert spoken_form("On Sept. 1st 2005 and Dec 31") == "On September first, two thousand five and December thirty-first"
+    assert spoken_form("May 186 points") == "May 186 points"                 # not a day: left alone
+    assert spoken_form("It may 3 times") == "It may 3 times"                 # lower-case "may" is a verb
+    assert [day_words(d) for d in (1, 2, 3, 5, 8, 9, 12, 20, 21, 22, 23, 30, 31)] == [
+        "first", "second", "third", "fifth", "eighth", "ninth", "twelfth", "twentieth",
+        "twenty-first", "twenty-second", "twenty-third", "thirtieth", "thirty-first"]
+    assert [year_words(y) for y in (1999, 2000, 2007, 2010, 2023, 1900, 1905)] == [
+        "nineteen ninety-nine", "two thousand", "two thousand seven", "twenty ten",
+        "twenty twenty-three", "nineteen hundred", "nineteen oh five"]
+    assert pace("June 28, 2023") == 1.25                                     # still read slower

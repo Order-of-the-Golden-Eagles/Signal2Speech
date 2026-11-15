@@ -328,6 +328,7 @@ class App:
         self._previewed = None
         self.log = Transcript(self.transcript_view, echo=echo)
         self.view = view if view is not None else load_view()
+        own_voice = speaker is None and not mute         # False in tests and with --mute
         if speaker is None:
             speaker = (MutedSpeaker(self.log) if mute
                        else OfflineSpeaker(self.log, neural=PiperVoice.find()))
@@ -383,6 +384,12 @@ class App:
             # #172: keys choose; a PiEEG board's eye closure confirms, after this session's check.
             # PiEEGConfirm builds its alpha switch during the check and hooks the #175 ring then.
             from signal2speech.eeg.app_live import PiEEGConfirm
+            pieeg = dict(pieeg)
+            if own_voice and "announce" not in pieeg:
+                # A wearer with closed eyes can't read "Open your eyes": one spoken line, then beeps.
+                from signal2speech.eeg.app_live import SpokenCheck
+                from signal2speech.eeg.board_session import Voice
+                pieeg["announce"] = SpokenCheck(Voice(neural=PiperVoice.find()))
             self.sim = PiEEGConfirm(h, self.window, self.log, **pieeg)
             sim_label = self.sim.connection_label()
         elif input_source == InputSources.SIMULATED:

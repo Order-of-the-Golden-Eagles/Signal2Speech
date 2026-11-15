@@ -616,3 +616,16 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Licences to know about: Piper is GPL-3.0, so we run it as a separate program. The voice we chose is for non-commercial use with credit. The 63 MB voice file is not in the repo
 - Lines with numbers in them are spoken 25 % slower, so the figures are easy to catch
 - Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux
+
+## 11/15/26 - 2:57 AM - Vasanth Anbukumar - #150 The board session speaks with the natural voice, and repeats itself less ([PR #209](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/209))
+- The voice-guided board session (`python -m signal2speech.eeg.board_session`) now gives its instructions in the same natural voice as the app, when that voice is installed
+    - `--standard-voice` goes back to the operating system's voice
+    - A new line takes a second or two to make the first time and is kept afterwards, so do one dry run before the real session
+- Calibration says "eyes open" and "eyes closed" on the first round only. After that the beeps are enough, because the introduction already explains them
+- Fixed the voice briefly switching to the old one mid-session: too many lines were being made at once, so one arrived late. They're now made two at a time
+- In the app and the session, dates are now read as dates: "June 28, 2023" is spoken as "June twenty-eighth, twenty twenty-three"
+- In the app, the PiEEG eye check can now be followed with closed eyes. It speaks one sentence, playing the low and high beep as examples as it names them, then uses beeps alone, then says "Ready." After that the app speaks only the replies the wearer confirms
+    - The screen shows the same words the voice says
+    - One rule everywhere, including the board session: low beep, close your eyes; high beep, open them
+- Fixed the app window growing past the screen during the eye check: a long status line forced it to 1841 wide on a 1536-wide screen. Long lines now wrap
+- Verified on the judging laptop: a full spoken dry run of the board session from a cold start with no cue falling back to the old voice, and the app in PiEEG mode on our simulated board staying 1520 wide. Seven new tests. Not yet run on a real board
