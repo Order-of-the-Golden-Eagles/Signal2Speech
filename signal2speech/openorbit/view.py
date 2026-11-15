@@ -117,6 +117,7 @@ class MapImage(QWidget):
         self.caption = caption
         self.caption_short = caption_short    # used when the full caption won't fit the image
         self._pixmap = QPixmap(str(dataset.images[date]))
+        self.opacity = 1.0                    # below 1 draws the whole map faintly (idle panel, #182)
         self.setMinimumSize(200, 111)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -215,6 +216,7 @@ class MapImage(QWidget):
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
+        painter.setOpacity(self.opacity)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         r = self.image_rect()
@@ -405,15 +407,13 @@ class OpenOrbitView(QWidget):
             layout.addWidget(_label(BLANK_HINT, SMALL_PX + 2, MUTED, align=Qt.AlignCenter))
             layout.addStretch(1)
             return page
-        from PySide6.QtWidgets import QGraphicsOpacityEffect
-
         layout.addWidget(_label("Wildfire smoke over southeast Michigan", TITLE_PX, MUTED, bold=True))
         layout.addWidget(_label(f"{_long_date(BEFORE)} and {_long_date(AFTER)}  ·  NASA satellite imagery "
                                 "and EPA air quality", SMALL_PX + 2, MUTED))
         self.idle_image = MapImage(ds, AFTER)
-        dim = QGraphicsOpacityEffect(self.idle_image)
-        dim.setOpacity(IDLE_OPACITY)
-        self.idle_image.setGraphicsEffect(dim)
+        # Drawn faintly by the painter itself. A graphics effect on this custom-painted widget
+        # crashed the test run on macOS (bus error).
+        self.idle_image.opacity = IDLE_OPACITY
         layout.addWidget(self.idle_image, 1)
         layout.addWidget(_label(BLANK_HINT, BODY_PX, MUTED, align=Qt.AlignCenter))
         layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))

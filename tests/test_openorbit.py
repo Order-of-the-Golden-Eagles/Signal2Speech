@@ -91,7 +91,8 @@ def test_idle_panel_shows_a_dimmed_region_and_no_results(qapp):
     numbers = {str(v) for c in ds.changes for v in (c.before, c.after)}
     assert not any(n in t for t in texts for n in numbers)                # no AQI values before a confirm
     assert not any("Biggest jump" in t or "Highest" in t for t in texts)
-    assert view.idle_image.graphicsEffect().opacity() == IDLE_OPACITY and IDLE_OPACITY <= 0.4
+    assert view.idle_image.opacity == IDLE_OPACITY and IDLE_OPACITY <= 0.4
+    assert view.idle_image.graphicsEffect() is None                       # an effect here crashed macOS
     missing = OpenOrbitView(data_root=Path("no-such-folder"))             # no data: the plain hint only
     assert visible_texts(missing) == [BLANK_HINT]
 
