@@ -218,7 +218,9 @@ def test_tile_short_label_stays_full_size_and_flash_keeps_size(app):
     t = Tile("target-2", "2")
     t.resize(420, 400)
     t.set_label("Compare counties")
-    assert t.font_px == Tile.MAX_PX
+    # At or within a few pixels of full size: fonts differ by platform, and the title's box is
+    # shorter now that tiles are.
+    assert Tile.MAX_PX - 6 <= t.font_px <= Tile.MAX_PX
     t.set_label(LONG_REPLY * 3)
     px = t.font_px
     t.set_lit(True)
