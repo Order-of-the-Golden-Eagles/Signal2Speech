@@ -20,6 +20,7 @@ SLOW = (
     "tests/test_lsl_source.py::test_self_test_board",             # LSL board into the alpha switch (#150)
     "tests/test_app_pieeg.py::test_self_test_board",              # PiEEG confirm in the app (#172)
     "tests/test_app_pieeg.py::test_a_failed_check",               # PiEEG check fails in the app (#172)
+    "tests/test_recorded.py::test_recorded_responses_choose",     # recorded EEG chooses in the app (#104)
 )
 
 

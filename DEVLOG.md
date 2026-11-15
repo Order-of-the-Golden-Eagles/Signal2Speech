@@ -644,3 +644,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - With a PiEEG board it shows two badges, one for what chooses and one for what confirms, so nobody mistakes keyboard choosing for brain choosing
 - Round numbers and internal outcome names moved to the tooltip and the developer log. The amber and green the evidence banner used didn't pass the contrast check with white text, so both windows now use colours that do
 - Checked offscreen at 1280 × 720 with keyboard, simulated, and PiEEG-style input, with a test that the sentence is never cut off. The text-size 1.6 check fails on this Linux machine on main too (fonts) and passes in CI
+## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
+- With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
+    - Each tile flash is answered with one real recorded brain response. The same g.Pype pipeline and classifier as the live path calibrate on them and pick the tile
+    - The dataset isn't in the repo. Without it, the app says where to get it
+- What's real and what isn't: the EEG and the classifier's pick are real. Which tile counts as "looked at" follows a script, because the recorded person was using g.tec's speller, not our app. The screen says "Recorded (g.tec dataset, re-mapped to our tiles)" and the confirm is labelled Simulated
+- Flashes are half a second apart in this mode. Faster than that, the recorded responses overlap and the classifier gets worse: measured offline, the right tile was picked 95 % of the time at the usual speed and 100 % at this one (best subject), and 90 to 100 % across all five subjects
+- Why now: the PiEEG board was tested on two people tonight and gave no usable EEG, so g.tec's data is the brain signal we can honestly show
+- Verified end to end on the judging laptop with subject S4: the recorded responses picked the scripted tile, then the map and the spoken line followed. Three new tests; the automated one uses a made-up recording because CI has no dataset. Not yet run for many choices in a row in the app

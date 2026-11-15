@@ -127,11 +127,16 @@ def test_speak_reply_speaks_without_map():
     assert view.calls == [] and speaker.said == ["Yes, please."]
 
 
-@pytest.mark.parametrize("source", [InputSources.RECORDED])   # live is wired in by #103
-def test_unbuilt_inputs_are_refused(qapp, source):
-    with pytest.raises(ValueError, match="blocked"):
-        App(source, view=FakeView(), speaker=FakeSpeaker(), echo=False)
-    assert main(["--input", "recorded"]) == 2
+def test_recorded_input_needs_a_recording_and_says_where_to_get_one(qapp, tmp_path, capsys, monkeypatch):
+    """#104: recorded input is wired in, but the g.tec dataset is never in the repo."""
+    with pytest.raises(ValueError, match="needs a recording"):
+        App(InputSources.RECORDED, view=FakeView(), speaker=FakeSpeaker(), echo=False)
+    with pytest.raises(ValueError, match="Unknown input"):
+        App("telepathy", view=FakeView(), speaker=FakeSpeaker(), echo=False)
+    monkeypatch.delenv("SIGNAL2SPEECH_GTEC", raising=False)
+    assert main(["--input", "recorded", "--recording", str(tmp_path / "missing.mat")]) == 2
+    assert "unicorn-bi/Hackathon" in capsys.readouterr().err
+    assert main(["--input", "keyboard", "--recording", str(tmp_path / "x.mat")]) == 2
 
 
 def test_pending_view_is_labelled(qapp):
