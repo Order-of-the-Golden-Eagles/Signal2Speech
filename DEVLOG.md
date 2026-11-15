@@ -336,3 +336,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The "Say this?" screen now shows how long is left before an unanswered preview cancels itself: "No answer cancels in 15 s"
 - It counts down from the same timer that does the cancelling (#26), so the number on screen always matches what happens
 - It disappears on confirm, cancel, disconnect, or the next question, and never appears with `--confirm-timeout 0`. Tests cover each case, including a real 2.5 s countdown that ends in the cancel. Fits 1280×720
+
+## 11/14/26 - 8:13 PM - Vasanth Anbukumar - #23 Plain-language prompts in the live-run guide (PR pending)
+- The guided headset test (`python -m signal2speech.eeg.live --source hybridblack`) now speaks to the wearer in plain words: "WEARER: look at the tile with the YELLOW border… count it silently", "If YES, close your eyes for about 2 seconds"
+- Steps read as what's happening ("checking the signal", "learning how your brain reacts to the flashes", "learning your eyes-closed YES signal") instead of jargon
+- Error messages say what to do next (adjust the headset, re-run with `--flashes 12`, or use `--confirm keyboard`)
+- Only the wording changed; the steps, timing, and safety rules are the same. Checked with a dry run on simulated data; the wearer prompts appear only with the real headset
