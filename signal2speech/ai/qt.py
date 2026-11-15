@@ -101,6 +101,7 @@ class QuestionPanel(QWidget):
         self.language.setWordWrap(True)
         self.language.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
         notes.addWidget(self.language, 2)
+        self.language.setVisible(False)
         col.addLayout(notes)
         self.alt_btn.setEnabled(False)
 
@@ -141,3 +142,5 @@ class QuestionPanel(QWidget):
 
     def set_language(self, text: str) -> None:
         self.language.setText(text)
+        # Shown only when replies are not in English, so the screen stays simple by default.
+        self.language.setVisible(not text.startswith("Reply language: English"))

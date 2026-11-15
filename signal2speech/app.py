@@ -60,8 +60,7 @@ REVEAL_SPLIT = (2, 3)     # the same on a reveal: columns that change width make
 #: Height of the one-line conversation box, before the text scale.
 CONVERSATION_HEIGHT = 132      # the label line plus a reply that wraps onto two lines
 PANEL_TITLE = (f"<span style='color:{T.ACTION_TINT[ActionIds.SHOW_SATELLITE]}'>OpenOrbit</span>"
-               " &nbsp;·&nbsp; NASA and EPA data"
-               f" &nbsp;·&nbsp; <span style='color:{T.QUIET}'>F2: developer log</span>")
+               " &nbsp;·&nbsp; NASA and EPA data")
 
 BLOCKED_INPUTS: dict = {}     # every input is wired in: recorded runs since #104
 

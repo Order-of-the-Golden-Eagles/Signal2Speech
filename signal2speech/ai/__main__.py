@@ -188,8 +188,7 @@ class AnsweringDemo:
             conv.setMinimumHeight(0)
             conv.setMaximumHeight(16777215)
             conv.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            app.panel_title.setText(f"<span style='color:{T.TEXT};font-weight:700'>Conversation</span>"
-                                    f" &nbsp;·&nbsp; <span style='color:{T.QUIET}'>F2: developer log</span>")
+            app.panel_title.setText(f"<span style='color:{T.TEXT};font-weight:700'>Conversation</span>")
         conv.restyle()
 
     def _fit_side_panel(self, rnd) -> None:
