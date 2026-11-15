@@ -33,6 +33,9 @@ Every pick is only a preview. Speech needs a second, different brain signal (alp
 **How do you know it never speaks twice, or speaks without a confirm?**
 We fuzz it. `tests/test_contract_fuzz.py` throws random sequences of picks, confirms, cancels, disconnects, late and stale decisions, duplicates, malformed events, and every input source at the selection handler. An independent checker asserts after every step: one output per confirm, never an output without a fresh preview, the exact previewed words, no event accepted twice, no live-EEG confirm while it's disarmed, and no old-round decision acting in a newer round. **3,000,000 operations (50,000 sequences) found 0 violations**, reaching 61,779 confirms. CI runs 180,000 operations on every PR. We also break the handler on purpose (double output, a cancel that keeps the preview, ignored round IDs), and the fuzzer catches each one. *These are software guarantees with keyboard and simulated input, not live-EEG accuracy.*
 
+**How fast does it respond?**
+Once the wearer confirms, the app reacts in milliseconds. Every confirm is timed and logged (#130): **confirm → map change 2–30 ms**, and **confirm → speech starting about 15 ms** for the bundled clips or **about 50 ms** with the computer's own voice. Each rehearsal writes these to a session report in `logs/` (#131), so we can show the numbers from the run the judges just watched. The slow part is the brain signal itself, by design: a P300 choice takes one flash sequence (about 2.5–3.5 s), and the alpha confirm lands about 1.2–1.5 s after the eyes close. *Measured with keyboard input on a dev Mac. The EEG timings come from simulated data until the live headset run (#23).*
+
 ## Bonus criteria
 
 **Is it a platform or a product?** *(platform, not a product)*

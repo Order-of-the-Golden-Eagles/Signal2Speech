@@ -487,3 +487,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The June 26 satellite image is mostly cloud, and the screen now says so, so nobody reads white cloud as clean air
 - Checked against EPA and NASA documentation and news reports of the June 28 smoke alert. The judge Q&A has three science answers ready
 - After review, corrected the fire distances from FIRMS data (most fires about 1,340 km away in Quebec, a few small ones closer, nearest 84 km), made Wayne the like-for-like PM2.5 comparison, and kept the June 26 caption inside the image on small screens. Verified with `pytest tests/test_openorbit.py` (keyboard and offscreen only)
+## 11/14/26 - 11:03 PM - Long Le - #128 Judge Q&A cites the response times ([PR #157](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/157))
+- The judge Q&A now answers "How fast does it respond?" with the measured times: map change in 2–30 ms and speech starting in about 15–50 ms after a confirm
+- It's honest about where the time really goes: the P300 choice takes a flash sequence (about 2.5–3.5 s), and the alpha confirm lands about 1.2–1.5 s after the eyes close. Those EEG numbers come from simulated data until the headset run
+- With the fuzz test answer already in the Q&A, every sub-issue of #128 is done and its "done when" is met
+
+## 11/14/26 - 11:14 PM - Long Le - #106 Real Claude replies re-checked after grounding ([PR #158](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/158))
+- Re-tested the AI demo window on the current code (Claude Sonnet 5.5 with grounded replies): a fresh question got two good replies in about 2 seconds, and the confirmed one was spoken once
+- The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
+- With the AI provider unreachable, saved phrases appear right away, labelled offline. A real Wi-Fi-off run is still part of the judging-laptop session
