@@ -919,7 +919,10 @@ def main(argv=None) -> int:
     try:
         T.set_scale(args.text_scale)
         app = App(source, sim_script=script, mute=args.mute, cues=not args.no_cues,
-                  attract=not (args.no_attract or args.screenshot or args.keys),
+                  # Never over a board session: the eye check runs 90 s with no key presses, and a
+                  # simulated demo must not start on top of a wearer's calibration or live input.
+                  attract=not (args.no_attract or args.screenshot or args.keys
+                               or args.input in ("pieeg", "live")),
                   help_by_eyes=args.help_by_eyes,
                   confirm_timeout_ms=int(args.confirm_timeout * 1000),
                   p300=args.p300, arm_live_confirm=args.arm_live_confirm,

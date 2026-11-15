@@ -161,7 +161,7 @@ When nobody has touched the table for 60 s, the app loops a narrated walkthrough
 - The loop is a second, self-contained app driven by the simulated input (the scripted g.Pype decoder when g.Pype is installed). Its picks go through its own handler and output path, so nothing reaches the real session or the report's counts. The report lists how many loops ran.
 - Any key, click, or input on the real app stops it at once. That key doesn't also pick a tile. Speech still waiting in the loop is cancelled, and the real app is left on a clean first question.
 - It never starts over an open preview, a map reveal, or a practice round.
-- Turn it off with `--no-attract`. It is also off with `--keys` or `--screenshot`, and in the AI demo.
+- Turn it off with `--no-attract`. It is also off with `--keys` or `--screenshot`, in the AI demo, and with a board (`--input pieeg` or `--input live`): the eye check runs about 90 seconds with no key presses, and a simulated demo must never start over a wearer's calibration.
 
 ![attract mode](media/193-attract.jpg)
 
