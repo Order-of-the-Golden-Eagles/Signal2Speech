@@ -321,13 +321,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The size is only recalculated when the label or the window size changes, never during a flash, so the P300 flash timing isn't affected
 - Checked with screenshots at 1280×720 and 1536×864 using 12-word replies: they fit at 54–56 px. The demo labels stay at full size. Tests cover the 32 px floor, the flash, and the preview
 
-## 11/14/26 - 7:58 PM - Vasanth Anbukumar - #106 Grounded Claude replies and map actions ([PR #TBD](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pulls))
+## 11/14/26 - 7:44 PM - Long Le - #96 Confirm countdown on the preview ([PR #114](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/114))
+- The "Say this?" screen now shows how long is left before an unanswered preview cancels itself: "No answer cancels in 15 s"
+- It counts down from the same timer that does the cancelling (#26), so the number on screen always matches what happens
+- It disappears on confirm, cancel, disconnect, or the next question, and never appears with `--confirm-timeout 0`. Tests cover each case, including a real 2.5 s countdown that ends in the cancel. Fits 1280×720
+
+## 11/14/26 - 7:58 PM - Vasanth Anbukumar - #106 Grounded Claude replies and map actions ([PR #116](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/116))
 - AI Answering now uses `claude-sonnet-5-5`, which answered in about 1.4–1.9 s, against 2–3 s for Opus. Low effort, the server-side fallback, the 8 s timeout, and saved phrases all stay the same
 - Claude now gets a "Verified facts" block built from the OpenOrbit data: the four EPA AQI rows, the changes, where EMU and Detroit are, and the sources. It's told to state only those facts and to say "I don't know" otherwise
 - Before, every model answered "Wayne" to "Which county's AQI rose more?". That was wrong: Washtenaw rose 186 points and Wayne rose 168. Claude now offers the Compare counties map action for it
 - A reply can now be a map action (compare counties or show the satellite view). The spoken line for those comes from the dataset and the demo contract, never from Claude's words, so the numbers always match the map
 - Checked with real calls: the AQI question, "Do you want water or juice?", and a question the data can't answer, which got an honest "I don't know". All 247 tests pass
-## 11/14/26 - 7:44 PM - Long Le - #96 Confirm countdown on the preview ([PR #114](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/114))
-- The "Say this?" screen now shows how long is left before an unanswered preview cancels itself: "No answer cancels in 15 s"
-- It counts down from the same timer that does the cancelling (#26), so the number on screen always matches what happens
-- It disappears on confirm, cancel, disconnect, or the next question, and never appears with `--confirm-timeout 0`. Tests cover each case, including a real 2.5 s countdown that ends in the cancel. Fits 1280×720
