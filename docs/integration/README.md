@@ -26,7 +26,29 @@ Add `--mute` for silent runs. `--confirm-timeout SECONDS` (default 15; 0 = never
   - **Map (#30, merged in #65):** `load_view()` uses `signal2speech.openorbit.OpenOrbitView`. The dashed stand-in panel appears only if that import fails.
   - **Simulated input (#21):** `--input simulated` uses `signal2speech.eeg.simulated.SimulatedDecoder`, a real g.Pype `Generator` stream, whenever it imports. Ctrl+1 and Ctrl+2 pick for a waiting sequence, and the stream closes on exit. If it can't import, the app injects scripted decisions through the same `arm_capture()` and `select_captured()` path. The connection label says why it fell back: "#21 SimulatedDecoder not merged" or "g.Pype not installed". Events are labelled `simulated` either way.
   - **Live input (#103):** `--input live` opens one Unicorn pipeline, calibrates on the app's own tiles, then runs the demo. The P300 chooses and the eye-closure switch confirms. See [EEG Hardware](../eeg-hardware/README.md#live-eeg-in-the-app-103).
+  - **PiEEG eye-closure confirm (#172):** `--input pieeg` keeps the keyboard choosing and takes the confirm from a PiEEG board's eye closure. See [below](#pieeg-eye-closure-confirm-in-the-app-172).
   - **Recorded input:** `--input recorded` still exits with a "blocked" message (#104). Record and replay work in the evidence view (#48).
+
+## PiEEG eye-closure confirm in the app (#172)
+
+Keys choose and preview. A real eye closure, read from a PiEEG Octopus 16 over LSL, confirms. Then the map changes and the line is spoken once.
+
+```
+python -m signal2speech.app --input pieeg --pieeg live          # a real board on a person
+python -m signal2speech.app --input pieeg --pieeg-self-test     # no board: our simulated 16-pin stream
+python -m signal2speech.app --input pieeg --pieeg simulated     # PiEEG's own simulator (python_quickstart.py --sim --lsl)
+python -m signal2speech.app --input pieeg --pieeg recorded      # a recorded session replayed over LSL
+```
+
+- **What's publishing must be stated** (`--pieeg live|simulated|recorded`), because LSL can't prove it. The app refuses to start without it, and `--pieeg-self-test` can never be labelled live.
+- **One pipeline, g.Pype only.** `PiEEGConfirm` (`signal2speech/eeg/app_live.py`) finds this computer's stream and relays it under a name unique to this machine (`lsl_source.find_stream`, `pieeg_lsl.PiEEGRelay`). It then puts it into the same `AlphaConfirm` (#47) the Unicorn uses, through `pieeg_lsl.make_source`. The P300 chooser is never wired to this board. One spot on the head gives an eyes-closed signal, not a P300.
+- **The #150 check runs on screen first:** the channel check, alpha calibration, rest, and closures. Prompts appear in the window's big prompt line, and the window stays responsive (closing it aborts cleanly). Eye-closure confirm switches on only if `lsl_source.safe_to_arm` passes in this session: 0 false triggers and exactly one confirm per closure. If it fails, the board's switch is closed and holding key 1 confirms (#175). `--arm-live-confirm` and `--p300` are refused here, because only the check decides and the board never chooses. The PiEEG flags are refused with any other `--input`, so nothing is silently ignored. Any error during the check (the stream drops, g.Pype fails) counts as a failed check, not a crash.
+- **The strip shows both inputs:** `Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)` once armed, or `Choose: Keyboard · Confirm: hold 1 · Live EEG (PiEEG Octopus 16): eye check failed`. Each confirm in the transcript carries its real source (`live-eeg`, `simulated`, `recorded`, or `keyboard`), and so does the session report.
+- **Options:** `--stream`, `--any-host`, `--channels 3,7` (1-based; default `auto` picks the pins that respond), `--probe-s`, `--alpha-calib-s`, `--rest-s`, `--closures`. The defaults match `lsl_source`'s full check: about 1.5 minutes before the first question.
+- **Self-test rehearsal:** with `--pieeg-self-test`, the simulated eyes follow the prompts and close on each Confirm round, so `--keys 2` runs hands-free. Tests drive the eyes themselves (`tests/test_app_pieeg.py`).
+- **Choose stays on the keyboard.** The simulated P300 chooser and g.tec's recorded data aren't combined with this confirm yet.
+- **Recorded:** `--pieeg recorded` labels any replay published over LSL as `Recorded (PiEEG Octopus 16)`. Recording a board session is #170.
+- **Not verified:** a real Octopus 16 on a person. Verified on our self-test stream (simulated) only.
 
 ## Rehearse without a headset: g.Pype simulated input (#21)
 

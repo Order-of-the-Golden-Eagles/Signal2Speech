@@ -213,6 +213,7 @@ class SelectionWindow(QMainWindow):
         self.keyboard = keyboard
         self.flash_enabled = flash
         self.eye_confirm: Optional[bool] = None   # False once eye-closure calibration failed (#103)
+        self.eye_off_reason = "its calibration failed"   # shown when eye_confirm is False (#172)
         self._preview: Optional[Choice] = None
         self.setWindowTitle("Signal2Speech")
         self.setStyleSheet(_STYLE)
@@ -324,6 +325,14 @@ class SelectionWindow(QMainWindow):
         self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(source, P.STRIP_TEXT)};"
                                        "font-weight:700;")
 
+    def set_input_text(self, text: str, color_source: str) -> None:
+        """Name two inputs at once, e.g. 'Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)'
+        (#172). ``input_source`` stays the chooser's; the colour is the confirm's when it's on."""
+        self.input_label.setText(text)
+        self.input_label.setToolTip(text)
+        self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(color_source, P.STRIP_TEXT)};"
+                                       "font-weight:700;")
+
     def set_connection(self, state: str) -> None:
         self.connection_label.setText(f"Connection: {state}")
         self.connection_label.setToolTip(self.connection_label.text())
@@ -347,7 +356,7 @@ class SelectionWindow(QMainWindow):
     def confirm_hint(self) -> str:
         """The Confirm-round hint, matching what really confirms (#103)."""
         if self.eye_confirm is False:
-            return ("Confirm: hold 1  (eye-closure confirm is off: its calibration failed)   ·   "
+            return (f"Confirm: hold 1  (eye-closure confirm is off: {self.eye_off_reason})   ·   "
                     "Cancel: key 2 or Esc")
         if (self.input_source == InputSources.LIVE_EEG
                 and not self.handler.live_eeg_confirm_armed):

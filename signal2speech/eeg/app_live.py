@@ -23,6 +23,7 @@ step turns that brain path off (keys still work) and the prompt and strip say wh
 """
 from __future__ import annotations
 
+import gc
 import shutil
 import tempfile
 import threading
@@ -30,7 +31,7 @@ import time
 from collections import deque
 from typing import Callable, Iterable, Optional
 
-from PySide6.QtCore import QCoreApplication, QTimer
+from PySide6.QtCore import QCoreApplication, Qt, QTimer
 
 from signal2speech.core import InputAdapter, InputSources, Round, RoundKind, TargetIds
 from signal2speech.eeg import alpha_confirm as am
@@ -109,6 +110,47 @@ def placeholder_model() -> p300.P300Model:
     return _PLACEHOLDER
 
 
+class SimulatedEyes:
+    """A simulated wearer's eyes: close shortly after a Confirm round opens, reopen 2.5 s later.
+
+    Shared by the Generator path (#103, ``AlphaBursts``) and the PiEEG self-test (#172,
+    ``SelfTestStream``). ``eyes()`` returns the object with ``close_eyes``/``open_eyes``, or None
+    when there is nothing simulated to drive.
+    """
+
+    HOLD_MS = 2500
+
+    def __init__(self, eyes: Callable[[], object]):
+        self._eyes = eyes
+        self._close_timer = QTimer(singleShot=True)
+        self._close_timer.timeout.connect(self.close_now)
+        self._open_timer = QTimer(singleShot=True)
+        self._open_timer.timeout.connect(self.open_now)
+
+    def close_after(self, settle_s: float) -> None:
+        """Close once the alpha switch's settle time has passed (eyes must be open first)."""
+        self._close_timer.start(int((settle_s + 0.2) * 1000))
+
+    def closing(self) -> bool:
+        return self._close_timer.isActive()
+
+    def close_now(self) -> None:
+        eyes = self._eyes()
+        if eyes is not None:
+            eyes.close_eyes()
+            self._open_timer.start(self.HOLD_MS)
+
+    def open_now(self) -> None:
+        self._close_timer.stop()
+        eyes = self._eyes()
+        if eyes is not None:
+            eyes.open_eyes()
+
+    def stop(self) -> None:
+        self._close_timer.stop()
+        self._open_timer.stop()
+
+
 class LiveEegInput:
     """P300 choose + alpha confirm feeding the app's SelectionHandler. Main thread only."""
 
@@ -177,10 +219,7 @@ class LiveEegInput:
                                          pipeline=self.nodes.pipeline, upstream=self.nodes.eeg)
         handler.live_eeg_confirm_armed = bool(arm_live_confirm)
 
-        self._eyes_open_timer = QTimer(singleShot=True)
-        self._eyes_open_timer.timeout.connect(self._open_eyes)
-        self._eyes_close_timer = QTimer(singleShot=True)
-        self._eyes_close_timer.timeout.connect(self._close_eyes)
+        self.eyes = SimulatedEyes(lambda: self.bursts)
         handler.on_round_opened.append(self._on_round_opened)
         handler.on_cleared.append(self._on_cleared)
         window.set_connection(self.connection_label())
@@ -241,8 +280,8 @@ class LiveEegInput:
         f.stop()
         (f.repetitions, f.flash_ms, f.isi_ms, f.on_sequence_started, f.on_flash,
          f.on_sequence_finished) = self._saved_flasher
-        for t in (self._decide, self._eyes_open_timer, self._eyes_close_timer):
-            t.stop()
+        self._decide.stop()
+        self.eyes.stop()
         for hooks, fn in ((self.handler.on_round_opened, self._on_round_opened),
                           (self.handler.on_cleared, self._on_cleared)):
             if fn in hooks:
@@ -418,18 +457,280 @@ class LiveEegInput:
             return
         if self.simulated and self.script:
             if self.script.popleft() == 1:               # the synthetic wearer closes their eyes
-                self._eyes_close_timer.start(int((self.alpha.settle_s + 0.2) * 1000))
+                self.eyes.close_after(self.alpha.settle_s)
 
     def _on_cleared(self, _reason: str) -> None:
         self._decide.stop()
-        self._open_eyes()
+        self.eyes.open_now()
 
-    def _close_eyes(self) -> None:
-        if self.bursts:
-            self.bursts.close_eyes()
-            self._eyes_open_timer.start(2500)
 
-    def _open_eyes(self) -> None:
-        self._eyes_close_timer.stop()
-        if self.bursts:
-            self.bursts.open_eyes()
+# ── PiEEG eye-closure confirm (#172) ─────────────────────────
+PIEEG_HELP = """Could not use the PiEEG board's LSL stream.
+  1. Power the board from a 5 V power bank (never the laptop's USB while it's on someone's head).
+  2. In PiEEG's starter folder, run and leave running: python python_quickstart.py --lsl
+  3. Check it with: python -m signal2speech.eeg.lsl_source --input live --check
+Rehearse without the board: python -m signal2speech.app --input pieeg --pieeg-self-test"""
+
+PIEEG_STREAM_IS = ("live", "simulated", "recorded")
+
+
+class PiEEGConfirm:
+    """Eye-closure confirm from a PiEEG Octopus 16 over LSL; the keyboard chooses (#172).
+
+    The board is only an amplifier: ``pieeg_lsl.make_source`` puts its relayed LSL stream into the
+    same ``AlphaConfirm`` (#47) the Unicorn path uses, so g.Pype stays the whole pipeline. The P300
+    chooser is never wired to it: one spot on the head gives an eyes-closed signal, not a P300.
+
+    ``stream_is`` says what is publishing, because LSL can't prove it: ``live`` (a real board on a
+    person), ``simulated`` (PiEEG's simulator or our self-test), or ``recorded`` (a replayed
+    session). Eye-closure confirm switches on only after this session's #150 check passes
+    (``lsl_source.safe_to_arm``). Until then, and if it fails, holding key 1 confirms.
+    """
+
+    def __init__(self, handler, window, log: Callable[[str], None], *, stream_is: str,
+                 stream: Optional[str] = None, any_host: bool = False,
+                 channels: Optional[str] = None, self_test: bool = False,
+                 auto_eyes: Optional[bool] = None, probe_s: float = 8.0,
+                 alpha_calib_s: float = 10.0, rest_s: float = 20.0, closures: int = 3,
+                 find_timeout_s: float = 5.0, no_data_s: float = 8.0):
+        from signal2speech.eeg import lsl_source as lsl
+
+        if self_test:
+            stream_is = "simulated"                      # our own publisher: never Live
+        if stream_is not in PIEEG_STREAM_IS:
+            raise ValueError(f"stream_is is one of {', '.join(PIEEG_STREAM_IS)}")
+        if closures < 2:
+            raise ValueError("the #150 check needs at least 2 closures")
+        self.handler, self.window, self.log = handler, window, log
+        self.stream_is = stream_is
+        self.input_source = {"live": InputSources.LIVE_EEG, "simulated": InputSources.SIMULATED,
+                             "recorded": InputSources.RECORDED}[stream_is]
+        self.self_test = self_test
+        self.stream = stream or (lsl.SELF_TEST_NAME if self_test else lsl.STREAM_NAME)
+        self.any_host = any_host
+        self.channels_arg = channels
+        # The self-test closes its simulated eyes on each Confirm round, so a rehearsal runs
+        # hands-free. Tests pass auto_eyes=False and call publisher.close_eyes() themselves.
+        self.auto_eyes = self_test if auto_eyes is None else auto_eyes
+        self.probe_s, self.alpha_calib_s = probe_s, alpha_calib_s
+        self.rest_s, self.closures = rest_s, closures
+        self.find_timeout_s, self.no_data_s = find_timeout_s, no_data_s
+
+        self.publisher = None                            # lsl_source.SelfTestStream
+        self.relay = None                                # pieeg_lsl.PiEEGRelay
+        self.device = None
+        self.alpha: Optional[am.AlphaConfirm] = None
+        self.pick = None
+        self.report: dict = {}
+        self.armed = False                               # eye-closure confirm on for this session
+        self.reasons: list = []
+        self.calibrated = False
+        self.running = False
+        self._closed = False
+        self.eyes = SimulatedEyes(lambda: self.publisher)
+        self.on_label: Optional[Callable[[str], None]] = None    # App refreshes its title
+        handler.live_eeg_confirm_armed = False           # only the check below may switch it on
+        handler.on_round_opened.append(self._on_round_opened)
+        handler.on_cleared.append(self._on_cleared)
+        window.eye_confirm = False                       # the hint says key 1 until the check passes
+        window.eye_off_reason = "the eye check hasn't run yet"
+        self._show_label()
+
+    # ── Labels ───────────────────────────────────────────────
+    @property
+    def device_name(self) -> str:
+        return self.device.name if self.device else "PiEEG Octopus 16"
+
+    def confirm_label(self) -> str:
+        """What confirms, as the strip shows it: 'Live EEG (PiEEG Octopus 16)'."""
+        from signal2speech.eeg import lsl_source as lsl
+        if self.stream_is == "live":
+            return f"Live EEG ({self.device_name})"
+        if self.stream_is == "recorded":
+            return f"Recorded ({self.device_name})"
+        return "Simulated (self-test LSL stream)" if self.self_test else lsl.SIMULATED_LABEL
+
+    def strip_text(self) -> str:
+        if self.armed:
+            return f"Choose: Keyboard · Confirm: {self.confirm_label()}"
+        state = "eye check not run yet" if not self.calibrated else "eye check failed"
+        return f"Choose: Keyboard · Confirm: hold 1 · {self.confirm_label()}: {state}"
+
+    def connection_label(self) -> str:
+        parts = [f"PiEEG over LSL · stream '{self.relay.name if self.relay else self.stream}'"]
+        if self.pick is not None and self.device is not None:
+            parts.append(f"pins {self.device.describe_channels(self.pick.channels)}")
+        parts.append("eye confirm armed" if self.armed else
+                     "eye confirm off (check failed)" if self.calibrated else
+                     "eye confirm off until the check passes")
+        return " · ".join(parts)
+
+    def _show_label(self) -> None:
+        text = self.strip_text()
+        self.window.set_input_text(text, self.input_source if self.armed else InputSources.KEYBOARD)
+        self.window.set_connection(self.connection_label())
+        if self.on_label is not None:
+            self.on_label(text)
+
+    # ── Lifecycle ────────────────────────────────────────────
+    def start(self) -> None:
+        """Find this computer's stream and relay it. Raises RuntimeError if it can't be used."""
+        from signal2speech.eeg import devices, pieeg_lsl
+        from signal2speech.eeg import lsl_source as lsl
+
+        if self.running:
+            return
+        if self.self_test:
+            self.publisher = lsl.SelfTestStream(name=self.stream).start()
+        try:
+            info = lsl.find_stream(self.stream, any_host=self.any_host,
+                                   timeout=self.find_timeout_s)
+        except pieeg_lsl.PiEEGSetupError as err:
+            self.close()
+            raise RuntimeError(f"no LSL stream '{self.stream}' on this computer") from err
+        self.relay = pieeg_lsl.PiEEGRelay(info).start()
+        self.running = True
+        self.device = (devices.PIEEG_OCTOPUS16 if self.self_test else
+                       devices.detect(stream_name=info.name(), channel_count=info.channel_count(),
+                                      rate=info.nominal_srate()))
+        if not pump(self.no_data_s, until=lambda: self.relay.rows > 0):
+            self.close()
+            raise RuntimeError(f"the stream '{self.stream}' sent no data within {self.no_data_s:g} s")
+        self.log(f"PiEEG: {self.confirm_label()}, {self.relay.channels} channels at "
+                 f"{self.relay.rate:g} Hz (stream '{info.name()}' on {info.hostname()})")
+        if self.stream_is == "live":
+            self.log(lsl.SAFETY)
+        self._show_label()
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self.eyes.stop()
+        for hooks, fn in ((self.handler.on_round_opened, self._on_round_opened),
+                          (self.handler.on_cleared, self._on_cleared)):
+            if fn in hooks:
+                hooks.remove(fn)
+        # Nothing can confirm after this. ``armed`` keeps this session's check verdict, so the
+        # session report (written on quit, after close) still says what really confirmed.
+        self.handler.live_eeg_confirm_armed = False
+        if self.alpha is not None:
+            self.alpha.close()
+        if self.relay is not None:
+            self.relay.stop()
+        self.alpha = self.relay = None
+        # The relay and its thread reference each other, so only a collection frees its inlet.
+        # Free it before the publisher's outlet goes, or the inlet logs "transmission broke off"
+        # and retries. The second pass frees the publisher's outlet, so its name is free again.
+        gc.collect()
+        if self.publisher is not None:
+            self.publisher.stop()
+        self.publisher = None
+        self.running = False
+        gc.collect()
+
+    # ── The #150 check, on screen ────────────────────────────
+    def calibrate(self, labels: Optional[dict] = None) -> Optional[bool]:
+        """Channel check, alpha calibration, rest and closures; arm only if it's clean.
+
+        Returns True if eye-closure confirm is on, False if the check failed (holding key 1 confirms),
+        or None if the operator closed the window.
+        """
+        from signal2speech.eeg import devices
+        from signal2speech.eeg import lsl_source as lsl
+
+        w = self.window
+        watched = w.isVisible()
+
+        def closed() -> bool:
+            return watched and not w.isVisible()
+
+        def tick() -> None:
+            QCoreApplication.processEvents()             # keep the window live while reading
+            if closed():
+                raise CalibrationAborted()
+
+        def prompt(text: str) -> None:
+            w.prompt.setText(text)
+            w.hint.setText("Eye-closure check (#150). Don't press anything.")
+            self.log(f"check: {text}")
+            tick()
+
+        for t in TILES:
+            w.tiles[t].set_label("")
+        w.preview.setVisible(False)
+        try:
+            try:
+                requested = lsl.parse_channels(self.channels_arg, self.relay.channels)
+                self.pick = lsl.choose_channels(self.device, requested, self.relay.name,
+                                                self.relay.rate, self.probe_s, prompt,
+                                                sim=self.publisher, say=self.log, tick=tick)
+            except (devices.NoAlphaResponse, ValueError) as err:
+                return self._finish({"error": f"channel check: {err}"})
+            except CalibrationAborted:
+                raise
+            except Exception as err:                     # the stream dropped, LSL errors, ...
+                return self._finish({"error": f"channel check: {type(err).__name__}: {err}"})
+            self.log(f"using {self.device.describe_channels(self.pick.channels)}: {self.pick.reason}")
+            try:
+                self.alpha = am.AlphaConfirm(
+                    self.handler, input_source=self.input_source,
+                    source=self._source(), channels=list(self.pick.channels),
+                    sampling_rate=self.relay.rate)
+                self.alpha.bursts = self.publisher       # the self-test's eyes follow the prompts
+                if hasattr(self.alpha, "progress") and hasattr(self.window, "set_eye_progress"):
+                    # #175: the confirm ring follows this board's alpha switch.
+                    self.alpha.progress.connect(self.window.set_eye_progress,
+                                                Qt.ConnectionType.QueuedConnection)
+                self.alpha.start()
+                pump(self.no_data_s, until=lambda: closed() or self.alpha.power_count() > 0)
+                tick()
+                if self.alpha.power_count() == 0:
+                    return self._finish({"error": "no alpha band power from the stream"})
+                report = am.measure(self.alpha, self.alpha_calib_s, self.rest_s, self.closures,
+                                    prompt=prompt, tick=tick)
+            except CalibrationAborted:
+                raise
+            except Exception as err:                     # g.Pype or the stream failed mid-check
+                return self._finish({"error": f"{type(err).__name__}: {err}"})
+        except CalibrationAborted:
+            self.log("eye-closure check aborted: the window was closed")
+            return None
+        return self._finish(report)
+
+    def _source(self):
+        from signal2speech.eeg import pieeg_lsl
+        return pieeg_lsl.make_source(self.relay.name, self.relay.channels, self.relay.rate)
+
+    def _finish(self, report: dict) -> bool:
+        from signal2speech.eeg import lsl_source as lsl
+
+        self.report = report
+        ok, self.reasons = lsl.safe_to_arm(report, self.closures)
+        self.calibrated = True
+        self.armed = ok
+        if not ok and self.alpha is not None:
+            self.alpha.close()                           # nothing from the board can confirm
+            self.alpha = None
+        # The handler gates Live EEG confirms; Simulated and Recorded confirms are gated by
+        # closing the switch above, so every label follows the same rule.
+        self.handler.live_eeg_confirm_armed = ok and self.input_source == InputSources.LIVE_EEG
+        self.window.eye_confirm = ok
+        self.window.eye_off_reason = "the eye check failed"
+        verdict = (f"Eye-closure confirm ON: {self.confirm_label()} passed the check"
+                   if ok else "Eye-closure confirm OFF, hold key 1 to confirm: " + "; ".join(self.reasons))
+        self.window.prompt.setText(verdict)
+        self.window.hint.setText("")
+        self.log(f"check: false triggers {report.get('false_triggers')}, confirms per closure "
+                 f"{report.get('edges_per_closure')} -> {'armed' if ok else 'not armed'}")
+        self._show_label()
+        return ok
+
+    # ── Self-test eyes ───────────────────────────────────────
+    def _on_round_opened(self, rnd: Round) -> None:
+        self.eyes.stop()
+        if rnd.kind is RoundKind.CONFIRM and self.auto_eyes and self.armed and self.alpha:
+            self.eyes.close_after(self.alpha.settle_s)
+
+    def _on_cleared(self, _reason: str) -> None:
+        self.eyes.open_now()
