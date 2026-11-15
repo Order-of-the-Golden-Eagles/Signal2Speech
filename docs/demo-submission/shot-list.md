@@ -6,7 +6,7 @@
 
 Every shot that shows EEG carries an on-screen caption naming its source: **Live EEG**, **Recorded**, **Simulated** or **Keyboard**. The app's judge strip and the evidence banner already show it, so the caption must agree with them. Never cut a Simulated or Keyboard shot under narration that says "live".
 
-## Primary cut (2:45)
+## Original cut (wearer on camera, Devpost only, 2:45)
 
 **Graphics (#132):** [title card](media/title-card.png) for shot 1, [architecture diagram](media/architecture.png) for shot 9, and [closing card](media/closing-card.png) for shot 10. All are 1920×1080 PNGs. To change the wording, edit `make_graphics.py` and run `python docs/demo-submission/make_graphics.py`.
 
