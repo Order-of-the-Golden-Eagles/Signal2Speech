@@ -490,3 +490,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Worked out what to record for the demo video and handed it to Vasanth as #160: a screen recording only, no headset, 2:30 or less, which fits both the Devpost and g.tec limits
     - Exact commands, what each shot shows, the narration, and how to export. Every brain-signal shot is labelled Simulated or Keyboard
 - The Devpost checklist now uses the grounded-Claude AI answer (#116 merged) and enters the Beyond the Horizon prize (#153)
+## 11/14/26 - 11:14 PM - Long Le - #106 Real Claude replies re-checked after grounding ([PR #158](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/158))
+- Re-tested the AI demo window on the current code (Claude Sonnet 5.5 with grounded replies): a fresh question got two good replies in about 2 seconds, and the confirmed one was spoken once
+- The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
+- With the AI provider unreachable, saved phrases appear right away, labelled offline. A real Wi-Fi-off run is still part of the judging-laptop session
