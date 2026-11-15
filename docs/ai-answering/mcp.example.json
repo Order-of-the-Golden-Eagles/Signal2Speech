@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "signal2speech": {
+      "command": "/ABSOLUTE/PATH/TO/Signal2Speech/.venv/bin/python",
+      "args": ["-m", "signal2speech.mcp", "--source", "generator"]
+    }
+  }
+}

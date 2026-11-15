@@ -18,6 +18,7 @@
 
 ## Verification and next checkpoint
 
+- **MCP server (#110):** `python -m signal2speech.mcp`, installed with `pip install -e ".[dev,mcp]"`, lets Claude Desktop or Claude Code query the g.Pype pipeline: quality, graph, decisions, P300 average, alpha, and the evidence view. Results are summaries labelled Simulated or Live EEG. Verified on the Generator only; live mode gives quality and alpha without P300. [Details](ai-answering/README.md#ai-assistant-reads-the-pipeline-mcp-server-110)
 - **Check your clone if you pushed with the hooks on (fixed by the `test_githooks` env fix):** git exports `GIT_DIR` to hooks, so `tests/test_githooks.py` ran its git commands against your *real* repo during the pre-push pytest. Run `git config --local --list`. If you see `core.bare=true`, `user.name=Hook Test`, `user.email=test@example.com`, `commit.gpgsign=false`, or an absolute `core.hookspath`, fix them:
   1. `git --git-dir=.git config --local core.bare false`
   2. `git config --local core.hooksPath .githooks`

@@ -417,3 +417,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - Restarts after 1 s, then every 2 s, up to 5 times. Closing the window normally just ends it
 - Every start and exit is logged to `logs/launcher-<time>.log`. If it gives up, it says to switch to the fallback build
 - Checked with real processes: a clean quit stopped the launcher, and a crashing app was restarted after 1 s, then given up on with a clear message. Tests use a fake process. The judging-laptop session and the stage script now use it
+
+## 11/14/26 - 9:43 PM - MagicJester2764 - #110 An AI assistant can read the brain pipeline (PR pending)
+- Claude (Desktop or Code) can now ask Signal2Speech about its live signal pipeline and get real numbers back: `python -m signal2speech.mcp`
+    - It answers questions like "Is the wearer's P300 visible?" from the actual averaged brain response, and can open the evidence window
+- Every answer says whether the data is Simulated or Live EEG, and only summaries are sent, never raw brain data
+- On the simulator it picked up a clear P300 (about 4.8 µV at 276 ms) and got 3 of 3 choices right
+- With the real headset it reports signal quality and the eye-closure signal. The P300 needs tiles on screen, so use the app or the evidence view for that
+- Still to do: record the 30-second clip for the video (#34), and try it with a real wearer
