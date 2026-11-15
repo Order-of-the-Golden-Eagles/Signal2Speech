@@ -357,3 +357,18 @@ The alpha branch uses its own Generator with `AlphaBursts`, because the P300 Gen
 4. Record the result here and in #103.
 
 The app's 5-flash, 250 ms timing still needs #101's flash-timing check on the judging laptop's real display.
+
+## Live EEG from a borrowed PiEEG Octopus 16 (#150)
+
+The track's bar is "a real signal driving a real outcome, live at the demo." Our Unicorn was lost in transit, and the packet says PiEEG Octopus 16 boards can be borrowed at the event. PiEEG's starter code publishes the board as an LSL stream (`Octopus16`: EEG, 16 channels, 250 Hz, µV). We read it with g.Pype's `LslReceiver` and run the eyes-closed alpha switch (#47) on it.
+
+1. Borrow a board at the PiEEG or organizer desk. Put at least one electrode over the back of the head (O1, Oz, or O2), and note which board channel it's on.
+2. In PiEEG's starter folder ([hello_world_octopus_16](https://github.com/pieeg-club/hello_world_octopus_16)): `python python_quickstart.py --lsl`. Keep it running.
+3. Here: `python -m signal2speech.eeg.lsl_source --input live --channels 15,16 --demo` (use your occipital channel numbers).
+   - It calibrates (10 s eyes open, 10 s closed), counts false triggers over 20 s of rest, and times 3 closures.
+   - Live confirm is switched on **only if that check is clean**: 0 false triggers and exactly one confirm per closure. Then a keyboard preview is confirmed by closing the eyes.
+4. Without a board: `python -m signal2speech.eeg.lsl_source --self-test --demo` runs the same path on our own simulated LSL stream.
+
+`--input live|simulated` is required because LSL can't prove what's publishing. A real board on a person is **Live EEG (PiEEG Octopus 16)**. PiEEG's `--sim` simulator and our self-test are **Simulated**. Never run a simulator with `--input live`.
+
+**Verified on 2026-11-14:** the self-test stream end to end on the judging laptop (0 false triggers, one confirm per closure, about 1.1 s latency, preview then confirm). **Not verified:** a real Octopus 16 board, its Bluetooth connection, electrode placement, or PiEEG's own simulator. The simulator switches its alpha on a fixed 6 s cycle and ignores our prompts, so calibration against it needs #138's work.

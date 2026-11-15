@@ -4,12 +4,12 @@ version = "0.1.0"
 description = "Hands-free selection, preview, and confirmation on g.tec g.Pype"
 requires-python = ">=3.10,<3.15"
 dependencies = [
-    "gpype[gui,devices]>=4.2,<4.3",  # core includes OSCAR; gui = PySide6 + pyqtgraph; devices = HybridBlack, Keyboard, Paradigm Presenter client
+    "gpype[gui,devices,lsl]>=4.2,<4.3",  # core includes OSCAR; gui = PySide6 + pyqtgraph; devices = HybridBlack, Keyboard; lsl = PiEEG board stream (#150)
     "h5py>=3.7",                      # g.Pype HDF5 recordings and replay (#48)
     "scikit-learn>=1.3",              # g.Pype Sklearn node: LDA for the P300 chooser (#46)
     "pyttsx3>=2.90",                  # offline speech for generated replies (#28)
 ]
-# Not needed: gpype[lsl] (no LSL out) and EDF (pyedflib). Dropping EDF also lifts the Python 3.12 requirement on Windows.
+# Not needed: EDF (pyedflib). Dropping EDF also lifts the Python 3.12 requirement on Windows.
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
