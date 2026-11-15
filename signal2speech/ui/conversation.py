@@ -63,7 +63,13 @@ class ConversationView(QTextBrowser):
         rows = list(zip(self.entries, self._stamps))
         if self.latest_only and rows:
             chosen = [r for r in rows if r[0][0] in ("preview", "said", "shown", "nothing", "help")]
-            rows = [(chosen or rows)[-1]]
+            last = (chosen or rows)[-1]
+            if last[0][0] == "nothing":                # dismissed: still show what was dismissed
+                previews = [r for r in rows if r[0][0] == "preview"]
+                if previews:
+                    (kind, _text, src), stamp = last
+                    last = ((kind, f"Cancelled: {previews[-1][0][1]}", src), stamp)
+            rows = [last]
         for (kind, text, src), stamp in rows:
             label, colour = KINDS[kind]
             source = f"<span style='color:{T.QUIET}'> · {html.escape(src)}</span>" if src else ""

@@ -196,18 +196,25 @@ class OfflineSpeaker(QObject):
         self._say_without_neural(made.text, clip)
 
     def _play_wav(self, wav: Path) -> None:
+        """Play a WAV on the speaker's one sound player. One player for the whole session: a new
+        QSoundEffect per line each held an audio channel that was never released, and after
+        about 35 lines Windows gave out no more. The app then went silent while still reporting
+        that it was playing."""
         from PySide6.QtMultimedia import QSoundEffect
-        self._sound = QSoundEffect(self)
-        sound = self._sound
-        if hasattr(sound, "playingChanged"):
-            def on_playing(sound=sound) -> None:
-                try:
-                    playing = sound.isPlaying()
-                except RuntimeError:          # Qt already deleted it (app quitting)
-                    return
-                if playing:
-                    self._started()
-            sound.playingChanged.connect(on_playing)
+        if self._sound is None:
+            self._sound = QSoundEffect(self)
+            sound = self._sound
+            if hasattr(sound, "playingChanged"):
+                def on_playing(sound=sound) -> None:
+                    try:
+                        playing = sound.isPlaying()
+                    except RuntimeError:          # Qt already deleted it (app quitting)
+                        return
+                    if playing:
+                        self._started()
+                sound.playingChanged.connect(on_playing)
+        else:
+            self._sound.stop()                    # a line still playing is cut off, never overlapped
         self._sound.setSource(QUrl.fromLocalFile(str(wav)))
         self._sound.play()
 
