@@ -54,6 +54,10 @@ class AnsweringDemo:
         # Recorded brain data (#104): it answers only a question that was asked. Which reply the
         # scripted wearer attends alternates, or the operator sets it with Ctrl+1 / Ctrl+2.
         self.recorded = input_source == InputSources.RECORDED
+        # A headset (or its simulated rehearsal): the cards flash only for a question that was
+        # asked. Flashing straight after calibration made a pick before anyone had asked anything.
+        self.live = input_source == InputSources.LIVE_EEG or p300
+        self._pending = False
         self.next_pick = 1
         self._asked = False
         if self.recorded:
@@ -231,8 +235,17 @@ class AnsweringDemo:
         if rnd.kind is RoundKind.CHOOSE:
             self._show_map(any(c.action_id in MAP_ACTIONS for c in rnd.choices))
 
+    def _idle_hint(self) -> None:
+        if self.live and not self._pending:
+            self.app.window.hint.setText(
+                "Type a question above and press Enter. The cards flash once it is asked.")
+
     def _arm_recorded(self) -> None:
         """Recorded input: one scripted look and one confirm, then the script is empty again."""
+        if self.live:
+            if self._asked:
+                self._asked, self._pending = False, True
+            self.app.window.flash_enabled = bool(self._pending and getattr(self.app.sim, "p300_ok", True))
         if not self.recorded:
             return
         self.app.sim.script.clear()            # a look left over from a replaced round never carries on
@@ -264,6 +277,7 @@ class AnsweringDemo:
         self.app.options_origin = self.nasa_origin
         self._arm_recorded()
         self.app.ask()
+        self._idle_hint()
 
     def attend(self, n: int) -> None:
         """Recorded input: the reply (1 or 2) the scripted wearer will look at for the next question."""
@@ -306,6 +320,7 @@ class AnsweringDemo:
         self.app.options_origin = rs.origin.lower() if rs.origin != "Claude" else "Claude"
         self._arm_recorded()
         self.app.ask()
+        self._idle_hint()
 
     def _on_restart(self) -> bool:
         """R (#180): forget the last visitor's question and replies, drop a pending AI request,
@@ -323,10 +338,74 @@ class AnsweringDemo:
             self.panel.show_origin(rs)
             self.app.choices = list(rs.choices)
             self.app.options_origin = rs.origin.lower()      # never "from Claude" for saved phrases
+            if self.live:                                    # answered: no flashing until the next question
+                self._pending = False
+                self.app.window.flash_enabled = False
             # The question is answered: empty the box for the next one.
             self.question = ""
             self.panel.question.clear()
             self.panel.alt_btn.setEnabled(False)
+
+
+def bring_to_front(window) -> None:
+    """Put the window on top of the others. Windows ignores a plain raise from a background
+    process, so it is pinned on top for a moment and then released."""
+    window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+    window.show()
+    window.raise_()
+    window.activateWindow()
+
+    def release() -> None:
+        window.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, False)
+        window.show()
+        window.raise_()
+        window.activateWindow()
+    QTimer.singleShot(1500, release)
+
+
+def wait_for_start(window, source: str) -> bool:
+    """A Start button over the window: calibration begins when the people at the table are
+    ready, not when the program happens to open. False if the window was closed instead."""
+    from PySide6.QtCore import QEventLoop
+    from PySide6.QtWidgets import QPushButton
+    live = source == InputSources.LIVE_EEG
+    veil = QWidget(window)
+    veil.setStyleSheet("background: rgba(11, 13, 16, 235);")
+    veil.setGeometry(window.rect())
+    col = QVBoxLayout(veil)
+    col.addStretch(1)
+    note = QLabel(("Put the headset on and sit comfortably. " if live else "")
+                  + "Calibration takes about 90 seconds. "
+                  + ("The wearer looks at one card and counts its flashes, then closes their eyes on the low beep "
+                     "and opens them on the high beep." if live else
+                     "It runs by itself on the recorded brain data."))
+    note.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    note.setWordWrap(True)
+    note.setStyleSheet(f"color:{T.TEXT};font-size:{T.px(T.HEADING)}px;background:transparent;")
+    button = QPushButton("Start")
+    button.setCursor(Qt.CursorShape.PointingHandCursor)
+    button.setStyleSheet(f"QPushButton{{background:{T.ACCENT};color:{T.ON_ACCENT};font-size:{T.px(T.TITLE)}px;"
+                         f"font-weight:800;padding:{T.M}px {T.px(64)}px;border-radius:{T.RADIUS_M}px;}}")
+    col.addWidget(note)
+    col.addSpacing(T.L)
+    col.addWidget(button, 0, Qt.AlignmentFlag.AlignHCenter)
+    col.addStretch(1)
+    veil.show()
+    veil.raise_()
+    button.setFocus()
+    loop, started = QEventLoop(), {"ok": False}
+
+    def go() -> None:
+        started["ok"] = True
+        loop.quit()
+    button.clicked.connect(go)
+    watch = QTimer(interval=200)
+    watch.timeout.connect(lambda: (veil.setGeometry(window.rect()), None if window.isVisible() else loop.quit()))
+    watch.start()
+    loop.exec()
+    watch.stop()
+    veil.deleteLater()
+    return started["ok"]
 
 
 def main(argv=None) -> int:
@@ -348,6 +427,8 @@ def main(argv=None) -> int:
     p.add_argument("--question", default="", help="ask this question at start")
     p.add_argument("--keys", default="", help="keys after the replies arrive, e.g. '1,1'")
     p.add_argument("--mute", action="store_true")
+    p.add_argument("--no-start-button", action="store_true",
+                   help="EEG inputs: begin calibration at once instead of waiting for the Start button")
     p.add_argument("--windows-voice", action="store_true",
                    help="speak with the Windows voice instead of the natural (Piper) voice")
     p.add_argument("--no-cues", action="store_true", help="no preview/confirm/cancel sounds")
@@ -396,6 +477,12 @@ def main(argv=None) -> int:
               + (f"\n{PAIRING_HELP}" if source == InputSources.LIVE_EEG else ""), file=sys.stderr)
         return 3
     demo.root.show()
+    bring_to_front(demo.root)
+    if hasattr(demo.app.sim, "calibrate") and not (args.no_start_button or args.question or args.screenshot
+                                                    or args.keys or args.mute):
+        if not wait_for_start(demo.root, source):  # the window was closed before Start
+            demo.app.close()
+            return 0
     if hasattr(demo.app.sim, "calibrate"):         # EEG inputs: open the stream and calibrate first
         qapp.aboutToQuit.connect(demo.app.close)
         demo.app.sim.calibration_sequences = args.calibration
