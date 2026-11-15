@@ -346,7 +346,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Updated the script for what's on `main` now: the real map with its 8 s reveal, fullscreen, F1 key help, and the confirm countdown. Submission fields live only in `submission-checklist.md`
 - Checked: every relative link in the folder resolves. Docs only
 
-## 11/14/26 - 8:31 PM - Long Le - #97 Same voice on every laptop for the map lines (PR pending)
+## 11/14/26 - 8:31 PM - Long Le - #97 Same voice on every laptop for the map lines ([PR #125](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/125))
 - The two OpenOrbit answers now play from bundled recordings, so they sound the same on every laptop, with or without Wi-Fi
     - `data/openorbit/audio/compare_air_quality.wav` and `show_satellite.wav`, about 7 s each
 - They're made with espeak-ng, an open-source voice whose output we can share freely. It sounds robotic but clear. `python data/openorbit/audio/make_audio.py` regenerates them
