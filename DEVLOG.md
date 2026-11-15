@@ -348,3 +348,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Folded in what only the old files had: a fallback for every beat of the table demo, a pre-judge checklist (frozen build, smoke check, Wi-Fi off, fallback folder), and an AI Answering alternate shot for the video
 - Updated the script for what's on `main` now: the real map with its 8 s reveal, fullscreen, F1 key help, and the confirm countdown. Submission fields live only in `submission-checklist.md`
 - Checked: every relative link in the folder resolves. Docs only
+
+## 11/14/26 - 8:30 PM - In Young Song - #107 Code tour (PR pending)
+- Any teammate can now walk a judge through the code in five minutes: `docs/demo-submission/code-tour.md`
+    - It goes flash to P300 decision, eye-closure confirm, why nothing is spoken twice, where the map and voice run, then CI and the git hooks, with one sentence to say at each stop
+- Every pointer links to the exact line on `main` and was checked against the code
+- It ends with honest answers to the three hardest judge questions: accuracy (simulated only so far, live not yet measured), proof the brain is responding, and stimulus timing
