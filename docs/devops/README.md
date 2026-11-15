@@ -33,7 +33,7 @@ The smoke prints these **MANUAL** checks and never runs them:
 - the Wi-Fi-off full reveal
 
 **Verified 2026-11-14 (Linux dev machine, Python 3.12.13):**
-- `--smoke` gives `SMOKE PASS: 5 pass, 2 skip, 0 fail`. The skips are #29 and #30.
+- `--smoke` gave `SMOKE PASS: 5 pass, 2 skip, 0 fail` before #29 and #30 landed. On `bfce988` it gives `SMOKE PASS: 7 pass, 0 skip, 0 fail` (#40 checkpoint).
 - `--smoke=judging` gives `SMOKE FAIL` with exit 1, as expected until #29 and #30 land.
 - A deliberate double-output breakage makes `confirm flow` FAIL with exit 1. That's covered in `tests/test_diagnostics.py`.
 

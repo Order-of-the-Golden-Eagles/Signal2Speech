@@ -41,9 +41,10 @@ MAP_ACTIONS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY
 CONFIRM_TIMEOUT_MS = 15_000   # longer than alpha calibration's ~1.5 s closure plus reading time
 
 BLOCKED_INPUTS = {
-    InputSources.LIVE_EEG: "Live EEG is blocked: needs the P300 chooser (#46), alpha confirm "
-                           "(#47), and the live run (#23).",
-    InputSources.RECORDED: "Recorded replay is blocked: needs record/replay (#48).",
+    InputSources.LIVE_EEG: "Live EEG is blocked on the #23 wiring: one HybridBlack pipeline "
+                           "shared by the P300 chooser (#46) and alpha confirm (#47), both merged.",
+    InputSources.RECORDED: "Recorded replay is blocked: it isn't wired into the app yet. Record "
+                           "and replay work in the evidence view (python -m signal2speech.evidence, #48).",
 }
 
 
