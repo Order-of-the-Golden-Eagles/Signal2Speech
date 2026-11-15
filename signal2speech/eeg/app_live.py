@@ -110,18 +110,24 @@ def placeholder_model() -> p300.P300Model:
     return _PLACEHOLDER
 
 
-def build_live_alpha(handler, nodes: p300.P300Nodes, input_source: str, *, simulated: bool):
-    """The alpha switch for ``--input live`` (#103): returns ``(AlphaConfirm, AlphaBursts or None)``.
+def build_live_graph(handler, source: str, input_source: str, *,
+                     placeholder: Optional[p300.P300Model] = None, enable_oscar: bool = True):
+    """Build (don't start) what ``--input live`` runs (#103): ``(P300Nodes, AlphaConfirm, bursts)``.
 
-    Live, it hangs off the P300 chooser's HybridBlack pipeline, because the Unicorn opens only
-    once. Simulated, it gets its own Generator with alpha bursts. The pipeline diagram (#166)
-    calls this too, so the drawing can't drift from the app.
+    Live, the alpha switch hangs off the P300 chooser's HybridBlack pipeline, because the Unicorn
+    opens only once. Simulated (``generator``), it gets its own Generator with alpha bursts.
+    ``LiveEegInput`` and the pipeline diagram (#166) both call this, so the drawing can't drift
+    from the app.
     """
-    if simulated:
+    # g.Pype refuses to start a realtime pipeline with an unfitted scorer, so start from a
+    # small synthetic model (in a private temp folder); calibrate() refits every scorer.
+    nodes = p300.build_pipeline(source, model=placeholder or placeholder_model(),
+                                enable_oscar=enable_oscar)
+    if source == "generator":
         bursts = am.AlphaBursts()
-        return am.AlphaConfirm(handler, input_source=input_source, bursts=bursts), bursts
-    return am.AlphaConfirm(handler, input_source=input_source, pipeline=nodes.pipeline,
-                           upstream=nodes.eeg), None
+        return nodes, am.AlphaConfirm(handler, input_source=input_source, bursts=bursts), bursts
+    return nodes, am.AlphaConfirm(handler, input_source=input_source, pipeline=nodes.pipeline,
+                                  upstream=nodes.eeg), None
 
 
 class SimulatedEyes:
@@ -202,10 +208,8 @@ class LiveEegInput:
         self.p300_calibration: dict = {}
         self.alpha_calibration: Optional[am.Calibration] = None
 
-        # g.Pype refuses to start a realtime pipeline with an unfitted scorer, so start from a
-        # small synthetic model (in a private temp folder); calibrate() refits every scorer.
-        placeholder = placeholder or placeholder_model()
-        self.nodes = p300.build_pipeline(source, model=placeholder, enable_oscar=enable_oscar)
+        self.nodes, self.alpha, self.bursts = build_live_graph(
+            handler, source, self.input_source, placeholder=placeholder, enable_oscar=enable_oscar)
         self.adapter = InputAdapter(handler, self.input_source)
         self.chooser = p300.P300Chooser(self.nodes, self.adapter, flashes_per_tile=flashes)
         self.chooser.bridge.listeners.append(self._on_p300_decision)
@@ -223,8 +227,6 @@ class LiveEegInput:
         self._decide = QTimer(singleShot=True, interval=int((p300.TIME_POST + 0.5) * 1000))
         self._decide.timeout.connect(self._force_decision)
 
-        self.alpha, self.bursts = build_live_alpha(handler, self.nodes, self.input_source,
-                                                   simulated=self.simulated)
         handler.live_eeg_confirm_armed = bool(arm_live_confirm)
 
         self.eyes = SimulatedEyes(lambda: self.bursts)

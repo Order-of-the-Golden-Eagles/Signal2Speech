@@ -66,7 +66,8 @@ def build_server(monitor: Monitor) -> MCPServer:
             try:
                 diagram_cache["text"] = diagram.mermaid(diagram.graph_of(monitor.graph.pipeline))
             except Exception as err:                  # never fail the tool over the drawing
-                return f"(diagram unavailable: {type(err).__name__})"
+                diagram_cache["text"] = f"(diagram unavailable: {type(err).__name__}: {err})"
+                print(f"pipeline diagram failed: {type(err).__name__}: {err}", file=sys.stderr)
         return diagram_cache["text"]
 
     def labelled(body: dict) -> dict:

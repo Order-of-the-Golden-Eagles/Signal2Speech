@@ -61,3 +61,25 @@ def test_cli_prints_one_mode(capsys):
     assert diagram.main(["alpha", "--source", "generator"]) == 0
     out = capsys.readouterr().out
     assert "Simulated: g.Pype Generator" in out and "AlphaBursts" in out and "flowchart LR" in out
+
+
+def test_describe_tolerates_unexpected_settings():
+    """A scalar where a list was expected, or a null, never breaks the drawing."""
+    assert diagram.describe("Trigger", {"time_pre": None, "time_post": 0.7, "target": 101}) == \
+        "? ms before to 700 ms after code 101"
+    assert diagram.describe("Generator", {"sampling_rate": 250, "channel_count": 8}) == \
+        "250 Hz, 8 channels, simulated"
+    assert diagram.describe("FFT", {"window_size": 250, "overlap": None}) == "250 samples"
+    assert diagram.describe("SomethingNew", {"x": 1}) == ""
+
+
+def test_cli_refuses_what_it_cant_draw(capsys):
+    for argv, message in ((["bogus"], "unknown mode bogus"),
+                          (["--source", "generator", "app"], "runs two pipelines"),
+                          (["--write", "alpha"], "regenerates every diagram")):
+        with pytest.raises(SystemExit):
+            diagram.main(argv)
+        assert message in capsys.readouterr().err
+    with pytest.raises(ValueError, match="two pipelines"):
+        with diagram.built("app", "generator"):
+            pass

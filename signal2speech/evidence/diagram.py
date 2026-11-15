@@ -22,7 +22,7 @@ import argparse
 import re
 import sys
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
@@ -43,6 +43,8 @@ TITLES = {
 }
 SOURCE_LABELS = {"hybridblack": "Live EEG: g.tec Unicorn Hybrid Black",
                  "generator": "Simulated: g.Pype Generator"}
+SIMULATED_APP = ("the simulated app (--input simulated --p300) runs two pipelines: the P300 "
+                 "chooser and a separate alpha switch. Draw them with: p300 alpha --source generator")
 
 
 # ── Graph from a pipeline ────────────────────────────────────
@@ -52,8 +54,6 @@ class Node:
     name: str
     cls: str
     detail: str
-    inputs: List[str] = field(default_factory=list)
-    outputs: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -61,15 +61,25 @@ class Graph:
     nodes: List[Node]
     edges: List[Tuple[str, str, str, str]]     # (from key, from port, to key, to port)
 
-    def as_dict(self) -> dict:
-        """A small summary for the MCP pipeline_graph tool (#110)."""
-        return {"nodes": [{"id": n.key, "name": n.name, "type": n.cls, "detail": n.detail}
-                          for n in self.nodes],
-                "edges": [f"{a}.{ap} -> {b}.{bp}" for a, ap, b, bp in self.edges]}
-
 
 def _hz(v) -> str:
     return f"{v:g}" if isinstance(v, (int, float)) else str(v)
+
+
+def _items(v) -> list:
+    """A setting that may be a list, a single value, or missing."""
+    if v is None:
+        return []
+    return list(v) if isinstance(v, (list, tuple)) else [v]
+
+
+def _first(v, default="?"):
+    items = _items(v)
+    return items[0] if items else default
+
+
+def _ms(v) -> str:
+    return str(round(v * 1000)) if isinstance(v, (int, float)) else "?"
 
 
 def describe(cls: str, cfg: dict) -> str:
@@ -78,13 +88,15 @@ def describe(cls: str, cfg: dict) -> str:
     if cls in ("Bandpass", "Bandstop") and g("f_lo") is not None:
         return f"{_hz(g('f_lo'))}–{_hz(g('f_hi'))} Hz"
     if cls == "Trigger":
-        return (f"{round(g('time_pre', 0) * 1000)} ms before to {round(g('time_post', 0) * 1000)} "
-                f"ms after code {', '.join(str(c) for c in g('target') or [])}")
+        return (f"{_ms(g('time_pre'))} ms before to {_ms(g('time_post'))} ms after code "
+                f"{', '.join(str(c) for c in _items(g('target')))}")
     if cls == "FFT":
-        return f"{g('window_size')} samples, {round(g('overlap', 0) * 100)}% overlap"
+        overlap = g("overlap")
+        return (f"{g('window_size')} samples"
+                + (f", {round(overlap * 100)}% overlap" if isinstance(overlap, (int, float)) else ""))
     if cls == "BandPower":
         bands = []
-        for band in g("bands") or []:
+        for band in _items(g("bands")):
             if isinstance(band, (list, tuple)) and len(band) == 3:
                 bands.append(f"{band[0]} {_hz(band[1])}–{_hz(band[2])} Hz")
             else:
@@ -97,13 +109,14 @@ def describe(cls: str, cfg: dict) -> str:
         return "hands its data to our Python code"
     if cls == "ChannelSelector":
         if g("indices") is not None:
-            return "channels " + ", ".join(str(i + 1) for i in g("indices"))
+            return "channels " + ", ".join(str(i + 1) if isinstance(i, int) else str(i)
+                                          for i in _items(g("indices")))
         return str(g("roles") or "")
     if cls == "HybridBlack":
-        return (f"{_hz(g('sampling_rate'))} Hz, {g('eeg_channel_count') or (g('channel_count') or ['?'])[0]} "
+        return (f"{_hz(g('sampling_rate'))} Hz, {g('eeg_channel_count') or _first(g('channel_count'))} "
                 f"EEG channels, OSCAR {'on' if g('enable_oscar') else 'off'}")
     if cls == "Generator":
-        return f"{_hz(g('sampling_rate'))} Hz, {(g('channel_count') or ['?'])[0]} channels, simulated"
+        return f"{_hz(g('sampling_rate'))} Hz, {_first(g('channel_count'))} channels, simulated"
     if cls == "LslReceiver":
         return f"LSL stream {g('stream_name')}"
     if cls in ("Baseline", "EpochAverage") and g("mode"):
@@ -123,17 +136,13 @@ def graph_of(pipeline) -> Graph:
     """Walk g.Pype's serialized record of ``pipeline``: nodes, parameters, connections."""
     data = pipeline.serialize()
     nodes: List[Node] = []
-    by_id: Dict[str, Node] = {}
     by_port: Dict[str, Tuple[Node, str]] = {}
     names: Dict[str, List[Node]] = {}
     for i, raw in enumerate(data["nodes"], 1):
         cfg = raw.get("config", {})
         node = Node(f"n{i}", str(cfg.get("name") or raw["class"]), raw["class"],
-                    describe(raw["class"], cfg),
-                    [p["name"] for p in cfg.get("input_ports", [])],
-                    [p["name"] for p in cfg.get("output_ports", [])])
+                    describe(raw["class"], cfg))
         nodes.append(node)
-        by_id[cfg.get("id", node.key)] = node
         names.setdefault(node.name, []).append(node)
         for p in cfg.get("input_ports", []) + cfg.get("output_ports", []):
             by_port[p["id"]] = (node, p["name"])
@@ -186,6 +195,8 @@ def built(mode: str, source: str = "hybridblack") -> Iterator[object]:
         raise ValueError(f"mode is one of {', '.join(MODES)}")
     if source not in SOURCES:
         raise ValueError(f"source is one of {', '.join(SOURCES)}")
+    if mode == "app" and source == "generator":
+        raise ValueError(SIMULATED_APP)
     # No Qt application is created here: AlphaConfirm is a plain QObject, and creating a
     # QCoreApplication would stop any later QApplication (the app's windows) in this process.
     from signal2speech.core import InputSources, SelectionHandler
@@ -215,16 +226,9 @@ def built(mode: str, source: str = "hybridblack") -> Iterator[object]:
             closers.append(ac)
             pipeline = ac.pipeline
         else:
-            from signal2speech.eeg import p300
-            from signal2speech.eeg.app_live import build_live_alpha, placeholder_model
-            nodes = p300.build_pipeline(source, model=placeholder_model())
-            if not live:
-                # Simulated, the alpha switch runs on a second pipeline; draw the chooser's.
-                closers.append(build_live_alpha(handler, nodes, InputSources.SIMULATED,
-                                                simulated=True)[0])
-            else:
-                closers.append(build_live_alpha(handler, nodes, InputSources.LIVE_EEG,
-                                                simulated=False)[0])
+            from signal2speech.eeg.app_live import build_live_graph
+            nodes, alpha, _bursts = build_live_graph(handler, source, InputSources.LIVE_EEG)
+            closers.append(alpha)
             pipeline = nodes.pipeline
         yield pipeline
     finally:
@@ -287,18 +291,26 @@ def write_docs() -> List[Path]:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m signal2speech.evidence.diagram",
                                  description="Mermaid diagrams of our g.Pype pipelines (#166)")
-    ap.add_argument("modes", nargs="*", choices=[[], *MODES], default=[],
-                    help=f"which pipelines (default: all): {', '.join(MODES)}")
+    ap.add_argument("modes", nargs="*", metavar="mode",
+                    help=f"which pipelines: {', '.join(MODES)} (default: all)")
     ap.add_argument("--source", choices=SOURCES, default="hybridblack",
                     help="hybridblack (Live EEG, the default) or generator (Simulated)")
     ap.add_argument("--write", action="store_true",
                     help="regenerate docs/architecture/pipelines.md and the README diagram")
     args = ap.parse_args(argv)
+    bad = [m for m in args.modes if m not in MODES]
+    if bad:
+        ap.error(f"unknown mode {', '.join(bad)}: choose from {', '.join(MODES)}")
     if args.write:
+        if args.modes or args.source != "hybridblack":
+            ap.error("--write regenerates every diagram; don't give modes or --source with it")
         for path in write_docs():
             print(f"wrote {path.relative_to(ROOT)}")
         return 0
-    for mode in args.modes or MODES:
+    if args.source == "generator" and "app" in args.modes:
+        ap.error(SIMULATED_APP)
+    modes = args.modes or [m for m in MODES if not (m == "app" and args.source == "generator")]
+    for mode in modes:
         print(f"%% {TITLES[mode]}: {SOURCE_LABELS[args.source]}")
         print(diagram(mode, args.source))
         print()
