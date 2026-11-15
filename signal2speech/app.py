@@ -360,7 +360,7 @@ class App:
         h.on_cleared.append(self._talk_cleared)
         h.on_preview.append(self._cue_preview)               # #177
         h.on_round_opened.append(lambda r: self._event(f"round {r.id} ({r.kind.value}) opened"))
-        h.on_cleared.append(lambda r: None if r == "practice" else self._event(f"cleared ({r}), no output"))
+        h.on_cleared.append(lambda r: None if r in ("practice", "restart") else self._event(f"cleared ({r}), no output"))
         h.on_handled.append(lambda e, o: self._event(
             f"{o.value}" + (f" · {e.source} {e.eventId} {e.roundId}->{e.targetId}" if e else "")))
 
@@ -471,6 +471,10 @@ class App:
         self.on_text_scale: List[Callable[[], None]] = []
         self._restyle_overlays()
 
+        self.restarts = 0                               # #180: R presses, for the report
+        restart_key = QShortcut(QKeySequence("R"), self.root)
+        restart_key.setAutoRepeat(False)
+        restart_key.activated.connect(self.restart)
         sc = QShortcut(QKeySequence("D"), self.root)   # rehearse a headset drop (#26)
         sc.setAutoRepeat(False)
         sc.activated.connect(lambda: h.disconnect())
@@ -482,6 +486,7 @@ class App:
         # Operator keys (#94). Neither touches the handler.
         rows = [("1 / 2", "Pick a tile. At the preview, hold 1 for 2 s to confirm; 2 cancels."),
                 ("Esc", "Cancel and clear the screen"),
+                ("R", "Restart: a fresh first question for the next visitor, nothing is said"),
                 ("D", "Pretend the headset disconnected"),
                 ("F11", "Fullscreen on or off"),
                 ("F2", "Conversation or developer log"),
@@ -509,6 +514,38 @@ class App:
             from signal2speech.attract import IDLE_MS, AttractMode
             self.attract = AttractMode(self, idle_ms=attract_idle_ms or IDLE_MS)
             self.attract.poke()
+
+    # ── #180 restart ─────────────────────────────────────────
+    def restart(self) -> None:
+        """R: a clean first question from any state, for the next visitor (#180).
+
+        It goes through the contract, never around it: an open round is ended with
+        ``handler.cancel("restart")``, so a decision still in flight for it arrives stale and is
+        rejected, and a fresh Choose round opens with ``begin_choice_round``. Nothing is shown or
+        spoken. Each restart goes in the session report.
+        """
+        h = self.handler
+        if self.attract is not None and self.attract.active:
+            self.attract.stop("restart")
+        self._reopen.stop()
+        self.sink.stop_output()                      # a reply still waiting for its cue stays unsaid
+        if self.practice.active:
+            finished, self.practice.on_finished = self.practice.on_finished, None
+            try:
+                self.practice.stop()                 # without its own "ask", we open the round below
+            finally:
+                self.practice.on_finished = finished
+            self.window.reset()
+        if h.current is not None:
+            h.cancel("restart")
+        self._reopen.stop()                          # the cancel scheduled a reopen; we open now
+        self._stop_confirm_timeout()
+        self._set_reveal(False)
+        self.restarts += 1
+        self.log("restart (R): a fresh first question, nothing was output")
+        self._event("restart (R)")
+        self.conversation.add("nothing", "Restarted for the next visitor.")
+        self.ask()
 
     # ── #196 practice ────────────────────────────────────────
     @property
@@ -631,7 +668,7 @@ class App:
 
     def _talk_cleared(self, reason: str) -> None:
         had_preview, self._previewed = self._previewed is not None, None
-        if reason == "practice":                 # the practice round took over the screen (#196)
+        if reason in ("practice", "restart"):   # practice (#196) and R (#180) say it themselves
             return
         what = "preview" if had_preview else "question"
         text = {"cancel": f"The {what} was cancelled.",
@@ -768,7 +805,8 @@ class App:
         lines += ["", "## Help phrase", ""]
         lines += ([f"- {c['time']} · {c['source']}: “{c['text']}”" for c in self.sink.help_calls]
                   or ["Not used this session."])
-        extra = [f"- **Practice rounds:** {self.practice.runs}"]
+        extra = [f"- **Practice rounds:** {self.practice.runs}",
+                 f"- **Restarts (R):** {self.restarts}"]
         if self.attract is not None:
             extra.append(f"- **Attract-mode loops:** {self.attract.runs} (simulated, left out of the counts)")
         lines += ["", "## Other", ""] + extra
