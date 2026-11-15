@@ -656,3 +656,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - How we kept it honest: each test uses a separate stretch of the recording from the one the classifier learned on, and with the labels scrambled the same code falls to chance (42 to 46 %)
 - This is offline analysis of five people who are not our wearer, labelled Recorded. It shows the method works on real human brain responses. It doesn't predict a live wearer's accuracy
 - Verified on the judging laptop against the real dataset; one new test uses a made-up recording, since the dataset is never committed
+## 11/15/26 - 6:41 AM - Vasanth Anbukumar - #150 We tested the PiEEG board on two people: it records, but shows no usable brain signal ([PR #216](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/216))
+- The borrowed PiEEG Octopus 16 is out of the demo. It connects, streams and records well, but on two people with good contact we found no eyes-closed alpha and no response to a flickering square, the two EEG signals we tried
+    - A jaw clench and a hard blink showed up only faintly at the back of the head, too faint to use as a switch
+    - Likely reason: the board's reference pin sits within 2 cm of its signal pins, which cancels a brain rhythm before it's measured. We didn't prove that; it's the explanation that fits
+- What this means for judging: the real EEG we show is g.tec's recorded data (#104, #142). Never call anything from this board live EEG. The app's `--input pieeg` mode is verified on simulated streams only
+- Two practical lessons are written down in `docs/eeg-hardware/README.md`: don't pair the board in Windows' Bluetooth settings (it then connects and drops in a loop), and seat the puck flat
+- New tool, tested on the real board: `python -m signal2speech.eeg.pieeg_keepalive` keeps the board's stream up and reconnects after a dropped link, which PiEEG's own script doesn't do
+- Verified by ten labelled recordings kept privately under `recordings/`, never committed. The full table of what was tried, where, and the numbers is in the hardware docs
