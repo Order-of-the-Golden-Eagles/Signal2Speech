@@ -340,6 +340,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Only the tests that really need g.Pype are skipped. The rest of `test_diagnostics.py` and `test_recovery.py` still runs everywhere, and CI still runs all of them on Windows, macOS, and Linux
 - Checked on macOS 12 without g.Pype: 183 passed, 0 failed, and the push hook passes again
 
+## 11/14/26 - 7:58 PM - Vasanth Anbukumar - #106 Grounded Claude replies and map actions ([PR #116](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/116))
+- AI Answering now uses `claude-sonnet-5-5`, which answered in about 1.4–1.9 s, against 2–3 s for Opus. Low effort, the server-side fallback, the 8 s timeout, and saved phrases all stay the same
+- Claude now gets a "Verified facts" block built from the OpenOrbit data: the four EPA AQI rows, the changes, where EMU and Detroit are, and the sources. It's told to state only those facts and to say "I don't know" otherwise
+- Before, every model answered "Wayne" to "Which county's AQI rose more?". That was wrong: Washtenaw rose 186 points and Wayne rose 168. Claude now offers the Compare counties map action for it
+- A reply can now be a map action (compare counties or show the satellite view). The spoken line for those comes from the dataset and the demo contract, never from Claude's words, so the numbers always match the map
+- Checked with real calls: the AQI question, "Do you want water or juice?", and a question the data can't answer, which got an honest "I don't know". All 247 tests pass
+
 ## 11/14/26 - 8:01 PM - MagicJester2764 - #103 Live EEG inside the app ([PR #124](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/124))
 - The headset can now drive the real demo app: `python -m signal2speech.app --input live`
     - It calibrates on the app's own tiles first (look at the named tile, then eyes open and eyes closed), then the brain's response picks a tile and closing your eyes confirms
@@ -348,6 +355,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - With no headset, it now stops within about 15 seconds with pairing steps, instead of freezing forever (the headset library waits indefinitely when no device is there)
 - Rehearse the exact same path without the headset: `--input simulated --p300`. That run worked end to end (one preview, one eye-closure confirm, one spoken line). Nothing has been tried on a real wearer yet
 - After two code reviews: a failed calibration switches that part off and the on-screen hints say so (keys still work); closing the window, a busy headset, a missing driver, or a crash all exit cleanly and release the headset; if the brain gives no answer, the tiles flash again, then hand over to the keys
+
 ## 11/14/26 - 8:07 PM - Long Le - #5 AI demo shows the map for map suggestions ([PR #118](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/118))
 - When Claude suggests a map answer (from #106), the AI demo window now shows the map and speaks the line once, just like the main app
 - Why: the AI demo had no map on purpose, because replies used to be spoken words only. With #106, picking "Compare counties (shows the map)" would have spoken the line but shown nothing, and logged a BUG line
@@ -366,6 +374,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The hook itself now clears git's variables before running the tests, so no other test or tool can do the same thing
 - Verified by pushing through the real pre-push hook: the tests passed, and the repo's settings, history, and staged files were unchanged afterwards. A new test also checks this on every run, in both ways a hook can set git's variables
 - If you pushed with the hooks turned on, check your repo with the steps in `docs/MEMORY.md`
+
 ## 11/14/26 - 8:13 PM - Vasanth Anbukumar - #23 Plain-language prompts in the live-run guide ([PR #127](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/127))
 - The guided headset test (`python -m signal2speech.eeg.live --source hybridblack`) now speaks to the wearer in plain words: "WEARER: look at the tile with the YELLOW border… count it silently", "If YES, close your eyes for about 2 seconds"
 - Steps read as what's happening ("checking the signal", "learning how your brain reacts to the flashes", "learning your eyes-closed YES signal") instead of jargon
@@ -419,6 +428,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - PiEEG's simulators have no P300, so the choice is made by keyboard here. The P300 chooser stays on `--input simulated --p300`
 - Only the stream from this laptop is used, under a name unique to it, so another team's PiEEG simulator on the venue Wi-Fi can't drive our app
 - Verified on Windows with PiEEG's real starter: 250.0 Hz, calibration ratio 26.2, one confirm and one spoken line. The new tests use a fake stream and skip without `pylsl`, which isn't in the team install yet (Vasanth's call, #19). Not tried on the judging laptop, and not in the evidence view yet
+
 ## 11/14/26 - 9:26 PM - Long Le - #133 Crash-safe launcher for the judging table ([PR #145](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/145))
 - One command starts the demo fullscreen and brings it back by itself if it crashes: `python tools/demo_launcher.py --input keyboard`
     - Restarts after 1 s, then every 2 s, up to 5 times. Closing the window normally just ends it

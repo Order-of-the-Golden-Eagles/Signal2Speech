@@ -97,7 +97,7 @@ def test_make_provider_without_key_is_labelled_stub(tmp_path):
 def test_make_provider_with_key_builds_claude_without_calling_it():
     pytest.importorskip("anthropic")
     provider, note = make_provider("auto", env={"ANTHROPIC_API_KEY": "sk-test"})
-    assert provider.name == CLAUDE and "claude-opus-5-5" in note
+    assert provider.name == CLAUDE and "claude-sonnet-5-5" in note
 
 
 def test_dotenv_loads_without_overriding(tmp_path):
@@ -129,13 +129,98 @@ def test_claude_provider_request_shape_and_refusal():
             messages = Msgs()
 
     p = ClaudeProvider("sk-test", client=Client())
-    assert p.replies("Walk later?", avoid=["Yes."]) == ["Sure.", "Not today."]
-    assert seen["model"] == "claude-opus-5-5" and seen["fallbacks"] == "default"
+    assert p.replies("Walk later?", avoid=["Yes."]) == [("Sure.", "speak_reply"),
+                                                        ("Not today.", "speak_reply")]
+    assert seen["model"] == "claude-sonnet-5-5" and seen["fallbacks"] == "default"
     assert seen["output_config"]["format"]["type"] == "json_schema"
     assert "Already offered" in seen["messages"][0]["content"]
     Resp.stop_reason = "refusal"
     with pytest.raises(ProviderError, match="declined"):
         p.replies("Walk later?")
+
+
+# ── Grounded replies and app actions (#106) ──────────────────
+def test_system_prompt_has_dataset_facts_and_is_stable():
+    pytest.importorskip("anthropic")
+    from signal2speech.ai import ClaudeProvider, openorbit_facts
+    from signal2speech.openorbit.dataset import load_dataset
+
+    ds = load_dataset()
+    p1, p2 = ClaudeProvider("sk-test", client=object()), ClaudeProvider("sk-test", client=object())
+    assert p1.system == p2.system and openorbit_facts() is not None
+    for c in ds.changes:
+        for value in (c.county, str(c.before), str(c.after), str(abs(c.change)),
+                      c.before_category, c.after_category):
+            assert value in p1.system
+    for word in ("2023-06-26", "2023-06-28", "Eastern Michigan University", "Detroit",
+                 "NASA GIBS", "EPA AirData", "Never invent numbers", "I don't know"):
+        assert word in p1.system
+    assert f"Larger increase: {ds.largest_increase().county}" in p1.system
+
+
+def test_compare_action_uses_dataset_line_not_model_text():
+    from signal2speech.openorbit.dataset import load_dataset
+
+    provider = FixedProvider([("Wayne rose more.", "compare_air_quality"),
+                              ("I'm not sure.", "speak_reply")])
+    rs = ReplySuggester(provider).suggest("Which county's AQI rose more?")
+    a, b = rs.choices
+    assert rs.origin == CLAUDE
+    assert (a.target_id, a.action_id) == (T1, ActionIds.COMPARE_AIR_QUALITY)
+    assert a.spoken_text == load_dataset().spoken_comparison() and "Wayne rose" not in a.label
+    assert "Compare counties" in a.label
+    assert (b.action_id, b.spoken_text) == (ActionIds.SPEAK_REPLY, "I'm not sure.")
+
+
+def test_show_satellite_action_uses_contract_line():
+    import json
+    from pathlib import Path
+    contract = json.loads((Path(__file__).resolve().parents[1] / "contracts" / "demo-round.json")
+                          .read_text(encoding="utf-8"))
+    line = next(c["spokenText"] for c in contract["choices"] if c["actionId"] == "show_satellite")
+    rs = ReplySuggester(FixedProvider([("Sure.", "speak_reply"),
+                                       ("Look.", "show_satellite")])).suggest("Show me?")
+    assert rs.choices[1].action_id == ActionIds.SHOW_SATELLITE
+    assert rs.choices[1].spoken_text == line
+
+
+@pytest.mark.parametrize("items", [
+    [("Yes.", "launch_rocket"), ("No.", "speak_reply")],                   # unknown action
+    [("A.", "compare_air_quality"), ("B.", "compare_air_quality")],        # same action twice
+    [("Same.", "speak_reply"), ("same.", "speak_reply")],                  # same words
+    [("Only one", "speak_reply")],                                         # one reply
+    [("x" * 200, "speak_reply"), ("No.", "speak_reply")],                  # too long
+])
+def test_invalid_action_output_falls_back(items):
+    rs = ReplySuggester(FixedProvider(items)).suggest("Q?")
+    assert rs.origin == SAVED and rs.texts == ["Yes.", "No."]
+
+
+def test_claude_provider_returns_actions_from_schema():
+    pytest.importorskip("anthropic")
+    from signal2speech.ai import ClaudeProvider
+    from signal2speech.ai.replies import REPLY_SCHEMA
+
+    class Block:
+        type = "text"
+        text = ('{"reply_a": "Washtenaw.", "action_a": "compare_air_quality", '
+                '"reply_b": "Let me check.", "action_b": "speak_reply"}')
+
+    class Resp:
+        stop_reason, content = "end_turn", [Block()]
+
+    class Client:
+        class beta:
+            class messages:
+                @staticmethod
+                def create(**kw):
+                    assert kw["output_config"]["format"]["schema"] is REPLY_SCHEMA
+                    return Resp()
+
+    assert set(REPLY_SCHEMA["required"]) == {"reply_a", "action_a", "reply_b", "action_b"}
+    p = ClaudeProvider("sk-test", client=Client())
+    assert p.replies("Which county?") == [("Washtenaw.", "compare_air_quality"),
+                                          ("Let me check.", "speak_reply")]
 
 
 # ── Qt: deadline and stale results ───────────────────────────
