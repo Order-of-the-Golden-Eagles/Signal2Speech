@@ -643,11 +643,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
 
-## 11/15/26 - 5:24 AM - MagicJester2764 - #180 R restarts the demo for the next visitor ([PR #213](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/213))
-- Between judges, one key press (R) brings back a fresh first question from wherever the app is: mid-preview, mid-reveal, mid-practice, or during the idle demo. Nothing is said
-- It uses the same rules as a normal cancel, so a brain decision still in flight from before the restart is thrown away instead of picking something on the new question
-- Each restart is counted in the session report, separately from cancels
-- Checked with keyboard and simulated input in tests. The welcome screen half of #180 is still open: Long's attract loop already uses the idle time, and we're agreeing on how the two fit
 ## 11/15/26 - 4:10 AM - MagicJester2764 - #165 Soak test for the judging hour ([PR #211](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/211))
 - Anyone can leave the demo running for an hour by itself and get a pass/fail report: no double outputs, no crashes, steady memory, same speed at the end as at the start
     - `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` writes `logs/soak-<time>.md`
@@ -660,6 +655,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - On all five of g.tec's recorded subjects, the biggest blink and movement swings got 14–65% smaller, while the rest of the signal barely changed. Classification stayed the same or improved (one subject went from 0.72 to 0.81)
 - We found that OSCAR delays the signal by about a third of a second and g.Pype doesn't shift the flash markers to match. Ignoring that costs up to 0.14 accuracy, so the docs say how to handle it, and the headset session should check it on the live path
 - Measured on g.tec's recordings replayed through g.Pype (Recorded, not our wearer, not live). The g.tec data stays out of git
+
+## 11/15/26 - 5:24 AM - MagicJester2764 - #180 R restarts the demo for the next visitor ([PR #213](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/213))
+- Between judges, one key press (R) brings back a fresh first question from wherever the app is: mid-preview, mid-reveal, mid-practice, or during the idle demo. Nothing is said
+- It uses the same rules as a normal cancel, so a brain decision still in flight from before the restart is thrown away instead of picking something on the new question
+- Each restart is counted in the session report, separately from cancels
+- Checked with keyboard and simulated input in tests. The welcome screen half of #180 is still open: Long's attract loop already uses the idle time, and we're agreeing on how the two fit
 
 ## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
 - With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
