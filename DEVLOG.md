@@ -418,7 +418,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every start and exit is logged to `logs/launcher-<time>.log`. If it gives up, it says to switch to the fallback build
 - Checked with real processes: a clean quit stopped the launcher, and a crashing app was restarted after 1 s, then given up on with a clear message. Tests use a fake process. The judging-laptop session and the stage script now use it
 
-## 11/14/26 - 9:43 PM - MagicJester2764 - #110 An AI assistant can read the brain pipeline (PR pending)
+## 11/14/26 - 9:43 PM - MagicJester2764 - #110 An AI assistant can read the brain pipeline ([PR #155](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/155))
 - Claude (Desktop or Code) can now ask Signal2Speech about its live signal pipeline and get real numbers back: `python -m signal2speech.mcp`
     - It answers questions like "Is the wearer's P300 visible?" from the actual averaged brain response, and can open the evidence window
 - Every answer says whether the data is Simulated or Live EEG, and only summaries are sent, never raw brain data
