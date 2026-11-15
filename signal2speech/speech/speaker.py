@@ -137,6 +137,12 @@ class OfflineSpeaker(QObject):
     def stop(self) -> None:
         """Stop any audio now (attract mode ending, #193)."""
         self._waiting = None                       # a natural-voice line still being made
+        if sys.platform == "win32":
+            try:
+                import winsound
+                winsound.PlaySound(None, winsound.SND_PURGE)
+            except Exception:
+                pass
         if self._sound is not None:
             try:
                 self._sound.stop()
@@ -202,6 +208,8 @@ class OfflineSpeaker(QObject):
         QSoundEffect per line each held an audio channel that was never released, and after
         about 35 lines Windows gave out no more. The app then went silent while still reporting
         that it was playing."""
+        if self._play_wav_windows(wav):
+            return
         from PySide6.QtMultimedia import QSoundEffect
         if self._sound is None:
             self._sound = QSoundEffect(self)
@@ -219,6 +227,23 @@ class OfflineSpeaker(QObject):
             self._sound.stop()                    # a line still playing is cut off, never overlapped
         self._sound.setSource(QUrl.fromLocalFile(str(wav)))
         self._sound.play()
+
+    def _play_wav_windows(self, wav: Path) -> bool:
+        """On Windows, play through the system's own WAV player. Qt's sound effect reported a
+        freshly made line as playing while nothing reached the speakers (measured on the judging
+        laptop, 2026-11-15); lines made earlier played. This path was heard and measured for
+        both. Returns False where it isn't available, and the Qt player is used."""
+        if sys.platform != "win32":
+            return False
+        try:
+            import winsound
+            winsound.PlaySound(None, winsound.SND_PURGE)             # cut off a line still playing
+            winsound.PlaySound(str(wav), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+        except Exception as err:
+            self.log(f"speech: the Windows player failed ({type(err).__name__}: {err}), using Qt's")
+            return False
+        self._started()
+        return True
 
     def _say_without_neural(self, text: str, clip: Optional[str] = None) -> None:
         wav = bundled_clip(clip, self.audio_dir)

@@ -348,6 +348,8 @@ def main(argv=None) -> int:
     p.add_argument("--question", default="", help="ask this question at start")
     p.add_argument("--keys", default="", help="keys after the replies arrive, e.g. '1,1'")
     p.add_argument("--mute", action="store_true")
+    p.add_argument("--windows-voice", action="store_true",
+                   help="speak with the Windows voice instead of the natural (Piper) voice")
     p.add_argument("--no-cues", action="store_true", help="no preview/confirm/cancel sounds")
     p.add_argument("--reply-language", default="en",
                    help="suggest and speak replies in this language, e.g. es or Spanish (#194); F3 switches")
@@ -361,6 +363,9 @@ def main(argv=None) -> int:
     except ValueError as e:
         print(e, file=sys.stderr)
         return 2
+    if args.windows_voice:
+        import os
+        os.environ["SIGNAL2SPEECH_VOICE"] = "off"       # read when the app builds its speaker
     qapp = QApplication.instance() or QApplication(sys.argv[:1])
     try:
         provider, note = make_provider(args.provider)
