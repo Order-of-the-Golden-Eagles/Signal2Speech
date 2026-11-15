@@ -418,7 +418,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every start and exit is logged to `logs/launcher-<time>.log`. If it gives up, it says to switch to the fallback build
 - Checked with real processes: a clean quit stopped the launcher, and a crashing app was restarted after 1 s, then given up on with a clear message. Tests use a fake process. The judging-laptop session and the stage script now use it
 
-## 11/14/26 - 9:36 PM - Long Le - #132 Video title card, closing card, and diagram (PR pending)
+## 11/14/26 - 9:36 PM - Long Le - #132 Video title card, closing card, and diagram ([PR #147](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/147))
 - The submission video has its three graphics ready in `docs/demo-submission/media/`: a title card, a closing card with the repo link and AI-use note, and an architecture diagram for shot 9
 - They're drawn by a script, so changing a name or a line is one command: `python docs/demo-submission/make_graphics.py`
 - The diagram shows the real path: headset → g.Pype (OSCAR) → P300 to choose and alpha to confirm → selection contract → speech and map, with keyboard and simulator input going through the same contract
