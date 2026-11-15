@@ -674,7 +674,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why: the old script assumed someone wearing a g.tec headset. Reading from it at the table would have meant saying things that aren't true today
 - Checked on the judging laptop: the four-exchange command ran and the recorded data picked the scripted tile all four times (2, 1, 2, 1). The older live-wearer plan is kept below the new section for reference
 
-## 11/15/26 - 7:52 AM - Vasanth Anbukumar - #91 The app's screens hold still, show much bigger NASA images, and nothing is cut off (PR pending)
+## 11/15/26 - 7:52 AM - Vasanth Anbukumar - #91 The app's screens hold still, show much bigger NASA images, and nothing is cut off ([PR #222](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/222))
 - The layout no longer jumps between screens: the heading stays at the top, the two cards stay at the bottom, and the columns keep the same width from question to result
 - The NASA images are about three times bigger. To make room, the box under the map shows only the latest thing chosen or said; F2 still shows the full log
 - Nothing is cut off any more. The status strip runs the full width of the window, and a long input label, such as recorded mode's, gets a line to itself
