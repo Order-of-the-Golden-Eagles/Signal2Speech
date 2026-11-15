@@ -417,9 +417,6 @@ class SelectionWindow(QMainWindow):
         self.round_label.setMinimumWidth(1)
         self.round_label.setVisible(False)
         srow.addWidget(self.round_label, 1)
-        # The last outcome can be long; let it clip instead of forcing the window wide.
-        # The transcript and the tooltip keep the full text.
-        self.outcome_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         # A sentence reads best in the body font, not the strip's monospace (#179).
         self.outcome_label.setProperty("class", "")
         self.outcome_label.setObjectName("stripSentence")
@@ -505,9 +502,13 @@ class SelectionWindow(QMainWindow):
         elif not own and not in_row:
             scol.removeWidget(self.outcome_label)
             srow.insertWidget(srow.indexOf(self.connection_label), self.outcome_label, 1)
-        # On its own line it may wrap (a timing note after a confirm); beside the badge it's
-        # one line, kept short by SENTENCE_MAX.
+        # On its own line it may wrap (a timing note after a confirm). Beside the badge it's one
+        # line that never shrinks below its text: the connection state gives way instead, down
+        # to "● …". Fonts differ by machine, so this can't rely on a fixed width.
         self.outcome_label.setWordWrap(own)
+        self.outcome_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred if own else QSizePolicy.Policy.Minimum,
+            QSizePolicy.Policy.Preferred)
 
     @property
     def has_connection(self) -> bool:
