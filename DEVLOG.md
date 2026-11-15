@@ -343,7 +343,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Error messages say what to do next (adjust the headset, re-run with `--flashes 12`, or use `--confirm keyboard`)
 - Only the wording changed; the steps, timing, and safety rules are the same. Checked with a dry run on simulated data; the wearer prompts appear only with the real headset
 
-## 11/14/26 - 8:44 PM - Vasanth Anbukumar - #23 On-screen and spoken cues for the wearer
+## 11/14/26 - 8:44 PM - Vasanth Anbukumar - #23 On-screen and spoken cues for the wearer ([PR #127](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/127))
 - The guided test now tells the wearer what to do on the tile window itself (a big yellow instruction line) and out loud with the laptop's offline voice: "Look at the yellow tile", "Close your eyes", "The app picked tile 2. If that's right, close your eyes"
     - So one person can wear the headset without watching the terminal, and eyes-closed steps work because the cues are spoken
 - New `--show` flag: `python -m signal2speech.eeg.live --source generator --show` opens the same window and cues on simulated data, so judges can watch the flow without hardware. `--no-voice` keeps the banner but mutes speech
