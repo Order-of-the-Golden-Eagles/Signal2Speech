@@ -28,12 +28,13 @@ from .replies import (TIMEOUT_S, ReplySet, ReplySuggester, make_provider,
 class AnsweringDemo:
     def __init__(self, input_source: str = InputSources.KEYBOARD, provider_kind: str = "auto", *,
                  provider=None, provider_note: Optional[str] = None, speaker=None, view=None,
+                 cues: bool = False,
                  mute: bool = False, echo: bool = True, deadline_s: float = TIMEOUT_S + 1):
         if provider is None and provider_note is None:
             provider, provider_note = make_provider(provider_kind)
         self.provider_note = provider_note or ""
         # view=None gives the real OpenOrbit view, so map suggestions (#106) reveal the map.
-        self.app = App(input_source, view=view, speaker=speaker, mute=mute, echo=echo)
+        self.app = App(input_source, view=view, speaker=speaker, mute=mute, echo=echo, cues=cues)
         self.suggester = ReplySuggester(provider, saved_phrases_from_file())   # #134
         self.async_ = AsyncSuggester(self.suggester, deadline_s, parent=self.app.window)
         self.panel = QuestionPanel()
@@ -63,6 +64,7 @@ class AnsweringDemo:
 
     def ask(self, question: str) -> None:
         self.question = question
+        self.app.add_question(question)
         self.app.log(f"question: \"{question}\"")
         self._request(())
 
@@ -87,6 +89,7 @@ class AnsweringDemo:
         note = f" ({rs.note})" if rs.note else ""
         self.app.log(f"replies from {rs.origin}{note}: " + " | ".join(rs.texts))
         self.app.choices = list(rs.choices)
+        self.app.options_origin = rs.origin.lower() if rs.origin != "Claude" else "Claude"
         self.app.ask()
 
     def _after_handled(self, _e, outcome: Outcome) -> None:
@@ -105,6 +108,7 @@ def main(argv=None) -> int:
     p.add_argument("--question", default="", help="ask this question at start")
     p.add_argument("--keys", default="", help="keys after the replies arrive, e.g. '1,1'")
     p.add_argument("--mute", action="store_true")
+    p.add_argument("--no-cues", action="store_true", help="no preview/confirm/cancel sounds")
     p.add_argument("--deadline", type=float, default=TIMEOUT_S + 1,
                    help="seconds before falling back to saved phrases")
     p.add_argument("--screenshot", type=Path, help="save a PNG after --keys (or replies) and exit")
@@ -116,7 +120,7 @@ def main(argv=None) -> int:
     except ValueError as e:
         print(e, file=sys.stderr)
         return 2
-    demo = AnsweringDemo(args.input, provider=provider, provider_note=note, mute=args.mute,
+    demo = AnsweringDemo(args.input, provider=provider, provider_note=note, mute=args.mute, cues=not args.no_cues,
                          deadline_s=args.deadline)
     demo.root.show()
     demo.start()

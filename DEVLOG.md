@@ -522,6 +522,17 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The library run sheet is in `docs/eeg-hardware/README.md`: power bank only while worn, close PiEEG Cloud first (one Bluetooth connection at a time), puck on the back of the head
 - First-run check: `python -m signal2speech.eeg.lsl_source --input live --check` detects the board, measures the sample rate, and reports each pin's contact in about 10 seconds, with no prompts
 - Verified against PiEEG's own script (their simulator publishing the real stream): detected as the Octopus 16 at 250 samples per second. Also verified with a stream that really sends 244 per second, as some boards do, and on our simulated 16-pin stream, where it found the flat pin and the loose pin, used the other 14, and confirmed once per closure. Not yet tried on a real board or a real person
+
+## 11/15/26 - 1:21 AM - Vasanth Anbukumar - #150 Voice-guided test and recording session for the board ([PR #198](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/198))
+- One command now runs the whole library session and the wearer only has to listen: `python -m signal2speech.eeg.board_session --input live --consent`
+    - Every instruction is spoken, then a beep starts the timed part, so timing doesn't depend on how fast anyone reads
+    - Six phases in about 5 minutes: pin contact, which pins respond, calibration, false triggers at rest, a closure test, and a four-choice test
+- The four-choice test reads numbered choices in turn ("One: Yes. Two: No…"). The wearer closes their eyes on the one they want, then once more to confirm. This board gives one dependable signal, so stepping through the choices is how one signal picks from many
+- Raw data is recorded from the first second and saved after every phase, so a failure midway loses nothing. `--verify <folder>` checks a saved recording is complete before you leave the board
+- Why Windows' own voice: the speech library the app uses for replies spoke the first cue and silently skipped the rest
+- Checked on our simulated 16-pin stream, on the judging laptop: with the real voice, at 244 samples per second, with slow uneven reactions, with almost no eyes-closed response (stops with a clear reason), and with the board dropping out (stops within 3 seconds). Measured there: about 19 seconds for a full pick-and-confirm from four choices
+- Not yet run on a real board or a real person
+
 ## 11/15/26 - 11:59 PM - Long Le - #174 One visual design and redesigned tiles ([PR #185](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/185))
 - The app now has one visual design: `signal2speech/ui/theme.py` sets the colours, text sizes, spacing, and corners, and every screen we built uses it
 - The two choice tiles are redesigned: an icon, a clear title, a one-line "what happens" line, and the key as a small badge in the corner instead of "[1]" in the title. They have distinct idle, flashing, selected (green check after a confirm), and waiting states
@@ -533,9 +544,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The old wording said Claude "can't invent numbers". That's only true for map answers, which speak our own fixed lines. Ordinary replies are the model's own words, kept to the facts by the prompt, so the text now says exactly that
 - Every video length check now says 2:30 or less, g.tec's cap (#160). The fact check was redone at `da6e00d`: 408 tests, and `main` now requires the four CI jobs before a merge
 - Docs only. If the Devpost draft was already submitted with the old AI answer, replace it before the final
+
 ## 11/15/26 - 12:32 AM - MagicJester2764 - #103 README: live input status ([PR #187](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/187))
 - The README status table now says the app already takes live headset input (`python -m signal2speech.app --input live`)
-- It said live input was switched off, which stopped being true when #103's code merged. A judge reading it would undersell the demo
+- It said live input was switched off, which stopped being true when #124 merged. A judge reading it would undersell the demo
 - Eye-closure confirm is still off on a real headset and key 1 confirms instead. That still needs one wearer run (#23, #103)
 - Docs only. Nothing new was run
 
@@ -551,3 +563,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Why it wasn't noticed: the judging laptop uses the main voice (Qt's Windows voice), which was never affected. Checked there: three replies in a row all spoke, each starting within a quarter of a second
 - How it was found: the voice-guided board session (#150) used the same library for its spoken cues, and the second and third cues were silent
 - Measured on the judging laptop: before the fix the backup spoke for 2.9 s, then 0.1 s and 0.1 s. After it: 2.7 s, 2.3 s, 2.2 s. A new test checks there is one helper per reply
+## 11/15/26 - 1:15 AM - Long Le - #176 #177 Readable conversation and sound cues ([PR #192](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/192))
+- The panel under the map now reads like a conversation: Options (and where they came from), Previewed, Said aloud or Showed the map and said, or Nothing was said, each with the input that caused it
+    - Press `F2` to swap to the developer log; the session report in `logs/` keeps both
+- Preview, confirm, and cancel each play a short, quiet tone, so a wearer with closed eyes knows the pick registered. The confirm tone ends before speech starts, so they never overlap.
+    - `--no-cues` turns them off; `--mute` silences them too
+- The tones are generated in code, so there's no audio file to download or license
+- Verified with the keyboard and in headless tests with a fake sound player (11 new tests: wording for cancel, timeout, and disconnect; one cue per event; confirm cue before speech; exactly one speech). I haven't listened to the tones' volume on the judging laptop's speakers yet.
