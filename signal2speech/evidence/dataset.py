@@ -202,11 +202,93 @@ def make_player_nodes(session: Session):
     return eeg, flashes
 
 
+# ── #151: how many flashes does the chooser need? ────────────────────────────
+CURVE_FLASHES = (1, 2, 3, 5, 10)
+
+
+def curve(session: Session, flashes: Sequence[int] = CURVE_FLASHES, folds: int = 5,
+          draws: int = 400, seed: int = 0) -> dict:
+    """How often our chooser picks the attended item out of two, by flashes averaged.
+
+    Cross-validated in blocks of time: the recording is cut into five consecutive stretches, the
+    LDA is fitted on four and tested on the fifth, five times over. Blocks matter. Flashes come
+    faster than an epoch lasts, so neighbouring epochs share samples, and a random split would
+    test on EEG the classifier had nearly seen (it scored 88-98 % on one flash that way, which is
+    too good). In each test, ``n`` held-out responses to the attended stimulus and ``n`` to an
+    unattended one are scored, and the pick is right when the attended ones score higher on
+    average. That is the two-tile decision ``signal2speech.eeg.p300`` makes, with its features
+    (40 ms bin means over the epoch). Offline, on someone else's recording: not a live result.
+    """
+    from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+    from sklearn.model_selection import KFold
+
+    from signal2speech.eeg import p300
+
+    ep, labels, _ = epochs(session, pre_s=p300.TIME_PRE, post_s=p300.TIME_POST)
+    feats = np.stack([p300.bin_means(e).reshape(-1) for e in ep])
+    rng = np.random.default_rng(seed)
+    right = {n: [] for n in flashes}
+    for train, test in KFold(folds, shuffle=False).split(feats):          # consecutive blocks
+        lda = LinearDiscriminantAnalysis(solver="lsqr", shrinkage="auto").fit(feats[train], labels[train])
+        scores = lda.decision_function(feats[test])
+        t, nt = scores[labels[test] == 1], scores[labels[test] == 0]
+        for n in flashes:
+            if len(t) < n or len(nt) < n:
+                continue
+            for _ in range(draws):
+                a = rng.choice(t, n, replace=False).mean()
+                b = rng.choice(nt, n, replace=False).mean()
+                right[n].append(a > b)
+    return {n: float(np.mean(v)) for n, v in right.items() if v}
+
+
+def curve_svg(curves: dict, flashes: Sequence[int] = CURVE_FLASHES) -> str:
+    """The curves as a small SVG line chart (no plotting library needed)."""
+    w, h, left, top, bottom = 640, 360, 64, 28, 52
+    pw, ph = w - left - 24, h - top - bottom
+    xs = {n: left + pw * i / (len(flashes) - 1) for i, n in enumerate(flashes)}
+    y = lambda acc: top + ph * (1.0 - (acc - 0.5) / 0.5)
+    colours = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" font-family="sans-serif" font-size="13">',
+           f'<rect width="{w}" height="{h}" fill="#ffffff"/>']
+    for acc in (0.5, 0.6, 0.7, 0.8, 0.9, 1.0):
+        out.append(f'<line x1="{left}" x2="{left + pw}" y1="{y(acc):.1f}" y2="{y(acc):.1f}" stroke="#dddddd"/>')
+        out.append(f'<text x="{left - 8}" y="{y(acc) + 4:.1f}" text-anchor="end" fill="#333">{acc:.0%}</text>')
+    for n in flashes:
+        out.append(f'<text x="{xs[n]:.1f}" y="{top + ph + 20}" text-anchor="middle" fill="#333">{n}</text>')
+    out.append(f'<text x="{left + pw / 2}" y="{h - 10}" text-anchor="middle" fill="#333">flashes averaged per tile</text>')
+    out.append(f'<text x="16" y="{top + ph / 2}" text-anchor="middle" fill="#333" transform="rotate(-90 16 {top + ph / 2})">right tile picked</text>')
+    out.append(f'<text x="{left}" y="18" fill="#333" font-weight="bold">Recorded (g.tec P300 Speller dataset): two-tile accuracy, tested on separate blocks of time</text>')
+    for i, (name, c) in enumerate(curves.items()):
+        pts = " ".join(f"{xs[n]:.1f},{y(c[n]):.1f}" for n in flashes if n in c)
+        col = colours[i % len(colours)]
+        out.append(f'<polyline points="{pts}" fill="none" stroke="{col}" stroke-width="2.5"/>')
+        for n in flashes:
+            if n in c:
+                out.append(f'<circle cx="{xs[n]:.1f}" cy="{y(c[n]):.1f}" r="3.5" fill="{col}"/>')
+        out.append(f'<rect x="{left + pw - 70}" y="{top + ph - 22 - 18 * (len(curves) - 1 - i)}" width="12" height="12" fill="{col}"/>')
+        out.append(f'<text x="{left + pw - 52}" y="{top + ph - 11 - 18 * (len(curves) - 1 - i)}" fill="#333">{name}</text>')
+    out.append("</svg>")
+    return "\n".join(out) + "\n"
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """Offline report for one file or every ``S*.mat`` in a folder."""
+    """Offline report for one file or every ``S*.mat`` in a folder. ``--curve`` adds accuracy by
+    number of flashes (#151); ``--plot FILE.svg`` also saves that as a chart."""
     args = list(sys.argv[1:] if argv is None else argv)
+    want_curve = "--curve" in args
+    plot = None
+    if "--plot" in args:
+        i = args.index("--plot")
+        if i + 1 >= len(args):
+            print("--plot needs a file name, e.g. --plot flashes.svg")
+            return 2
+        plot = Path(args[i + 1])
+        del args[i:i + 2]
+        want_curve = True
+    args = [a for a in args if a != "--curve"]
     if len(args) != 1:
-        print("usage: python -m signal2speech.evidence.dataset <S1.mat | folder>")
+        print("usage: python -m signal2speech.evidence.dataset <S1.mat | folder> [--curve] [--plot FILE.svg]")
         return 2
     p = Path(args[0])
     files: List[Path] = sorted(p.glob("S*.mat")) if p.is_dir() else [p]
@@ -214,8 +296,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"No S*.mat files in {p}")
         return 1
     print(f"Recorded ({LABEL_DETAIL}). Offline analysis of g.tec's recording, not our wearer.")
-    for f in files:
-        print("  " + analyse(load(f)).line())
+    sessions = [load(f) for f in files]
+    for s in sessions:
+        print("  " + analyse(s).line())
+    if want_curve:
+        print("\nRight tile picked out of two, by flashes averaged per tile (cross-validated on 5 separate blocks of time; chance 50 %):")
+        print("  subject | " + " | ".join(f"{n:>3} flash{'es' if n > 1 else '  '}" for n in CURVE_FLASHES))
+        curves = {}
+        for s in sessions:
+            curves[s.name] = curve(s)
+            print(f"  {s.name:7} | " + " | ".join(f"{curves[s.name].get(n, float('nan')):>10.0%}" for n in CURVE_FLASHES))
+        if len(curves) > 1:
+            mean = {n: float(np.mean([c[n] for c in curves.values() if n in c])) for n in CURVE_FLASHES}
+            print("  mean    | " + " | ".join(f"{mean[n]:>10.0%}" for n in CURVE_FLASHES))
+        if plot is not None:
+            plot.write_text(curve_svg(curves), encoding="utf-8")
+            print(f"saved {plot}")
     return 0
 
 

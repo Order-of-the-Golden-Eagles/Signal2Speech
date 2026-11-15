@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" font-family="sans-serif" font-size="13">
+<rect width="640" height="360" fill="#ffffff"/>
+<line x1="64" x2="616" y1="308.0" y2="308.0" stroke="#dddddd"/>
+<text x="56" y="312.0" text-anchor="end" fill="#333">50%</text>
+<line x1="64" x2="616" y1="252.0" y2="252.0" stroke="#dddddd"/>
+<text x="56" y="256.0" text-anchor="end" fill="#333">60%</text>
+<line x1="64" x2="616" y1="196.0" y2="196.0" stroke="#dddddd"/>
+<text x="56" y="200.0" text-anchor="end" fill="#333">70%</text>
+<line x1="64" x2="616" y1="140.0" y2="140.0" stroke="#dddddd"/>
+<text x="56" y="144.0" text-anchor="end" fill="#333">80%</text>
+<line x1="64" x2="616" y1="84.0" y2="84.0" stroke="#dddddd"/>
+<text x="56" y="88.0" text-anchor="end" fill="#333">90%</text>
+<line x1="64" x2="616" y1="28.0" y2="28.0" stroke="#dddddd"/>
+<text x="56" y="32.0" text-anchor="end" fill="#333">100%</text>
+<text x="64.0" y="328" text-anchor="middle" fill="#333">1</text>
+<text x="202.0" y="328" text-anchor="middle" fill="#333">2</text>
+<text x="340.0" y="328" text-anchor="middle" fill="#333">3</text>
+<text x="478.0" y="328" text-anchor="middle" fill="#333">5</text>
+<text x="616.0" y="328" text-anchor="middle" fill="#333">10</text>
+<text x="340.0" y="350" text-anchor="middle" fill="#333">flashes averaged per tile</text>
+<text x="16" y="168.0" text-anchor="middle" fill="#333" transform="rotate(-90 16 168.0)">right tile picked</text>
+<text x="64" y="18" fill="#333" font-weight="bold">Recorded (g.tec P300 Speller dataset): two-tile accuracy, tested on separate blocks of time</text>
+<polyline points="64.0,49.3 202.0,30.8 340.0,28.8 478.0,28.0 616.0,28.0" fill="none" stroke="#1f77b4" stroke-width="2.5"/>
+<circle cx="64.0" cy="49.3" r="3.5" fill="#1f77b4"/>
+<circle cx="202.0" cy="30.8" r="3.5" fill="#1f77b4"/>
+<circle cx="340.0" cy="28.8" r="3.5" fill="#1f77b4"/>
+<circle cx="478.0" cy="28.0" r="3.5" fill="#1f77b4"/>
+<circle cx="616.0" cy="28.0" r="3.5" fill="#1f77b4"/>
+<rect x="546" y="214" width="12" height="12" fill="#1f77b4"/>
+<text x="564" y="225" fill="#333">S1</text>
+<polyline points="64.0,62.2 202.0,33.9 340.0,28.8 478.0,28.0 616.0,28.0" fill="none" stroke="#ff7f0e" stroke-width="2.5"/>
+<circle cx="64.0" cy="62.2" r="3.5" fill="#ff7f0e"/>
+<circle cx="202.0" cy="33.9" r="3.5" fill="#ff7f0e"/>
+<circle cx="340.0" cy="28.8" r="3.5" fill="#ff7f0e"/>
+<circle cx="478.0" cy="28.0" r="3.5" fill="#ff7f0e"/>
+<circle cx="616.0" cy="28.0" r="3.5" fill="#ff7f0e"/>
+<rect x="546" y="232" width="12" height="12" fill="#ff7f0e"/>
+<text x="564" y="243" fill="#333">S2</text>
+<polyline points="64.0,100.5 202.0,71.1 340.0,54.3 478.0,35.3 616.0,28.6" fill="none" stroke="#2ca02c" stroke-width="2.5"/>
+<circle cx="64.0" cy="100.5" r="3.5" fill="#2ca02c"/>
+<circle cx="202.0" cy="71.1" r="3.5" fill="#2ca02c"/>
+<circle cx="340.0" cy="54.3" r="3.5" fill="#2ca02c"/>
+<circle cx="478.0" cy="35.3" r="3.5" fill="#2ca02c"/>
+<circle cx="616.0" cy="28.6" r="3.5" fill="#2ca02c"/>
+<rect x="546" y="250" width="12" height="12" fill="#2ca02c"/>
+<text x="564" y="261" fill="#333">S3</text>
+<polyline points="64.0,54.9 202.0,41.7 340.0,35.3 478.0,28.8 616.0,28.0" fill="none" stroke="#d62728" stroke-width="2.5"/>
+<circle cx="64.0" cy="54.9" r="3.5" fill="#d62728"/>
+<circle cx="202.0" cy="41.7" r="3.5" fill="#d62728"/>
+<circle cx="340.0" cy="35.3" r="3.5" fill="#d62728"/>
+<circle cx="478.0" cy="28.8" r="3.5" fill="#d62728"/>
+<circle cx="616.0" cy="28.0" r="3.5" fill="#d62728"/>
+<rect x="546" y="268" width="12" height="12" fill="#d62728"/>
+<text x="564" y="279" fill="#333">S4</text>
+<polyline points="64.0,54.3 202.0,37.0 340.0,32.8 478.0,28.3 616.0,28.0" fill="none" stroke="#9467bd" stroke-width="2.5"/>
+<circle cx="64.0" cy="54.3" r="3.5" fill="#9467bd"/>
+<circle cx="202.0" cy="37.0" r="3.5" fill="#9467bd"/>
+<circle cx="340.0" cy="32.8" r="3.5" fill="#9467bd"/>
+<circle cx="478.0" cy="28.3" r="3.5" fill="#9467bd"/>
+<circle cx="616.0" cy="28.0" r="3.5" fill="#9467bd"/>
+<rect x="546" y="286" width="12" height="12" fill="#9467bd"/>
+<text x="564" y="297" fill="#333">S5</text>
+</svg>

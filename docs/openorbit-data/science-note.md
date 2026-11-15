@@ -47,8 +47,8 @@ Michigan's EGLE declared June 28, 2023 an Air Quality Action Day for elevated PM
 | Where | Text | Status |
 | --- | --- | --- |
 | Spoken line (`contracts/demo-round.json`) | "Washtenaw's AQI rose 186 points. Wayne's rose 168 points." | ✅ True on the AQI scale |
-| Spoken line | "…NASA MODIS view of southeast Michigan under wildfire smoke." | ✅ Supported by the same-day PM2.5 peak, the EGLE action day, and the FIRMS fires |
-| View | June 26 image caption | ✅ Now reads "June 26, 2023 · mostly cloud" (#153) |
+| Spoken line | "NASA satellite images from June 24 to June 28, 2023: clear ground, then cloud, then wildfire smoke over southeast Michigan." | ✅ Describes the five MODIS Terra images shown: ground visible on June 24, overcast on June 25 to 27, smoke haze on June 28. The smoke on June 28 is supported by the same-day PM2.5 peak, the EGLE action day, and the FIRMS fires |
+| View | Cloudy days in the day-by-day sequence | ✅ June 25, 26 and 27 are each captioned "mostly cloud" (#153). The comparison and the satellite view both flow from June 24 to June 28 and rest on June 28 |
 | View | Pollutant line under the table | ✅ Added (#153), computed from the data: "Each county AQI is set by its highest pollutant AQI that day: PM2.5 for all values except Washtenaw Jun 26 (Ozone)." |
 | View | Separate NASA and EPA credit lines | ✅ Matches SOURCES.md |
 | README | "NASA imagery shows the smoke from orbit. EPA data measures air quality at ground level." | ✅ |

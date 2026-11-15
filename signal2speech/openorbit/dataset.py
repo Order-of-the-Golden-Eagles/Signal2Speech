@@ -54,6 +54,9 @@ class Dataset:
     layer: str
     places: Tuple[Place, ...]
     changes: Tuple[CountyChange, ...]  # in COUNTIES order
+    #: Day-by-day frames for the satellite view: (date, short note), oldest first, ending on AFTER.
+    #: Just (AFTER, "") when the extra days aren't in the data folder.
+    timelapse: Tuple[Tuple[str, str], ...] = ()
 
     def to_pixel(self, lat: float, lon: float) -> Tuple[float, float]:
         """Image pixel for a lat/lon. The images are plain lat/lon grids (EPSG:4326)."""
@@ -170,6 +173,11 @@ def load_dataset(root: Optional[Path] = None) -> Dataset:
 
     places = tuple(Place(p["id"], p["label"], p.get("short", p["label"]), p["county"],
                          float(p["lat"]), float(p["lon"])) for p in meta["places"])
+    frames = tuple((f["date"], f.get("note", "")) for f in meta.get("timelapse", [])
+                   if f.get("date") in images and images[f["date"]].exists())
+    if not frames or frames[-1][0] != AFTER:           # the sequence must end on the smoke image
+        frames = ((AFTER, ""),)
     return Dataset(root=root, images=images, bbox={k: float(v) for k, v in meta["bbox"].items()},
                    width=int(meta["image"]["width"]), height=int(meta["image"]["height"]),
-                   layer=meta.get("layer", ""), places=places, changes=tuple(changes))
+                   layer=meta.get("layer", ""), places=places, changes=tuple(changes),
+                   timelapse=frames)

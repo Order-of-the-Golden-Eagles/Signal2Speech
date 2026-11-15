@@ -32,6 +32,9 @@ class ConversationView(QTextBrowser):
         super().__init__(parent)
         self.entries: List[Tuple[str, str, Optional[str]]] = []   # (kind, text, input label)
         self._stamps: List[str] = []
+        #: Show only the most recent thing chosen or said. The full history stays in ``entries``
+        #: (and in the developer log and the session report); this only saves screen space.
+        self.latest_only = False
         self.setOpenLinks(False)
         self.restyle()
 
@@ -57,7 +60,17 @@ class ConversationView(QTextBrowser):
 
     def _render(self) -> None:
         parts = []
-        for (kind, text, src), stamp in zip(self.entries, self._stamps):
+        rows = list(zip(self.entries, self._stamps))
+        if self.latest_only and rows:
+            chosen = [r for r in rows if r[0][0] in ("preview", "said", "shown", "nothing", "help")]
+            last = (chosen or rows)[-1]
+            if last[0][0] == "nothing":                # dismissed: still show what was dismissed
+                previews = [r for r in rows if r[0][0] == "preview"]
+                if previews:
+                    (kind, _text, src), stamp = last
+                    last = ((kind, f"Cancelled: {previews[-1][0][1]}", src), stamp)
+            rows = [last]
+        for (kind, text, src), stamp in rows:
             label, colour = KINDS[kind]
             source = f"<span style='color:{T.QUIET}'> · {html.escape(src)}</span>" if src else ""
             parts.append(
