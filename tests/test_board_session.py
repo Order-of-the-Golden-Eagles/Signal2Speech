@@ -115,3 +115,35 @@ def test_whole_session_on_the_simulated_board(tmp_path, capsys):
     assert (out / "eeg.npz").is_file() and (out / "events.json").is_file()
     assert "USABLE: the recording is complete." in text
     assert "Simulated" in report["label"]
+
+
+def test_voice_without_the_windows_engine_speaks_every_cue_from_a_helper(monkeypatch):
+    """pyttsx3 skips every line after the first inside one process, so each cue gets its own."""
+    calls = []
+
+    class Done:
+        returncode = 0
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs.get("timeout")))
+        return Done()
+
+    monkeypatch.setattr(bs.subprocess, "run", fake_run)
+    v = bs.Voice(enabled=True)
+    v._sapi = None                                            # as on macOS or Linux
+    cues = ["Close your eyes.", "Open your eyes.", "Two: No."]
+    for cue in cues:
+        v.say(cue)
+    assert [a[-1] for a, _ in calls] == cues                  # one helper per cue, text as an argument
+    assert all(a[1] == "-c" and cue not in a[2] and t for (a, t), cue in zip(calls, cues))
+    assert v.log == cues
+
+
+def test_voice_helper_failure_never_stops_the_session(monkeypatch):
+    def boom(*a, **k):
+        raise OSError("no python")
+    monkeypatch.setattr(bs.subprocess, "run", boom)
+    v = bs.Voice(enabled=True)
+    v._sapi = None
+    v.say("Close your eyes.")                                 # printed, not spoken, no exception
+    assert v.log == ["Close your eyes."]
