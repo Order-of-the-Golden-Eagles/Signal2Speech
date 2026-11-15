@@ -340,11 +340,22 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Only the tests that really need g.Pype are skipped. The rest of `test_diagnostics.py` and `test_recovery.py` still runs everywhere, and CI still runs all of them on Windows, macOS, and Linux
 - Checked on macOS 12 without g.Pype: 183 passed, 0 failed, and the push hook passes again
 
+## 11/14/26 - 8:07 PM - Long Le - #5 AI demo shows the map for map suggestions ([PR #118](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/118))
+- When Claude suggests a map answer (from #106), the AI demo window now shows the map and speaks the line once, just like the main app
+- Why: the AI demo had no map on purpose, because replies used to be spoken words only. With #106, picking "Compare counties (shows the map)" would have spoken the line but shown nothing, and logged a BUG line
+- Checked with a test that confirms a map suggestion: the map changes once and the line is spoken once, with nothing during the preview. Not yet run with a real Claude key in the window
+
 ## 11/14/26 - 8:10 PM - Long Le - #92 One demo script and one shot list ([PR #119](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/119))
 - The team now has one two-minute script (`stage-script.md`) and one video shot list (`shot-list.md`) in `docs/demo-submission/`. The duplicate `run-of-show.md` and `video-shot-list.md` are gone
 - Folded in what only the old files had: a fallback for every beat of the table demo, a pre-judge checklist (frozen build, smoke check, Wi-Fi off, fallback folder), and an AI Answering alternate shot for the video
 - Updated the script for what's on `main` now: the real map with its 8 s reveal, fullscreen, F1 key help, and the confirm countdown. Submission fields live only in `submission-checklist.md`
 - Checked: every relative link in the folder resolves. Docs only
+
+## 11/14/26 - 8:30 PM - In Young Song - #107 Code tour ([PR #123](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/123))
+- Any teammate can now walk a judge through the code in five minutes: `docs/demo-submission/code-tour.md`
+    - It goes flash to P300 decision, eye-closure confirm, why nothing is spoken twice, where the map and voice run, then CI and the git hooks, with one sentence to say at each stop
+- Every pointer links to the exact line on `main` and was checked against the code
+- It ends with honest answers to the three hardest judge questions: accuracy (simulated only so far, live not yet measured), proof the brain is responding, and stimulus timing
 
 ## 11/14/26 - 8:31 PM - Long Le - #97 Same voice on every laptop for the map lines ([PR #125](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/125))
 - The two OpenOrbit answers now play from bundled recordings, so they sound the same on every laptop, with or without Wi-Fi
