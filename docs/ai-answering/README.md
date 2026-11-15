@@ -117,3 +117,16 @@ The offline saved phrases live in `data/phrases.json`, one pair per line. Each p
 - **Rules:** two different phrases per pair, each under 120 characters. "Saved phrases" in the AI demo cycles through the pairs in order.
 - **Fallback:** if the file is missing, can't be read, or breaks a rule, the app uses its built-in list (the same six pairs the file ships with). The transcript says why, for example `saved phrases: built-in (phrases.json pair 3: reply too long)`.
 - **Check after editing:** start `python -m signal2speech.ai --provider saved` and read the `saved phrases:` line in the transcript.
+
+## Replies in another language (#194)
+
+```bash
+python -m signal2speech.ai --reply-language es        # or Spanish; F3 switches back to English
+```
+
+- Claude gets the language in its system prompt ("Write both replies in plain spoken Spanish") and writes the replies in it directly. They aren't translated afterwards. The two-reply and short-reply limits are unchanged.
+- The tiles and preview show the replies, and the confirmed reply is spoken by an installed OS voice for that language (Qt TextToSpeech locales on macOS, Windows, and Linux).
+- **No voice installed:** the app checks before the round. The conversation says "No Spanish voice is installed, so replies stay in English.", and everything stays English, so a reply is never read in the wrong accent.
+- **Offline:** the saved phrases, the stub, and the help phrase have Spanish versions. Choosing Spanish uses the built-in Spanish phrases instead of `data/phrases.json`. Other languages keep English offline replies, and the panel says "English only".
+- The demo script and the two OpenOrbit lines stay English and always use the English voice.
+- Supported codes: en, es, fr, de, pt, it, vi, zh, ja, ko, hi, ar.

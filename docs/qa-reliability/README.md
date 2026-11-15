@@ -18,7 +18,7 @@ Verify confirmation, cancellation, duplicate events, disconnects, and offline la
 
 | Case | Inputs exercised | Result |
 | --- | --- | --- |
-| Cancel during preview: Esc, key 2, confirm timeout | keyboard and simulated | Round cleared (`cancel` or `timeout`), 0 outputs. Late simulated decisions are dropped. |
+| Cancel during preview: Esc, hold key 2, confirm timeout | keyboard and simulated | Round cleared (`cancel` or `timeout`), 0 outputs. Late simulated decisions are dropped. |
 | Disconnect during preview: key D, g.Pype stream stop (`SimulatedDecoder.disconnect_stream()`) | keyboard and simulated | Round cleared (`disconnect`), and the in-flight confirm from the stopped stream is dropped. 0 outputs. |
 | Duplicate event ID, held or repeated confirm key, the same simulated decision twice, the same recording replayed twice | keyboard, simulated, recorded | `RejectedDuplicateEvent`, `RejectedRoundConsumed`, or `RejectedNoOpenRound`. Exactly 1 output. |
 | Stale decision from the Choose round arriving in the Confirm round, late decision from a closed round | keyboard, recorded, simulated | `RejectedStaleRound` or dropped before the adapter. 0 outputs. |

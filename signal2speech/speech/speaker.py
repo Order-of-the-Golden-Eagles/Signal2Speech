@@ -32,6 +32,7 @@ NEURAL_WAIT_MS = 6000
 ROOT = Path(__file__).resolve().parents[2]
 AUDIO_DIR = ROOT / "data" / "openorbit" / "audio"
 BUNDLED_CLIPS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
+ENGLISH_LINE = "english-line"   # clip hint: English text, use the English voice (#194)
 
 Log = Callable[[str], None]
 
@@ -60,6 +61,12 @@ class MutedSpeaker:
         self.said.append(text)
         self.log("speech: muted (--mute), nothing audible")
 
+    def stop(self) -> None:
+        pass
+
+    def set_language(self, code: str) -> bool:
+        return True                   # nothing is audible, so no voice can be wrong
+
 
 class OfflineSpeaker(QObject):
     def __init__(self, log: Log, audio_dir: Path = AUDIO_DIR, use_qt_tts: bool = True,
@@ -76,6 +83,9 @@ class OfflineSpeaker(QObject):
         self.on_started: Optional[Callable[[], None]] = None
         self._awaiting_start = False
         self.tts = self._make_qt_tts() if use_qt_tts else None
+        self.language = "en"
+        self._default_locale = self.tts.locale() if self.tts is not None else None
+        self._reply_locale = None
         self.fallback_backend = ("Qt TextToSpeech (" + self.tts.engine() + ")") if self.tts else self._pyttsx3_name()
         self.backend = f"Piper ({self.neural.name})" if self.neural else self.fallback_backend
 
@@ -94,6 +104,45 @@ class OfflineSpeaker(QObject):
         tts.stateChanged.connect(lambda s: self._started() if s.name == "Speaking" else None)
         return tts
 
+    def voice_locales(self, code: str) -> list:
+        """Installed OS-voice locales for a language code such as "es" (#194)."""
+        if self.tts is None:
+            return []
+        from PySide6.QtCore import QLocale
+        want = QLocale(code).language()
+        return [loc for loc in self.tts.availableLocales() if loc.language() == want]
+
+    def set_language(self, code: str) -> bool:
+        """Speak replies in `code`. False (and English kept) if no OS voice for it is installed.
+        The bundled OpenOrbit lines are English and always use the English voice."""
+        if code == "en":
+            self.language, self._reply_locale = "en", None
+            return True
+        found = self.voice_locales(code)
+        if not found:
+            return False
+        self.language, self._reply_locale = code, found[0]
+        return True
+
+    def _use_locale(self, clip: Optional[str]) -> None:
+        if self.tts is None or self._default_locale is None:
+            return
+        reply = self._reply_locale is not None and clip not in BUNDLED_CLIPS and clip != ENGLISH_LINE
+        loc = self._reply_locale if reply else self._default_locale
+        if self.tts.locale() != loc:
+            self.tts.setLocale(loc)
+
+    def stop(self) -> None:
+        """Stop any audio now (attract mode ending, #193)."""
+        self._waiting = None                       # a natural-voice line still being made
+        if self._sound is not None:
+            try:
+                self._sound.stop()
+            except RuntimeError:
+                pass
+        if self.tts is not None:
+            self.tts.stop()
+
     def _started(self) -> None:
         if self._awaiting_start:
             self._awaiting_start = False
@@ -110,13 +159,18 @@ class OfflineSpeaker(QObject):
     def prepare(self, text: str) -> None:
         """Start making a line that may be spoken soon (it is on screen as a preview), so it is
         ready the moment the wearer confirms. Makes no sound."""
-        if self.neural is not None and text:
+        if self.neural is not None and text and self._reply_locale is None:
             self.neural.request(text)
+
+    def _in_another_language(self, clip: Optional[str]) -> bool:
+        """True for a reply that will be spoken in the wearer's chosen non-English language."""
+        return (self._reply_locale is not None and clip not in BUNDLED_CLIPS
+                and clip != ENGLISH_LINE)
 
     def say(self, text: str, clip: Optional[str] = None) -> None:
         self._awaiting_start = True
         self._waiting = None
-        if self.neural is not None:
+        if self.neural is not None and not self._in_another_language(clip):   # an English voice
             self._waiting, self._waited_ms = (self.neural.request(text), clip), 0
             self._play_neural_when_ready()
             return
@@ -164,7 +218,9 @@ class OfflineSpeaker(QObject):
             self.log(f"speech: bundled {wav.relative_to(ROOT) if wav.is_relative_to(ROOT) else wav}")
             return
         if self.tts is not None:
-            self.log(f"speech: OS voice, {self.fallback_backend}")
+            self._use_locale(clip)
+            self.log(f"speech: OS voice, {self.fallback_backend}" +
+                     (f", {self.tts.locale().name()}" if self._reply_locale is not None else ""))
             self.tts.say(text)
             return
         if self.fallback_backend == "pyttsx3":

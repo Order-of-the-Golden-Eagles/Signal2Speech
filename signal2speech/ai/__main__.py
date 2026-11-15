@@ -21,14 +21,14 @@ from signal2speech.app import App
 from signal2speech.core import InputSources, Outcome, TargetIds
 
 from .qt import AsyncSuggester, QuestionPanel
-from .replies import (TIMEOUT_S, ReplySet, ReplySuggester, make_provider,
-                      saved_phrases_from_file)
+from .replies import (HELP_PHRASES, TIMEOUT_S, ReplySet, ReplySuggester, language_code,
+                      language_name, make_provider, saved_phrases_from_file)
 
 
 class AnsweringDemo:
     def __init__(self, input_source: str = InputSources.KEYBOARD, provider_kind: str = "auto", *,
                  provider=None, provider_note: Optional[str] = None, speaker=None, view=None,
-                 cues: bool = False,
+                 cues: bool = False, reply_language: str = "en",
                  mute: bool = False, echo: bool = True, deadline_s: float = TIMEOUT_S + 1):
         if provider is None and provider_note is None:
             provider, provider_note = make_provider(provider_kind)
@@ -58,6 +58,53 @@ class AnsweringDemo:
         self.app.handler.on_handled.append(self._after_handled)
         self.app.log(f"replies provider: {self.provider_note}")
         self.app.log(f"saved phrases: {self.suggester.saved.source}")
+        # #194: F3 switches between English and the chosen reply language.
+        self.language = "en"
+        self.other_language = reply_language if reply_language != "en" else "es"
+        if reply_language != "en":
+            self.set_language(reply_language)
+        else:
+            self._label_language()
+        from PySide6.QtGui import QKeySequence, QShortcut
+        sc = QShortcut(QKeySequence("F3"), self.root)
+        sc.setAutoRepeat(False)
+        sc.activated.connect(self.toggle_language)
+        self.app.help.rows.insert(-1, ("F3", f"Replies in English or {language_name(self.other_language)}"))
+        self.app.help.restyle()
+        self.app.on_text_scale.append(self.panel.restyle)
+
+    def set_language(self, code: str) -> bool:
+        """Switch the reply language (#194). Checks the OS voice first: with no voice for the
+        language it says so and stays in English, so a reply is never read in the wrong accent."""
+        speaker = self.app.speaker
+        has_voice = speaker.set_language(code) if hasattr(speaker, "set_language") else code == "en"
+        if not has_voice:
+            msg = f"No {language_name(code)} voice is installed, so replies stay in English."
+            self.app.log(f"reply language: {msg}")
+            self.app.conversation.add("note", msg)
+            if hasattr(speaker, "set_language"):
+                speaker.set_language("en")
+            code = "en"
+        note = self.suggester.set_language(code)
+        self.language = code
+        self.app.help_text = HELP_PHRASES.get(code, HELP_PHRASES["en"])
+        self.app.help_english = code not in HELP_PHRASES or code == "en"
+        self.app.log(f"reply language: {language_name(code)}" + (f" ({note})" if note else ""))
+        self._label_language(note if has_voice else f"no {language_name(self.other_language)} voice installed")
+        return has_voice
+
+    def toggle_language(self) -> None:
+        self.set_language(self.other_language if self.language == "en" else "en")
+        if not self.async_.pending:            # show the offline replies in the new language now
+            if self.question:
+                self._request(())
+            else:
+                self._show(self.suggester.saved.current("language changed"))
+
+    def _label_language(self, note: str = "") -> None:
+        other = language_name("en" if self.language != "en" else self.other_language)
+        self.panel.set_language(f"Reply language: {language_name(self.language)}"
+                                + (f" ({note})" if note else "") + f"   ·   F3: {other}")
 
     def start(self) -> None:
         self._show(self.suggester.saved.current("waiting for a question"))
@@ -109,11 +156,18 @@ def main(argv=None) -> int:
     p.add_argument("--keys", default="", help="keys after the replies arrive, e.g. '1,1'")
     p.add_argument("--mute", action="store_true")
     p.add_argument("--no-cues", action="store_true", help="no preview/confirm/cancel sounds")
+    p.add_argument("--reply-language", default="en",
+                   help="suggest and speak replies in this language, e.g. es or Spanish (#194); F3 switches")
     p.add_argument("--deadline", type=float, default=TIMEOUT_S + 1,
                    help="seconds before falling back to saved phrases")
     p.add_argument("--screenshot", type=Path, help="save a PNG after --keys (or replies) and exit")
     args = p.parse_args(argv)
 
+    try:
+        reply_language = language_code(args.reply_language)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 2
     qapp = QApplication.instance() or QApplication(sys.argv[:1])
     try:
         provider, note = make_provider(args.provider)
@@ -121,7 +175,7 @@ def main(argv=None) -> int:
         print(e, file=sys.stderr)
         return 2
     demo = AnsweringDemo(args.input, provider=provider, provider_note=note, mute=args.mute, cues=not args.no_cues,
-                         deadline_s=args.deadline)
+                         reply_language=reply_language, deadline_s=args.deadline)
     demo.root.show()
     demo.start()
 

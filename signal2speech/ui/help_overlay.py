@@ -23,19 +23,25 @@ class KeyHelpOverlay(QLabel):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setWordWrap(True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setStyleSheet("background: rgba(11, 13, 16, 235); "      # P.HELP_BG at 92%
-                           f"color: {P.TEXT}; font-size: {P.HEADING - 2}px;")
-        body = "".join(
-            f"<tr><td style='padding:8px 28px 8px 0; color:{P.ACCENT}; font-weight:700'>"
-            f"{html.escape(k)}</td><td style='padding:8px 0'>{html.escape(v)}</td></tr>"
-            for k, v in self.rows)
-        self.setText(f"<div style='font-size:{P.TITLE - 2}px; font-weight:700'>{html.escape(title)}</div>"
-                     f"<table align='center' style='margin-top:18px'>{body}</table>"
-                     f"<div style='margin-top:{P.L}px; color:{P.QUIET}; font-size:{P.CAPTION + 2}px'>"
-                     "F1 or click to close</div>")
+        self.title = title
+        self.restyle()
         self.hide()
         parent.installEventFilter(self)
         self._fit()
+
+    def restyle(self) -> None:
+        """Build the text at the current text scale (#195)."""
+        rows, title = self.rows, self.title
+        self.setStyleSheet("background: rgba(11, 13, 16, 235); "      # P.HELP_BG at 92%
+                           f"color: {P.TEXT}; font-size: {P.px(P.HEADING - 2)}px;")
+        body = "".join(
+            f"<tr><td style='padding:8px 28px 8px 0; color:{P.ACCENT}; font-weight:700'>"
+            f"{html.escape(k)}</td><td style='padding:8px 0'>{html.escape(v)}</td></tr>"
+            for k, v in rows)
+        self.setText(f"<div style='font-size:{P.px(P.TITLE - 2)}px; font-weight:700'>{html.escape(title)}</div>"
+                     f"<table align='center' style='margin-top:18px'>{body}</table>"
+                     f"<div style='margin-top:{P.L}px; color:{P.QUIET}; font-size:{P.px(P.CAPTION + 2)}px'>"
+                     "F1 or click to close</div>")
 
     def toggle(self) -> None:
         self.setVisible(not self.isVisible())

@@ -123,6 +123,10 @@ class AppSink:
         self.timings: List[dict] = []
         self.on_timing: Optional[Callable[[dict], None]] = None
         self.cues = None          # #177: a CuePlayer, or None for no sounds
+        self.help_calls: List[dict] = []    # #197: one entry per help phrase spoken
+        self._speech_timer = QTimer(singleShot=True)   # the reply waits for the confirm cue
+        self._speech_timer.timeout.connect(self._speak_now)
+        self._queued: Optional[Callable[[], None]] = None
 
     def execute(self, action: ConfirmedAction) -> None:
         t0 = self.clock()
@@ -154,10 +158,30 @@ class AppSink:
                 self.speaker.say(action.spoken_text, action.action_id)
             if self.cues is not None:
                 # #177: the confirm cue first, then the reply, so they never overlap.
-                QTimer.singleShot(self.cues.play("confirm") + 40, speak)
+                self._queued = speak
+                self._speech_timer.start(self.cues.play("confirm") + 40)
             else:
                 speak()
         self._report(entry)
+
+    def _speak_now(self) -> None:
+        fn, self._queued = self._queued, None
+        if fn is not None:
+            fn()
+
+    def stop_output(self) -> None:
+        """Cancel a reply still waiting for its cue, and stop audio (attract mode ending, #193)."""
+        self._speech_timer.stop()
+        self._queued = None
+        if hasattr(self.speaker, "stop"):
+            self.speaker.stop()
+
+    def call_for_help(self, text: str, source: str, english: bool = True) -> None:
+        """#197: the help phrase. Its own output, never a choice and never a round outcome."""
+        from signal2speech.speech.speaker import ENGLISH_LINE
+        self.help_calls.append({"time": time.strftime("%H:%M:%S"), "source": source, "text": text})
+        self.log(f"OUTPUT help: \"{text}\"  [{source}]")
+        self.speaker.say(text, ENGLISH_LINE if english else None)
 
     def _report(self, entry: dict) -> None:
         if self.on_timing is not None:
@@ -279,7 +303,9 @@ class App:
                  p300: bool = False, arm_live_confirm: bool = False,
                  live_options: Optional[dict] = None,
                  pieeg: Optional[dict] = None,
-                 clock: Callable[[], float] = time.monotonic, cues: bool = False):
+                 clock: Callable[[], float] = time.monotonic, cues: bool = False,
+                 attract: bool = False, attract_idle_ms: Optional[int] = None,
+                 help_by_eyes: bool = False, practice_s: Optional[float] = None):
         if pieeg is not None and input_source != InputSources.KEYBOARD:
             raise ValueError("--input pieeg chooses by keyboard: the board gives the eyes-closed "
                              "confirm only (#172)")
@@ -289,6 +315,7 @@ class App:
                                 InputSources.LIVE_EEG):
             raise ValueError(f"Unknown input: {input_source}")
         self.input_source = input_source
+        self.muted = mute
 
         self.transcript_view = QPlainTextEdit(readOnly=True)
         self.transcript_view.setStyleSheet(f"background:{T.SURFACE}; color:{T.STRIP_TEXT}; font-size:15px;"
@@ -333,7 +360,7 @@ class App:
         h.on_cleared.append(self._talk_cleared)
         h.on_preview.append(self._cue_preview)               # #177
         h.on_round_opened.append(lambda r: self._event(f"round {r.id} ({r.kind.value}) opened"))
-        h.on_cleared.append(lambda r: self._event(f"cleared ({r}), no output"))
+        h.on_cleared.append(lambda r: None if r == "practice" else self._event(f"cleared ({r}), no output"))
         h.on_handled.append(lambda e, o: self._event(
             f"{o.value}" + (f" · {e.source} {e.eventId} {e.roundId}->{e.targetId}" if e else "")))
 
@@ -397,7 +424,7 @@ class App:
         self.root.setStyleSheet(f"background:{T.BG};")
         right = QVBoxLayout()
         self.panel_title = QLabel("Conversation   ·   F2: developer log")
-        self.panel_title.setStyleSheet(f"color:{T.MUTED}; font-size:{T.BODY}px; font-weight:600;")
+        self.panel_title.setWordWrap(True)
         right.addWidget(self.panel_title)
         if isinstance(self.view, QWidget):
             right.addWidget(self.view, 3)
@@ -411,6 +438,38 @@ class App:
         self._row = row
         self.revealing = False
         fit_to_screen(self.root)
+
+        # #196: practice round. No handler round is open while it runs, so nothing can output.
+        from signal2speech.practice import PRACTICE_S, PracticeRound
+        self.practice = PracticeRound(self.window, duration_s=practice_s or PRACTICE_S,
+                                      on_finished=self._practice_done)
+        self.window.on_escape = self.practice.stop
+        # #197: help phrase from any screen.
+        from signal2speech.helpcall import HELP_TEXT, HelpCall
+        self.help_text = HELP_TEXT
+        self.help_english = True        # the AI demo switches it with the reply language (#194)
+        self.helpcall = HelpCall(self._call_for_help, parent=self.root,
+                                 in_confirm=lambda: (h.current is not None
+                                                     and h.current.kind is RoundKind.CONFIRM))
+        self.helpcall.install()
+        self.helpcall.eyes_enabled = help_by_eyes
+        alpha = getattr(self.sim, "alpha", None)
+        if alpha is not None and hasattr(alpha, "progress"):
+            alpha.progress.connect(self.helpcall.feed_eyes, Qt.ConnectionType.QueuedConnection)
+        self.help_banner = QLabel("", self.root)
+        self.help_banner.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.help_banner.setWordWrap(True)
+        self.help_banner.hide()
+        self._help_hide = QTimer(singleShot=True, interval=8000)
+        self._help_hide.timeout.connect(self.help_banner.hide)
+        # #195: text size toast.
+        self.toast = QLabel("", self.root)
+        self.toast.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.toast.hide()
+        self._toast_hide = QTimer(singleShot=True, interval=1500)
+        self._toast_hide.timeout.connect(self.toast.hide)
+        self.on_text_scale: List[Callable[[], None]] = []
+        self._restyle_overlays()
 
         sc = QShortcut(QKeySequence("D"), self.root)   # rehearse a headset drop (#26)
         sc.setAutoRepeat(False)
@@ -426,6 +485,9 @@ class App:
                 ("D", "Pretend the headset disconnected"),
                 ("F11", "Fullscreen on or off"),
                 ("F2", "Conversation or developer log"),
+                ("P", "Practice round: 30 s of flashes, nothing is sent"),
+                ("Hold H", "Say \u201cI need help, please.\u201d (2 s hold, from any screen)"),
+                ("Ctrl+= / Ctrl+-", "Bigger or smaller text; Ctrl+0 resets"),
                 ("F1", "Show or hide this help")]
         if hasattr(self.sim, "set_next"):
             rows.insert(3, ("Ctrl+1 / Ctrl+2", "Pick for the simulated decoder"))
@@ -433,12 +495,102 @@ class App:
                       else INPUT_LABELS[input_source])
         self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {help_input}")
         for seq, fn in (("F1", self.help.toggle), ("F11", self.toggle_fullscreen),
-                        ("F2", self.toggle_log)):
+                        ("F2", self.toggle_log), ("P", self.start_practice),
+                        ("Ctrl+=", lambda: self.step_text(1)), ("Ctrl++", lambda: self.step_text(1)),
+                        ("Ctrl+-", lambda: self.step_text(-1)), ("Ctrl+0", lambda: self.step_text(0))):
             s3 = QShortcut(QKeySequence(seq), self.root)
             s3.setAutoRepeat(False)
             s3.activated.connect(fn)
         self.log(f"input: {self.input_summary()}" + (f" ({sim_label})" if sim_label else ""))
         self.log(f"speech: {getattr(self.speaker, 'backend', type(self.speaker).__name__)}")
+        # #193: attract mode. Off by default (tests, AI demo); main() turns it on.
+        self.attract = None
+        if attract:
+            from signal2speech.attract import IDLE_MS, AttractMode
+            self.attract = AttractMode(self, idle_ms=attract_idle_ms or IDLE_MS)
+            self.attract.poke()
+
+    # ── #196 practice ────────────────────────────────────────
+    @property
+    def practicing(self) -> bool:
+        return self.practice.active
+
+    def start_practice(self) -> bool:
+        """P or --practice. Not during a preview: finish or cancel that first."""
+        h = self.handler
+        if self.practice.active or self.revealing or h.pending is not None or (
+                h.current is not None and h.current.kind is RoundKind.CONFIRM):
+            return False
+        if self.attract is not None and self.attract.active:
+            self.attract.stop("practice")
+        self._reopen.stop()
+        if h.current is not None:
+            h.cancel("practice")
+            self._reopen.stop()
+        self.log("practice: started (nothing is sent until it ends)")
+        self.practice.start()
+        return True
+
+    def _practice_done(self) -> None:
+        p = self.practice
+        self.log(f"practice: ended after {p.sequences} sequence(s), tile 1 flashed {p.target_flashes} times")
+        self.window.reset()
+        self.ask()
+
+    # ── #197 help phrase ─────────────────────────────────────
+    def _call_for_help(self, how: str) -> None:
+        label = INPUT_LABELS.get(self.input_source, self.input_source)
+        source = "Keyboard (held H)" if how == "keyboard" else f"{label} (long eye closure)"
+        self.sink.call_for_help(self.help_text, source, self.help_english)
+        self.conversation.add("help", f"“{self.help_text}”", source)
+        self._event(f"help phrase · {source}")
+        self.help_banner.setText(f"Help requested  ·  “{self.help_text}”")
+        self._place_overlays()
+        self.help_banner.show()
+        self.help_banner.raise_()
+        self._help_hide.start()
+
+    # ── #195 text size ───────────────────────────────────────
+    def step_text(self, direction: int) -> float:
+        scale = T.step_scale(direction)
+        self.apply_text_scale()
+        self.toast.setText(f"Text size {round(scale * 100)}%")
+        self._place_overlays()
+        self.toast.show()
+        self.toast.raise_()
+        self._toast_hide.start()
+        self.log(f"text size: {round(scale * 100)}%")
+        return scale
+
+    def apply_text_scale(self) -> None:
+        self.window.apply_text_scale()
+        self.conversation.restyle()
+        self.help.restyle()
+        self._restyle_overlays()
+        for fn in self.on_text_scale:
+            fn()
+
+    def _restyle_overlays(self) -> None:
+        self.panel_title.setStyleSheet(f"color:{T.MUTED}; font-size:{T.px(T.BODY)}px; font-weight:600;")
+        self.transcript_view.setStyleSheet(f"background:{T.SURFACE}; color:{T.STRIP_TEXT};"
+                                           f"font-size:{T.px(15)}px; font-family: {T.MONO};")
+        self.toast.setStyleSheet(f"background:{T.RAISED}; color:{T.TEXT}; border:2px solid {T.BORDER};"
+                                 f"border-radius:{T.RADIUS_M}px; padding:{T.M}px {T.L}px;"
+                                 f"font-size:{T.px(T.HEADING)}px; font-weight:700;")
+        self.help_banner.setStyleSheet(f"background:{T.ACCENT}; color:{T.ON_ACCENT};"
+                                       f"border-radius:{T.RADIUS_M}px; padding:{T.L}px;"
+                                       f"font-size:{T.px(T.TITLE)}px; font-weight:800;")
+        self._place_overlays()
+
+    def _place_overlays(self) -> None:
+        r = self.root.rect()
+        self.toast.adjustSize()
+        self.toast.move(max(0, (r.width() - self.toast.width()) // 2), T.L)
+        w = min(r.width() - 2 * T.L, 1100)
+        self.help_banner.setFixedWidth(max(200, w))
+        self.help_banner.adjustSize()
+        self.help_banner.move(max(0, (r.width() - self.help_banner.width()) // 2),
+                              max(0, (r.height() - self.help_banner.height()) // 2))
 
     def input_summary(self) -> str:
         """The input as judges should read it. With a PiEEG confirm (#172), both inputs."""
@@ -479,6 +631,8 @@ class App:
 
     def _talk_cleared(self, reason: str) -> None:
         had_preview, self._previewed = self._previewed is not None, None
+        if reason == "practice":                 # the practice round took over the screen (#196)
+            return
         what = "preview" if had_preview else "question"
         text = {"cancel": f"The {what} was cancelled.",
                 "timeout": f"No answer in time, so the {what} was cancelled.",
@@ -502,6 +656,13 @@ class App:
         """Stop the g.Pype stream (#21) and this app's timers, so nothing fires after close."""
         self._confirm_timer.stop()
         self._reopen.stop()
+        self._countdown.stop()
+        if getattr(self, "attract", None) is not None:
+            self.attract.stop("closing")
+            self.attract.enabled = False
+        if hasattr(self, "practice"):
+            self.practice.active = False
+            self.practice.flasher.stop()
         if hasattr(self.sim, "close"):
             self.sim.close()
 
@@ -604,6 +765,13 @@ class App:
                              f"{fmt(t['speech_ms'])} |")
         else:
             lines.append("No confirms this session.")
+        lines += ["", "## Help phrase", ""]
+        lines += ([f"- {c['time']} · {c['source']}: “{c['text']}”" for c in self.sink.help_calls]
+                  or ["Not used this session."])
+        extra = [f"- **Practice rounds:** {self.practice.runs}"]
+        if self.attract is not None:
+            extra.append(f"- **Attract-mode loops:** {self.attract.runs} (simulated, left out of the counts)")
+        lines += ["", "## Other", ""] + extra
         lines += ["", "## Conversation", ""] + [
             f"- **{KINDS[k][0]}**" + (f" ({src})" if src else "") + f": {text}"
             for k, text, src in self.conversation.entries]
@@ -670,6 +838,14 @@ def main(argv=None) -> int:
                    help="live/--p300: P300 calibration sequences before the demo")
     p.add_argument("--alpha-calib-s", type=float, default=10.0,
                    help="live/--p300: seconds of eyes open, then closed, for the alpha switch")
+    p.add_argument("--practice", action="store_true",
+                   help="start with the 30 s practice round (#196); P starts it any time")
+    p.add_argument("--no-attract", action="store_true",
+                   help="don't loop the simulated demo after 60 s idle (#193)")
+    p.add_argument("--help-by-eyes", action="store_true",
+                   help="a long eye closure outside a Confirm round also says the help phrase (#197)")
+    p.add_argument("--text-scale", type=float, default=1.0,
+                   help="start at this text size, 0.8 to 1.6 (#195); Ctrl+= / Ctrl+- / Ctrl+0 change it")
     g = p.add_argument_group("PiEEG eye-closure confirm (--input pieeg, #172)")
     g.add_argument("--pieeg", choices=["live", "simulated", "recorded"],
                    help="what is publishing the board's LSL stream: a real board on a person, "
@@ -741,7 +917,13 @@ def main(argv=None) -> int:
         from signal2speech.eeg.app_live import PAIRING_HELP, PIEEG_HELP
         return PIEEG_HELP if pieeg is not None else PAIRING_HELP
     try:
+        T.set_scale(args.text_scale)
         app = App(source, sim_script=script, mute=args.mute, cues=not args.no_cues,
+                  # Never over a board session: the eye check runs 90 s with no key presses, and a
+                  # simulated demo must not start on top of a wearer's calibration or live input.
+                  attract=not (args.no_attract or args.screenshot or args.keys
+                               or args.input in ("pieeg", "live")),
+                  help_by_eyes=args.help_by_eyes,
                   confirm_timeout_ms=int(args.confirm_timeout * 1000),
                   p300=args.p300, arm_live_confirm=args.arm_live_confirm,
                   live_options={"calibration_sequences": args.calibration,
@@ -793,7 +975,8 @@ def main(argv=None) -> int:
         guards.append(guard)
 
     app.root.showFullScreen() if args.fullscreen else app.root.show()
-    app.ask()
+    if not (args.practice and app.start_practice()):
+        app.ask()
     keymap = {"1": TargetIds.TARGET_1, "2": TargetIds.TARGET_2}
     for k in filter(None, (s.strip() for s in args.keys.split(","))):
         app.window.press_target(keymap[k])
