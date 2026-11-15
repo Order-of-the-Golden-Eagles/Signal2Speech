@@ -64,7 +64,7 @@ jobs:
           python -m pip install --upgrade pip
           # -c applies the verified pins where a package is needed. Windows-only pins
           # (pywin32, comtypes) are ignored on other platforms.
-          pip install --resume-retries 30 --timeout 120 -c requirements-lock.txt -e ".[dev]"
+          pip install --resume-retries 30 --timeout 120 -c requirements-lock.txt -e ".[dev,mcp]"
 
       - name: Show versions
         run: |

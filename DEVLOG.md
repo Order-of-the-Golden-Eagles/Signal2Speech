@@ -441,6 +441,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every start and exit is logged to `logs/launcher-<time>.log`. If it gives up, it says to switch to the fallback build
 - Checked with real processes: a clean quit stopped the launcher, and a crashing app was restarted after 1 s, then given up on with a clear message. Tests use a fake process. The judging-laptop session and the stage script now use it
 
+## 11/14/26 - 9:43 PM - MagicJester2764 - #110 An AI assistant can read the brain pipeline ([PR #155](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/155))
+- Claude (Desktop or Code) can now ask Signal2Speech about its live signal pipeline and get real numbers back: `python -m signal2speech.mcp`
+    - It answers questions like "Is the wearer's P300 visible?" from the actual averaged brain response, and can open the evidence window
+- Every answer says whether the data is Simulated or Live EEG, and only summaries are sent, never raw brain data
+- On the simulator it picked up a clear P300 (about 4.8 µV at 276 ms) and got 3 of 3 choices right
+- With the real headset it reports signal quality and the eye-closure signal. The P300 needs tiles on screen, so use the app or the evidence view for that
+- Still to do: record the 30-second clip for the video (#34), and try it with a real wearer
+- Code review follow-up: the evidence window closes when the assistant disconnects, a missing or busy headset fails cleanly instead of hanging, and the accuracy figure counts every sequence, including ones with no answer
 ## 11/14/26 - 9:36 PM - Long Le - #132 Video title card, closing card, and diagram ([PR #147](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/147))
 - The submission video has its three graphics ready in `docs/demo-submission/media/`: a title card, a closing card with the repo link and AI-use note, and an architecture diagram for shot 9
 - They're drawn by a script, so changing a name or a line is one command: `python docs/demo-submission/make_graphics.py`
