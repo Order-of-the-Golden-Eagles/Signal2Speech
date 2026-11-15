@@ -112,7 +112,8 @@ def placeholder_model() -> p300.P300Model:
 
 
 def build_live_graph(handler, source: str, input_source: str, *,
-                     placeholder: Optional[p300.P300Model] = None, enable_oscar: bool = True):
+                     placeholder: Optional[p300.P300Model] = None, enable_oscar: bool = True,
+                     recorded: Optional[p300.RecordedResponses] = None):
     """Build (don't start) what ``--input live`` runs (#103): ``(P300Nodes, AlphaConfirm, bursts)``.
 
     Live, the alpha switch hangs off the P300 chooser's HybridBlack pipeline, because the Unicorn
@@ -123,10 +124,12 @@ def build_live_graph(handler, source: str, input_source: str, *,
     # g.Pype refuses to start a realtime pipeline with an unfitted scorer, so start from a
     # small synthetic model (in a private temp folder); calibrate() refits every scorer.
     nodes = p300.build_pipeline(source, model=placeholder or placeholder_model(),
-                                enable_oscar=enable_oscar)
-    if source == "generator":
+                                enable_oscar=enable_oscar, recorded=recorded)
+    if source in ("generator", "recorded"):
         bursts = am.AlphaBursts()
-        return nodes, am.AlphaConfirm(handler, input_source=input_source, bursts=bursts), bursts
+        # Recorded EEG only chooses (#104). Its confirm is the simulated eye closure, and says so.
+        confirm = InputSources.SIMULATED if source == "recorded" else input_source
+        return nodes, am.AlphaConfirm(handler, input_source=confirm, bursts=bursts), bursts
     return nodes, am.AlphaConfirm(handler, input_source=input_source, pipeline=nodes.pipeline,
                                   upstream=nodes.eeg), None
 
@@ -180,16 +183,20 @@ class LiveEegInput:
                  enable_oscar: bool = True, flashes: int = p300.FLASHES_PER_TILE,
                  soa_s: float = p300.SOA_S, calibration_sequences: int = 10,
                  alpha_calib_s: float = 10.0, arm_live_confirm: bool = False,
-                 placeholder: Optional[p300.P300Model] = None, open_timeout_s: float = 20.0):
-        if source not in ("hybridblack", "generator"):
-            raise ValueError("source is hybridblack or generator")
+                 placeholder: Optional[p300.P300Model] = None, open_timeout_s: float = 20.0,
+                 recorded: Optional[p300.RecordedResponses] = None):
+        if source not in ("hybridblack", "generator", "recorded"):
+            raise ValueError("source is hybridblack, generator or recorded")
         script = [int(s) for s in script]
         if any(s not in (1, 2) for s in script):
             raise ValueError(f"script values are 1 or 2, got {script}")
         self.handler, self.window, self.log = handler, window, log
-        self.simulated = source == "generator"
+        self.recorded = source == "recorded"       # real recorded responses answer the flashes
+        # "simulated" here means: no person is wearing a headset, so attention follows a script.
+        self.simulated = source in ("generator", "recorded")
         self.enable_oscar = enable_oscar
-        self.input_source = InputSources.SIMULATED if self.simulated else InputSources.LIVE_EEG
+        self.input_source = (InputSources.RECORDED if self.recorded else
+                             InputSources.SIMULATED if self.simulated else InputSources.LIVE_EEG)
         self.script = deque(script)
         self.calibration_sequences = calibration_sequences
         self.alpha_calib_s = alpha_calib_s
@@ -210,7 +217,8 @@ class LiveEegInput:
         self.alpha_calibration: Optional[am.Calibration] = None
 
         self.nodes, self.alpha, self.bursts = build_live_graph(
-            handler, source, self.input_source, placeholder=placeholder, enable_oscar=enable_oscar)
+            handler, source, self.input_source, placeholder=placeholder, enable_oscar=enable_oscar,
+            recorded=recorded)
         self.adapter = InputAdapter(handler, self.input_source)
         self.chooser = p300.P300Chooser(self.nodes, self.adapter, flashes_per_tile=flashes)
         self.chooser.bridge.listeners.append(self._on_p300_decision)
@@ -242,7 +250,9 @@ class LiveEegInput:
 
     # ── Labels ───────────────────────────────────────────────
     def connection_label(self) -> str:
-        parts = ["g.Pype Generator + synthetic P300 · alpha bursts" if self.simulated else
+        parts = [f"recorded responses from {self.nodes.synth.responses.name} · simulated eye closure"
+                 if self.recorded else
+                 "g.Pype Generator + synthetic P300 · alpha bursts" if self.simulated else
                  f"Unicorn Hybrid Black · {'OSCAR on' if self.enable_oscar else 'OSCAR off'}"]
         if self.p300_ok is False:
             parts.append("P300 off (calibration failed)")
@@ -362,9 +372,14 @@ class LiveEegInput:
         try:
             for i in range(n):
                 attended = TILES[i % 2]
-                w.prompt.setText(f"Calibration {i + 1}/{n}: look at “{labels[attended]}” "
-                                 "and silently count its flashes")
-                w.hint.setText("Keep still. Don't press anything.")
+                if self.recorded:
+                    w.prompt.setText(f"Calibration {i + 1}/{n} on recorded EEG: the attended tile "
+                                     f"is “{labels[attended]}”")
+                    w.hint.setText("Recorded data. Nobody needs to look at the screen.")
+                else:
+                    w.prompt.setText(f"Calibration {i + 1}/{n}: look at “{labels[attended]}” "
+                                     "and silently count its flashes")
+                    w.hint.setText("Keep still. Don't press anything.")
                 self.chooser.begin_calibration(attended)
                 self._sequence_done = False
                 w.flasher.start(list(TILES))
@@ -387,7 +402,7 @@ class LiveEegInput:
         self.p300_calibration = {"sequences": n, "target_epochs": n_t,
                                  "nontarget_epochs": len(model.trials) - n_t}
         self.log(f"P300 calibrated on {n_t} target and {len(model.trials) - n_t} non-target "
-                 f"epochs ({'simulated' if self.simulated else 'live EEG'})")
+                 f"epochs ({'recorded EEG' if self.recorded else 'simulated' if self.simulated else 'live EEG'})")
         return True
 
     def _calibrate_alpha(self, wait) -> bool:
@@ -483,6 +498,32 @@ class LiveEegInput:
     def _on_cleared(self, _reason: str) -> None:
         self._decide.stop()
         self.eyes.open_now()
+
+
+class RecordedEegInput(LiveEegInput):
+    """Recorded human EEG chooses the tile; a simulated eye closure confirms (#104).
+
+    Every tile flash is answered with one real single-flash response from a recording (g.tec's
+    P300 Speller dataset). The same g.Pype pipeline and the same classifier as the live path then
+    calibrate on those responses and pick the tile. Which tile is "attended" follows the script,
+    because the recorded person was looking at g.tec's speller, not at our tiles: the strip says
+    "re-mapped to our tiles" for that reason.
+    """
+
+    def __init__(self, handler, window, log: Callable[[str], None], *,
+                 responses: p300.RecordedResponses, soa_s: float = p300.RECORDED_SOA_S, **kwargs):
+        super().__init__(handler, window, log, source="recorded", recorded=responses,
+                         soa_s=soa_s, **kwargs)
+        self.responses = responses
+
+    def strip_text(self) -> str:
+        return "Choose: Recorded (g.tec dataset, re-mapped to our tiles) · Confirm: Simulated"
+
+    def usage(self) -> dict:
+        """How many recorded responses were played, for the session report."""
+        r = self.responses
+        return {"recording": r.name, "target_responses": r.served[True],
+                "nontarget_responses": r.served[False], "played_twice": r.reused}
 
 
 # ── PiEEG eye-closure confirm (#172) ─────────────────────────

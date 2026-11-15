@@ -533,6 +533,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Checked on our simulated 16-pin stream, on the judging laptop: with the real voice, at 244 samples per second, with slow uneven reactions, with almost no eyes-closed response (stops with a clear reason), and with the board dropping out (stops within 3 seconds). Measured there: about 19 seconds for a full pick-and-confirm from four choices
 - Not yet run on a real board or a real person
 
+## 11/15/26 - 5:24 AM - MagicJester2764 - #180 R restarts the demo for the next visitor ([PR #213](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/213))
+- Between judges, one key press (R) brings back a fresh first question from wherever the app is: mid-preview, mid-reveal, mid-practice, or during the idle demo. Nothing is said
+- It uses the same rules as a normal cancel, so a brain decision still in flight from before the restart is thrown away instead of picking something on the new question
+- Each restart is counted in the session report, separately from cancels
+- Checked with keyboard and simulated input in tests. The welcome screen half of #180 is still open: Long's attract loop already uses the idle time, and we're agreeing on how the two fit
+
 ## 11/15/26 - 11:59 PM - Long Le - #174 One visual design and redesigned tiles ([PR #185](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/185))
 - The app now has one visual design: `signal2speech/ui/theme.py` sets the colours, text sizes, spacing, and corners, and every screen we built uses it
 - The two choice tiles are redesigned: an icon, a clear title, a one-line "what happens" line, and the key as a small badge in the corner instead of "[1]" in the title. They have distinct idle, flashing, selected (green check after a confirm), and waiting states
@@ -639,8 +645,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
 
-## 11/15/26 - 5:24 AM - MagicJester2764 - #180 R restarts the demo for the next visitor ([PR #213](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/213))
-- Between judges, one key press (R) brings back a fresh first question from wherever the app is: mid-preview, mid-reveal, mid-practice, or during the idle demo. Nothing is said
-- It uses the same rules as a normal cancel, so a brain decision still in flight from before the restart is thrown away instead of picking something on the new question
-- Each restart is counted in the session report, separately from cancels
-- Checked with keyboard and simulated input in tests. The welcome screen half of #180 is still open: Long's attract loop already uses the idle time, and we're agreeing on how the two fit
+## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
+- With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
+    - Each tile flash is answered with one real recorded brain response. The same g.Pype pipeline and classifier as the live path calibrate on them and pick the tile
+    - The dataset isn't in the repo. Without it, the app says where to get it
+- What's real and what isn't: the EEG and the classifier's pick are real. Which tile counts as "looked at" follows a script, because the recorded person was using g.tec's speller, not our app. The screen says "Recorded (g.tec dataset, re-mapped to our tiles)" and the confirm is labelled Simulated
+- Flashes are half a second apart in this mode. Faster than that, the recorded responses overlap and the classifier gets worse: measured offline, the right tile was picked 95 % of the time at the usual speed and 100 % at this one (best subject), and 90 to 100 % across all five subjects
+- Why now: the PiEEG board was tested on two people tonight and gave no usable EEG, so g.tec's data is the brain signal we can honestly show
+- Verified end to end on the judging laptop with subject S4: the recorded responses picked the scripted tile, then the map and the spoken line followed. Three new tests; the automated one uses a made-up recording because CI has no dataset. Not yet run for many choices in a row in the app
