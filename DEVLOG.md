@@ -617,12 +617,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Lines with numbers in them are spoken 25 % slower, so the figures are easy to catch
 - Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux
 
-## 11/15/26 - 4:25 AM - MagicJester2764 - #164 OSCAR shown and measured on g.tec's recorded EEG (PR pending)
-- Judges can now see g.tec's OSCAR artifact removal working on real human EEG, before and after side by side, even without our headset
-    - `python -m signal2speech.evidence --source dataset path/to/p300-speller/S1.mat`, and the numbers with `python -m signal2speech.evidence.oscar_report path/to/p300-speller --jobs 5`
-- On all five of g.tec's recorded subjects, the biggest blink and movement swings got 14–65% smaller, while the rest of the signal barely changed. Classification stayed the same or improved (one subject went from 0.72 to 0.81)
-- We found that OSCAR delays the signal by about a third of a second and g.Pype doesn't shift the flash markers to match. Ignoring that costs up to 0.14 accuracy, so the docs say how to handle it, and the headset session should check it on the live path
-- Measured on g.tec's recordings replayed through g.Pype (Recorded, not our wearer, not live). The g.tec data stays out of git
 ## 11/15/26 - 2:57 AM - Vasanth Anbukumar - #150 The board session speaks with the natural voice, and repeats itself less ([PR #209](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/209))
 - The voice-guided board session (`python -m signal2speech.eeg.board_session`) now gives its instructions in the same natural voice as the app, when that voice is installed
     - `--standard-voice` goes back to the operating system's voice
@@ -644,3 +638,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The idle demo (#193) now stays off whenever a board is used, so it can't start over a wearer's 90-second eye check
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
+
+## 11/15/26 - 4:25 AM - MagicJester2764 - #164 OSCAR shown and measured on g.tec's recorded EEG ([PR #212](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/212))
+- Judges can now see g.tec's OSCAR artifact removal working on real human EEG, before and after side by side, even without our headset
+    - `python -m signal2speech.evidence --source dataset path/to/p300-speller/S1.mat`, and the numbers with `python -m signal2speech.evidence.oscar_report path/to/p300-speller --jobs 5`
+- On all five of g.tec's recorded subjects, the biggest blink and movement swings got 14–65% smaller, while the rest of the signal barely changed. Classification stayed the same or improved (one subject went from 0.72 to 0.81)
+- We found that OSCAR delays the signal by about a third of a second and g.Pype doesn't shift the flash markers to match. Ignoring that costs up to 0.14 accuracy, so the docs say how to handle it, and the headset session should check it on the live path
+- Measured on g.tec's recordings replayed through g.Pype (Recorded, not our wearer, not live). The g.tec data stays out of git
