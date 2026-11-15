@@ -528,7 +528,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The flash looks the same as before (plain white with black content), so the brain-signal stimulus doesn't change. The flash timing check still passes, and the new tiles repaint in about 3 ms
 - All text still meets WCAG AA. A test fails if any screen uses a colour outside the theme. Before and after screenshots are in `docs/accessibility-ui/README.md`
 
-## 11/15/26 - 12:32 AM - MagicJester2764 - #103 README: live input status (PR pending)
+## 11/15/26 - 12:32 AM - MagicJester2764 - #103 README: live input status ([PR #187](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/187))
 - The README status table now says the app already takes live headset input (`python -m signal2speech.app --input live`)
 - It said live input was switched off, which stopped being true when #103's code merged. A judge reading it would undersell the demo
 - Eye-closure confirm is still off on a real headset and key 1 confirms instead. That still needs one wearer run (#23, #103)
