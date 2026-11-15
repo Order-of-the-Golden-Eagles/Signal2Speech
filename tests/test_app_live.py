@@ -183,3 +183,79 @@ def test_closing_the_window_during_calibration_exits_cleanly(qapp, monkeypatch):
     monkeypatch.setattr(app_live.LiveEegInput, "start", lambda self, no_data_s=8.0: None)
     monkeypatch.setattr(app_live.LiveEegInput, "calibrate", lambda self, labels=None: None)
     assert app_module.main(["--input", "live", "--mute"]) == 0
+
+
+# ── Review fixes (PR #124) ───────────────────────────────────
+def test_reflash_keeps_the_same_attention_and_script(qapp, make):
+    app, log = make(InputSources.SIMULATED, p300=True, sim_script=[2, 1], confirm_timeout_ms=0)
+    live = app.sim
+    app.ask()                                   # flashing starts: pops 2 (attend tile 2)
+    app.window.flasher.stop()
+    assert list(live.script) == [1] and live._last_attended == T2
+    live._got_decision = False
+    live.chooser.end_sequence = lambda: None    # no scores arrived
+    live._force_decision()                      # re-flash
+    app.window.flasher.stop()
+    assert list(live.script) == [1] and live._last_attended == T2   # nothing consumed
+
+
+def test_hints_follow_failed_calibrations(qapp, make, monkeypatch):
+    app, log = make(InputSources.SIMULATED, p300=True, sim_script=[2, 1], confirm_timeout_ms=0)
+    live = app.sim
+    monkeypatch.setattr(live, "_calibrate_p300", lambda labels, wait: False)
+    monkeypatch.setattr(live, "_calibrate_alpha", lambda wait: True)
+    live.calibrate()
+    app.ask()
+    assert "Press 1 or 2" in app.window.hint.text() and not app.window.flasher.running
+    assert list(live.script) == [1]             # the Choose value was the keyboard's
+    app.window.press_target(T2)
+    assert live._eyes_close_timer.isActive()    # the Confirm value (1) still closes the eyes
+
+    app2, _ = make(InputSources.LIVE_EEG, arm_live_confirm=True, confirm_timeout_ms=0)
+    monkeypatch.setattr(app2.sim, "_calibrate_p300", lambda labels, wait: True)
+    monkeypatch.setattr(app2.sim, "_calibrate_alpha", lambda wait: False)
+    app2.sim.calibrate()
+    app2.ask()
+    app2.window.flasher.stop()
+    app2.window.press_target(T2)
+    assert "calibration failed" in app2.window.hint.text()
+
+
+def test_a_hung_open_leaves_the_pipeline_alone(qapp, make, monkeypatch):
+    app, log = make(InputSources.LIVE_EEG, confirm_timeout_ms=0)
+    live = app.sim
+    monkeypatch.setattr(app_live, "find_unicorn", lambda timeout_s=15.0: ["UN-1"])
+    monkeypatch.setattr(app_live, "_bounded", lambda fn, t, name: (False, None, None))
+    closed = []
+    monkeypatch.setattr(live.nodes.pipeline, "close", lambda: closed.append(1))
+    with pytest.raises(RuntimeError, match="couldn't open it"):
+        live.start()
+    live.close()
+    assert closed == []                          # start() is still inside it in its thread
+
+
+def test_scan_errors_are_not_reported_as_not_paired(monkeypatch):
+    monkeypatch.setattr(app_live, "_bounded", lambda fn, t, name: (True, None, OSError("no lib")))
+    with pytest.raises(RuntimeError, match="couldn't search for a Unicorn"):
+        app_live.find_unicorn()
+
+
+def test_setup_and_calibration_errors_exit_cleanly(qapp, monkeypatch, capsys):
+    def boom(*a, **k):
+        raise OSError("driver missing")
+    monkeypatch.setattr(app_live.LiveEegInput, "__init__", boom)
+    assert app_module.main(["--input", "live", "--mute"]) == 3
+    assert "Couldn't set up the EEG pipeline" in capsys.readouterr().err
+    monkeypatch.undo()
+
+    closed = []
+    monkeypatch.setattr(app_live.LiveEegInput, "start", lambda self, no_data_s=8.0: None)
+    monkeypatch.setattr(app_live.LiveEegInput, "calibrate",
+                        lambda self, labels=None: (_ for _ in ()).throw(ValueError("x")))
+    monkeypatch.setattr(app_live.LiveEegInput, "close", lambda self: closed.append(1))
+    assert app_module.main(["--input", "live", "--mute"]) == 1
+    assert closed                                # the headset is released
+
+
+def test_placeholder_model_is_built_once():
+    assert app_live.placeholder_model() is app_live.placeholder_model()

@@ -422,11 +422,20 @@ def main(argv=None) -> int:
     if any(s not in (1, 2) for s in script):
         print(f"--sim takes 1s and 2s, e.g. 2,1; got {args.sim!r}", file=sys.stderr)
         return 2
-    app = App(source, sim_script=script, mute=args.mute,
-              confirm_timeout_ms=int(args.confirm_timeout * 1000),
-              p300=args.p300, arm_live_confirm=args.arm_live_confirm,
-              live_options={"calibration_sequences": args.calibration,
-                            "alpha_calib_s": args.alpha_calib_s})
+    live_path = source == InputSources.LIVE_EEG or (source == InputSources.SIMULATED and args.p300)
+    try:
+        app = App(source, sim_script=script, mute=args.mute,
+                  confirm_timeout_ms=int(args.confirm_timeout * 1000),
+                  p300=args.p300, arm_live_confirm=args.arm_live_confirm,
+                  live_options={"calibration_sequences": args.calibration,
+                                "alpha_calib_s": args.alpha_calib_s})
+    except Exception as err:
+        if not live_path:
+            raise
+        from signal2speech.eeg.app_live import PAIRING_HELP   # driver or pipeline setup failed
+        print(f"Couldn't set up the EEG pipeline: {type(err).__name__}: {err}\n{PAIRING_HELP}",
+              file=sys.stderr)
+        return 3
     qapp.aboutToQuit.connect(app.close)
     if hasattr(app.sim, "calibrate"):          # #103: open the stream and calibrate first
         app.root.showFullScreen() if args.fullscreen else app.root.show()
@@ -437,9 +446,17 @@ def main(argv=None) -> int:
             print(f"{type(err).__name__}: {err}\n{PAIRING_HELP}", file=sys.stderr)
             app.close()
             return 3
-        if app.sim.calibrate({c.target_id: c.label for c in app.choices}) is None:
+        try:
+            ok = app.sim.calibrate({c.target_id: c.label for c in app.choices})
+        except Exception as err:               # release the headset, then report
+            app.close()
+            print(f"Calibration crashed: {type(err).__name__}: {err}", file=sys.stderr)
+            return 1
+        if ok is None:
             app.close()                        # window closed during calibration
             return 0
+        from signal2speech.eeg.app_live import pump
+        pump(2.0 if ok else 6.0)               # let the operator read the calibration result
     guards: List[QTimer] = []   # stopped on return, so a later event loop in this process can't fire them
     if args.screenshot:
         def shoot(code: int) -> None:

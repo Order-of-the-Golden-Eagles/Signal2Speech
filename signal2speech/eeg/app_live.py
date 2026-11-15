@@ -82,12 +82,31 @@ def find_unicorn(timeout_s: float = 15.0) -> list:
     """Serials of reachable Unicorns, or [] if none answer within ``timeout_s``.
 
     The driver's discovery is a Bluetooth scan that can take from 3 s to well over 20 s.
+    Raises RuntimeError if the scan itself fails (a missing driver is not "not paired").
     """
     def scan():
         import gpype as gp
         return gp.HybridBlack.get_available_devices()
-    done, result, _err = _bounded(scan, timeout_s, "unicorn-scan")
+    done, result, err = _bounded(scan, timeout_s, "unicorn-scan")
+    if done and err is not None:
+        raise RuntimeError(f"couldn't search for a Unicorn (driver problem?): "
+                           f"{type(err).__name__}: {err}")
     return list(result or []) if done else []
+
+
+_PLACEHOLDER: Optional[p300.P300Model] = None
+
+
+def placeholder_model() -> p300.P300Model:
+    """The synthetic stand-in LDA g.Pype needs to start; built once per process."""
+    global _PLACEHOLDER
+    if _PLACEHOLDER is None:
+        tmp = tempfile.mkdtemp(prefix="s2s-p300-")
+        try:
+            _PLACEHOLDER = p300.train_on_synthetic(n_sequences=4, seed=99, workdir=tmp)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return _PLACEHOLDER
 
 
 class LiveEegInput:
@@ -121,17 +140,15 @@ class LiveEegInput:
         self._sequence_done = False
         self._got_decision = False
         self._reflashes = 0
+        self._reflashing = False
+        self._last_attended: Optional[str] = None
+        self._start_hung = False
         self.p300_calibration: dict = {}
         self.alpha_calibration: Optional[am.Calibration] = None
 
         # g.Pype refuses to start a realtime pipeline with an unfitted scorer, so start from a
         # small synthetic model (in a private temp folder); calibrate() refits every scorer.
-        if placeholder is None:
-            tmp = tempfile.mkdtemp(prefix="s2s-p300-")
-            try:
-                placeholder = p300.train_on_synthetic(n_sequences=4, seed=99, workdir=tmp)
-            finally:
-                shutil.rmtree(tmp, ignore_errors=True)
+        placeholder = placeholder or placeholder_model()
         self.nodes = p300.build_pipeline(source, model=placeholder, enable_oscar=enable_oscar)
         self.adapter = InputAdapter(handler, self.input_source)
         self.chooser = p300.P300Chooser(self.nodes, self.adapter, flashes_per_tile=flashes)
@@ -159,7 +176,6 @@ class LiveEegInput:
             self.alpha = am.AlphaConfirm(handler, input_source=self.input_source,
                                          pipeline=self.nodes.pipeline, upstream=self.nodes.eeg)
         handler.live_eeg_confirm_armed = bool(arm_live_confirm)
-        self.live_confirm_armed = bool(arm_live_confirm) or self.simulated
 
         self._eyes_open_timer = QTimer(singleShot=True)
         self._eyes_open_timer.timeout.connect(self._open_eyes)
@@ -168,6 +184,11 @@ class LiveEegInput:
         handler.on_round_opened.append(self._on_round_opened)
         handler.on_cleared.append(self._on_cleared)
         window.set_connection(self.connection_label())
+
+    @property
+    def live_confirm_armed(self) -> bool:
+        """Whether an eye closure can confirm: always when simulated, else the handler's flag."""
+        return self.simulated or self.handler.live_eeg_confirm_armed
 
     # ── Labels ───────────────────────────────────────────────
     def connection_label(self) -> str:
@@ -199,12 +220,15 @@ class LiveEegInput:
             done, _r, err = _bounded(self.nodes.pipeline.start, self.open_timeout_s,
                                      "unicorn-open")
             if not done:
+                # start() is still blocked in its thread: close() must not touch the pipeline
+                # under it. The daemon thread dies with the process.
+                self._start_hung = True
                 raise RuntimeError(f"found a Unicorn but couldn't open it within "
                                    f"{self.open_timeout_s:g} s (is another app using it?)")
             if err is not None:
                 raise RuntimeError(f"couldn't open the Unicorn: {type(err).__name__}: {err}")
+        self.running = True       # set before anything else can fail, so close() stops it
         self.alpha.start()        # its own Generator when simulated; a no-op when shared
-        self.running = True
         if not pump(no_data_s, until=lambda: self.alpha.power_count() > 0):
             self.close()
             raise RuntimeError(f"the stream sent no data within {no_data_s:g} s")
@@ -224,9 +248,10 @@ class LiveEegInput:
             if fn in hooks:
                 hooks.remove(fn)
         self.alpha.close()
-        if self.running:
-            self.nodes.pipeline.stop()
-        self.nodes.pipeline.close()
+        if not self._start_hung:
+            if self.running:
+                self.nodes.pipeline.stop()
+            self.nodes.pipeline.close()
         self.running = False
 
     # ── Calibration, on the app's own tiles ──────────────────
@@ -262,6 +287,7 @@ class LiveEegInput:
             w.tiles[t].set_label("")
         if not self.p300_ok:
             w.flash_enabled = False                 # no brain choosing; keys 1 and 2 still work
+        w.eye_confirm = bool(self.alpha_ok)         # the Confirm hint follows what really works
         status = (f"P300 {'ready' if self.p300_ok else 'OFF, use keys 1 and 2'} · "
                   f"eye-closure confirm {'ready' if self.alpha_ok else 'OFF, use key 1'}")
         w.prompt.setText(f"Calibration done: {status}")
@@ -328,8 +354,11 @@ class LiveEegInput:
             w.prompt.setText("Open your eyes.")
             self.alpha_calibration = self.alpha.calibrate(open_vals, closed_vals)
             collect(1.5)                                     # alpha decays below release
-        except am.CalibrationError as err:
-            self.log(f"Eye-closure calibration failed: {err}. Key 1 still confirms.")
+        except CalibrationAborted:
+            raise
+        except Exception as err:                             # incl. CalibrationError
+            self.log(f"Eye-closure calibration failed: {type(err).__name__}: {err}. "
+                     "Key 1 still confirms.")
             return False                                     # threshold stays at "never fires"
         self.log(f"Alpha switch calibrated: ratio {self.alpha_calibration.ratio:.1f}")
         return True
@@ -340,11 +369,16 @@ class LiveEegInput:
             return                                       # begin_calibration already ran
         attended = None
         if self.simulated:
-            if not self.script:                          # script spent: keys take over
+            if self._reflashing:                         # same question again: same attention
+                attended = self._last_attended
+            elif not self.script:                        # script spent: keys take over
                 self.window.flasher.stop()
                 self.window.hint.setText("Simulated script finished: press 1 or 2")
                 return
-            attended = TILES[self.script.popleft() - 1]  # which tile the synthetic brain attends
+            else:
+                attended = TILES[self.script.popleft() - 1]   # tile the synthetic brain attends
+            self._last_attended = attended
+        self._reflashing = False
         self._got_decision = False
         self.chooser.begin_sequence(attended_for_synthetic=attended)
 
@@ -368,6 +402,7 @@ class LiveEegInput:
         if self._reflashes < MAX_REFLASH:                # no scores at all: flash again
             self._reflashes += 1
             self.log(f"no P300 decision; flashing again ({self._reflashes}/{MAX_REFLASH})")
+            self._reflashing = True
             self.window.flasher.start(list(TILES))
         else:
             self.log("no P300 decision after re-flashing; use keys 1 or 2")
@@ -378,6 +413,8 @@ class LiveEegInput:
         self._decide.stop()
         if rnd.kind is RoundKind.CHOOSE:
             self._reflashes = 0
+            if self.simulated and not self.window.flash_enabled and self.script:
+                self.script.popleft()                    # P300 off: keys choose this step
             return
         if self.simulated and self.script:
             if self.script.popleft() == 1:               # the synthetic wearer closes their eyes

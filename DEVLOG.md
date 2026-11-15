@@ -348,6 +348,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - With no headset, it now stops within about 15 seconds with pairing steps, instead of freezing forever (the headset library waits indefinitely when no device is there)
 - Rehearse the exact same path without the headset: `--input simulated --p300`. That run worked end to end (one preview, one eye-closure confirm, one spoken line). Nothing has been tried on a real wearer yet
 - Code review follow-up: a failed calibration now switches that part off and says so (keys still work). Closing the window mid-calibration releases the headset. A headset that's found but busy fails in 20 seconds instead of freezing. If the brain gives no answer, the tiles flash again, then hand over to the keys
+- Second review: on-screen hints now match what actually works after a failed calibration, the calibration result stays on screen long enough to read, setup and calibration errors exit cleanly instead of crashing or holding the headset, and a missing driver is no longer reported as "not paired"
 
 ## 11/14/26 - 8:10 PM - Long Le - #92 One demo script and one shot list ([PR #119](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/119))
 - The team now has one two-minute script (`stage-script.md`) and one video shot list (`shot-list.md`) in `docs/demo-submission/`. The duplicate `run-of-show.md` and `video-shot-list.md` are gone

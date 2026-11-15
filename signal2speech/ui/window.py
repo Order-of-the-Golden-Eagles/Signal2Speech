@@ -112,6 +112,7 @@ class SelectionWindow(QMainWindow):
         self.handler = handler
         self.keyboard = keyboard
         self.flash_enabled = flash
+        self.eye_confirm: Optional[bool] = None   # False once eye-closure calibration failed (#103)
         self._preview: Optional[Choice] = None
         self.setWindowTitle("Signal2Speech")
         self.setStyleSheet(_STYLE)
@@ -226,7 +227,10 @@ class SelectionWindow(QMainWindow):
 
     # ── Handler listeners ────────────────────────────────────
     def confirm_hint(self) -> str:
-        """The Confirm-round hint. Live EEG eye confirm stays off until #23 arms it (#103)."""
+        """The Confirm-round hint, matching what really confirms (#103)."""
+        if self.eye_confirm is False:
+            return ("Confirm: key 1  (eye-closure confirm is off: its calibration failed)   ·   "
+                    "Cancel: key 2 or Esc")
         if (self.input_source == InputSources.LIVE_EEG
                 and not self.handler.live_eeg_confirm_armed):
             return ("Confirm: key 1  (eye-closure confirm is off until #23 says it's safe)   ·   "
@@ -250,7 +254,8 @@ class SelectionWindow(QMainWindow):
             self.prompt.setText("Choose a reply")
             self.set_countdown(None)
             self.preview.setVisible(False)
-            self.hint.setText("Look at a tile, or press 1 or 2   ·   Esc clears")
+            self.hint.setText("Look at a tile, or press 1 or 2   ·   Esc clears" if self.flash_enabled
+                              else "Press 1 or 2   ·   Esc clears")
             if self.flash_enabled:
                 self.flasher.start([t for t in _TILE_ORDER if rnd.find(t)])
 

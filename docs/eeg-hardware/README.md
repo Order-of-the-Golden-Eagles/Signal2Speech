@@ -325,7 +325,8 @@ Flags: `--calibration N` sets the P300 calibration sequences (default 10). `--al
 2. **Calibration on the app's own tiles.**
    - P300: N flash sequences, each naming the tile to watch, e.g. "look at “Compare counties” and count its flashes". `P300Chooser.finish_calibration()` then refits the LDA.
    - Alpha switch: eyes open, then eyes closed, then `AlphaConfirm.calibrate`.
-   - **If a calibration fails, that path turns off.** A failed P300 calibration stops the tiles flashing, so keys 1 and 2 choose. A failed eye-closure calibration leaves the threshold at "never fires", so key 1 confirms. The final prompt and the strip both state the result.
+   - **If a calibration fails, that path turns off.** A failed P300 calibration stops the tiles flashing, and the Choose hint changes to "Press 1 or 2". A failed eye-closure calibration leaves the threshold at "never fires", and the Confirm hint says key 1. The prompt shows the result for 6 s before the first question (2 s if both passed), and the strip keeps it.
+   - **Errors exit cleanly and release the headset.** A driver or setup error exits 3 with the pairing help. A crash during calibration exits 1. A Unicorn scan that fails reports a driver problem, not "not paired".
    - Closing the window during calibration exits cleanly. The headset is released.
 3. **Demo.**
    - Choose rounds flash the tiles at the chooser's validated timing: 5 flashes per tile, 100 ms on, 250 ms SOA. Each flash emits the P300 `Marker` on the frame the tile lights. The decision reaches the handler on the Qt main thread through `InputAdapter(LIVE_EEG)`.
