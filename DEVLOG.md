@@ -585,7 +585,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - If no voice works at all, the cue is still printed and the session carries on
 - Verified on the judging laptop by switching the Windows voice off: three cues in a row spoke for 2.3 s, 2.1 s and 2.2 s. Two new tests. Not tried on a real Mac or Linux machine
 
-## 11/15/26 - 2:32 AM - MagicJester2764 - #166 Pipeline diagrams drawn from the code (PR pending)
+## 11/15/26 - 2:32 AM - MagicJester2764 - #166 Pipeline diagrams drawn from the code ([PR #208](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/208))
 - Anyone can show a judge the exact g.Pype graph we run, for the app with live EEG, the evidence view, the P300 chooser, and the eye-closure switch
     - `python -m signal2speech.evidence.diagram`, or read [pipelines.md](docs/architecture/pipelines.md). The README has the live app's graph
 - Nothing is drawn by hand. Each diagram is built by the same code the app uses, then read back from g.Pype's own record of nodes and connections. A test fails if someone changes a pipeline and forgets `--write`
