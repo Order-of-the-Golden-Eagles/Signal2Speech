@@ -308,6 +308,8 @@ class App:
 
         self.root = QWidget()
         self.root.setWindowTitle(f"Signal2Speech · {self.input_summary()}")
+        if hasattr(self.sim, "on_label"):              # #172: the check changes the label
+            self.sim.on_label = lambda text: self.root.setWindowTitle(f"Signal2Speech · {text}")
         self.root.setStyleSheet(f"background:{T.BG};")
         right = QVBoxLayout()
         title = QLabel("Output and transcript")
@@ -340,7 +342,9 @@ class App:
                 ("F1", "Show or hide this help")]
         if hasattr(self.sim, "set_next"):
             rows.insert(3, ("Ctrl+1 / Ctrl+2", "Pick for the simulated decoder"))
-        self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {self.input_summary()}")
+        help_input = ("keyboard chooses, PiEEG eye closure confirms" if pieeg is not None
+                      else INPUT_LABELS[input_source])
+        self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {help_input}")
         for seq, fn in (("F1", self.help.toggle), ("F11", self.toggle_fullscreen)):
             s3 = QShortcut(QKeySequence(seq), self.root)
             s3.setAutoRepeat(False)
@@ -548,6 +552,14 @@ def main(argv=None) -> int:
         from signal2speech.diagnostics import run_smoke
         return run_smoke(args.smoke)
     pieeg = None
+    pieeg_only = {"--pieeg": args.pieeg is not None, "--pieeg-self-test": args.pieeg_self_test,
+                  "--stream": args.stream is not None, "--any-host": args.any_host,
+                  "--channels": args.channels != "auto", "--probe-s": args.probe_s != 8.0,
+                  "--rest-s": args.rest_s != 20.0, "--closures": args.closures != 3}
+    if args.input != "pieeg" and any(pieeg_only.values()):
+        given = ", ".join(k for k, v in pieeg_only.items() if v)
+        print(f"{given}: only for --input pieeg", file=sys.stderr)
+        return 2
     if args.input == "pieeg":
         if not (args.pieeg or args.pieeg_self_test):
             print("--input pieeg: say what is publishing the stream with --pieeg live, simulated, "
@@ -559,6 +571,13 @@ def main(argv=None) -> int:
         if args.arm_live_confirm:
             print("--arm-live-confirm doesn't apply to --input pieeg: the #150 check in this "
                   "session decides", file=sys.stderr)
+            return 2
+        if args.p300:
+            print("--p300 doesn't apply to --input pieeg: keys choose, the board only confirms",
+                  file=sys.stderr)
+            return 2
+        if args.closures < 2:
+            print("--closures: the #150 check needs at least 2", file=sys.stderr)
             return 2
         pieeg = {"stream_is": args.pieeg or "simulated", "self_test": args.pieeg_self_test,
                  "stream": args.stream, "any_host": args.any_host, "channels": args.channels,

@@ -23,6 +23,7 @@ step turns that brain path off (keys still work) and the prompt and strip say wh
 """
 from __future__ import annotations
 
+import gc
 import shutil
 import tempfile
 import threading
@@ -109,6 +110,47 @@ def placeholder_model() -> p300.P300Model:
     return _PLACEHOLDER
 
 
+class SimulatedEyes:
+    """A simulated wearer's eyes: close shortly after a Confirm round opens, reopen 2.5 s later.
+
+    Shared by the Generator path (#103, ``AlphaBursts``) and the PiEEG self-test (#172,
+    ``SelfTestStream``). ``eyes()`` returns the object with ``close_eyes``/``open_eyes``, or None
+    when there is nothing simulated to drive.
+    """
+
+    HOLD_MS = 2500
+
+    def __init__(self, eyes: Callable[[], object]):
+        self._eyes = eyes
+        self._close_timer = QTimer(singleShot=True)
+        self._close_timer.timeout.connect(self.close_now)
+        self._open_timer = QTimer(singleShot=True)
+        self._open_timer.timeout.connect(self.open_now)
+
+    def close_after(self, settle_s: float) -> None:
+        """Close once the alpha switch's settle time has passed (eyes must be open first)."""
+        self._close_timer.start(int((settle_s + 0.2) * 1000))
+
+    def closing(self) -> bool:
+        return self._close_timer.isActive()
+
+    def close_now(self) -> None:
+        eyes = self._eyes()
+        if eyes is not None:
+            eyes.close_eyes()
+            self._open_timer.start(self.HOLD_MS)
+
+    def open_now(self) -> None:
+        self._close_timer.stop()
+        eyes = self._eyes()
+        if eyes is not None:
+            eyes.open_eyes()
+
+    def stop(self) -> None:
+        self._close_timer.stop()
+        self._open_timer.stop()
+
+
 class LiveEegInput:
     """P300 choose + alpha confirm feeding the app's SelectionHandler. Main thread only."""
 
@@ -177,10 +219,7 @@ class LiveEegInput:
                                          pipeline=self.nodes.pipeline, upstream=self.nodes.eeg)
         handler.live_eeg_confirm_armed = bool(arm_live_confirm)
 
-        self._eyes_open_timer = QTimer(singleShot=True)
-        self._eyes_open_timer.timeout.connect(self._open_eyes)
-        self._eyes_close_timer = QTimer(singleShot=True)
-        self._eyes_close_timer.timeout.connect(self._close_eyes)
+        self.eyes = SimulatedEyes(lambda: self.bursts)
         handler.on_round_opened.append(self._on_round_opened)
         handler.on_cleared.append(self._on_cleared)
         window.set_connection(self.connection_label())
@@ -241,8 +280,8 @@ class LiveEegInput:
         f.stop()
         (f.repetitions, f.flash_ms, f.isi_ms, f.on_sequence_started, f.on_flash,
          f.on_sequence_finished) = self._saved_flasher
-        for t in (self._decide, self._eyes_open_timer, self._eyes_close_timer):
-            t.stop()
+        self._decide.stop()
+        self.eyes.stop()
         for hooks, fn in ((self.handler.on_round_opened, self._on_round_opened),
                           (self.handler.on_cleared, self._on_cleared)):
             if fn in hooks:
@@ -418,21 +457,11 @@ class LiveEegInput:
             return
         if self.simulated and self.script:
             if self.script.popleft() == 1:               # the synthetic wearer closes their eyes
-                self._eyes_close_timer.start(int((self.alpha.settle_s + 0.2) * 1000))
+                self.eyes.close_after(self.alpha.settle_s)
 
     def _on_cleared(self, _reason: str) -> None:
         self._decide.stop()
-        self._open_eyes()
-
-    def _close_eyes(self) -> None:
-        if self.bursts:
-            self.bursts.close_eyes()
-            self._eyes_open_timer.start(2500)
-
-    def _open_eyes(self) -> None:
-        self._eyes_close_timer.stop()
-        if self.bursts:
-            self.bursts.open_eyes()
+        self.eyes.open_now()
 
 
 # ── PiEEG eye-closure confirm (#172) ─────────────────────────
@@ -491,7 +520,6 @@ class PiEEGConfirm:
         self.relay = None                                # pieeg_lsl.PiEEGRelay
         self.device = None
         self.alpha: Optional[am.AlphaConfirm] = None
-        self.bursts = None                               # AlphaConfirm reads .bursts in measure()
         self.pick = None
         self.report: dict = {}
         self.armed = False                               # eye-closure confirm on for this session
@@ -499,14 +527,13 @@ class PiEEGConfirm:
         self.calibrated = False
         self.running = False
         self._closed = False
-        self._eyes_close_timer = QTimer(singleShot=True)
-        self._eyes_close_timer.timeout.connect(self._close_eyes)
-        self._eyes_open_timer = QTimer(singleShot=True)
-        self._eyes_open_timer.timeout.connect(self._open_eyes)
+        self.eyes = SimulatedEyes(lambda: self.publisher)
+        self.on_label: Optional[Callable[[str], None]] = None    # App refreshes its title
         handler.live_eeg_confirm_armed = False           # only the check below may switch it on
         handler.on_round_opened.append(self._on_round_opened)
         handler.on_cleared.append(self._on_cleared)
         window.eye_confirm = False                       # the hint says key 1 until the check passes
+        window.eye_off_reason = "the eye check hasn't run yet"
         self._show_label()
 
     # ── Labels ───────────────────────────────────────────────
@@ -539,9 +566,11 @@ class PiEEGConfirm:
         return " · ".join(parts)
 
     def _show_label(self) -> None:
-        self.window.set_input_text(self.strip_text(),
-                                   self.input_source if self.armed else InputSources.KEYBOARD)
+        text = self.strip_text()
+        self.window.set_input_text(text, self.input_source if self.armed else InputSources.KEYBOARD)
         self.window.set_connection(self.connection_label())
+        if self.on_label is not None:
+            self.on_label(text)
 
     # ── Lifecycle ────────────────────────────────────────────
     def start(self) -> None:
@@ -577,26 +606,28 @@ class PiEEGConfirm:
         if self._closed:
             return
         self._closed = True
-        for t in (self._eyes_close_timer, self._eyes_open_timer):
-            t.stop()
+        self.eyes.stop()
         for hooks, fn in ((self.handler.on_round_opened, self._on_round_opened),
                           (self.handler.on_cleared, self._on_cleared)):
             if fn in hooks:
                 hooks.remove(fn)
+        # Nothing can confirm after this. ``armed`` keeps this session's check verdict, so the
+        # session report (written on quit, after close) still says what really confirmed.
         self.handler.live_eeg_confirm_armed = False
-        self.armed = False
-        import gc
         if self.alpha is not None:
             self.alpha.close()
         if self.relay is not None:
             self.relay.stop()
         self.alpha = self.relay = None
-        gc.collect()          # drop the relay's inlet before its publisher goes, so it can't retry
+        # The relay and its thread reference each other, so only a collection frees its inlet.
+        # Free it before the publisher's outlet goes, or the inlet logs "transmission broke off"
+        # and retries. The second pass frees the publisher's outlet, so its name is free again.
+        gc.collect()
         if self.publisher is not None:
             self.publisher.stop()
         self.publisher = None
         self.running = False
-        gc.collect()                                     # release LSL outlets so names are free
+        gc.collect()
 
     # ── The #150 check, on screen ────────────────────────────
     def calibrate(self, labels: Optional[dict] = None) -> Optional[bool]:
@@ -611,15 +642,19 @@ class PiEEGConfirm:
         w = self.window
         watched = w.isVisible()
 
+        def closed() -> bool:
+            return watched and not w.isVisible()
+
         def tick() -> None:
-            if watched and not w.isVisible():
+            QCoreApplication.processEvents()             # keep the window live while reading
+            if closed():
                 raise CalibrationAborted()
 
         def prompt(text: str) -> None:
-            w.prompt.setText(text.replace(">>> ", ""))
+            w.prompt.setText(text)
             w.hint.setText("Eye-closure check (#150). Don't press anything.")
             self.log(f"check: {text}")
-            QCoreApplication.processEvents()
+            tick()
 
         for t in TILES:
             w.tiles[t].set_label("")
@@ -632,17 +667,28 @@ class PiEEGConfirm:
                                                 sim=self.publisher, say=self.log, tick=tick)
             except (devices.NoAlphaResponse, ValueError) as err:
                 return self._finish({"error": f"channel check: {err}"})
+            except CalibrationAborted:
+                raise
+            except Exception as err:                     # the stream dropped, LSL errors, ...
+                return self._finish({"error": f"channel check: {type(err).__name__}: {err}"})
             self.log(f"using {self.device.describe_channels(self.pick.channels)}: {self.pick.reason}")
-            self.alpha = am.AlphaConfirm(
-                self.handler, input_source=self.input_source,
-                source=self._source(), channels=list(self.pick.channels),
-                sampling_rate=self.relay.rate)
-            self.alpha.bursts = self.publisher           # the self-test's eyes follow the prompts
-            self.alpha.start()
-            if not pump(self.no_data_s, until=lambda: self.alpha.power_count() > 0):
-                return self._finish({"error": "no alpha band power from the stream"})
-            report = am.measure(self.alpha, self.alpha_calib_s, self.rest_s, self.closures,
-                                prompt=prompt, tick=tick)
+            try:
+                self.alpha = am.AlphaConfirm(
+                    self.handler, input_source=self.input_source,
+                    source=self._source(), channels=list(self.pick.channels),
+                    sampling_rate=self.relay.rate)
+                self.alpha.bursts = self.publisher       # the self-test's eyes follow the prompts
+                self.alpha.start()
+                pump(self.no_data_s, until=lambda: closed() or self.alpha.power_count() > 0)
+                tick()
+                if self.alpha.power_count() == 0:
+                    return self._finish({"error": "no alpha band power from the stream"})
+                report = am.measure(self.alpha, self.alpha_calib_s, self.rest_s, self.closures,
+                                    prompt=prompt, tick=tick)
+            except CalibrationAborted:
+                raise
+            except Exception as err:                     # g.Pype or the stream failed mid-check
+                return self._finish({"error": f"{type(err).__name__}: {err}"})
         except CalibrationAborted:
             self.log("eye-closure check aborted: the window was closed")
             return None
@@ -666,6 +712,7 @@ class PiEEGConfirm:
         # closing the switch above, so every label follows the same rule.
         self.handler.live_eeg_confirm_armed = ok and self.input_source == InputSources.LIVE_EEG
         self.window.eye_confirm = ok
+        self.window.eye_off_reason = "the eye check failed"
         verdict = (f"Eye-closure confirm ON: {self.confirm_label()} passed the check"
                    if ok else "Eye-closure confirm OFF, key 1 confirms: " + "; ".join(self.reasons))
         self.window.prompt.setText(verdict)
@@ -677,19 +724,9 @@ class PiEEGConfirm:
 
     # ── Self-test eyes ───────────────────────────────────────
     def _on_round_opened(self, rnd: Round) -> None:
-        self._eyes_close_timer.stop()
+        self.eyes.stop()
         if rnd.kind is RoundKind.CONFIRM and self.auto_eyes and self.armed and self.alpha:
-            self._eyes_close_timer.start(int((self.alpha.settle_s + 0.2) * 1000))
+            self.eyes.close_after(self.alpha.settle_s)
 
     def _on_cleared(self, _reason: str) -> None:
-        self._open_eyes()
-
-    def _close_eyes(self) -> None:
-        if self.publisher is not None:
-            self.publisher.close_eyes()
-            self._eyes_open_timer.start(2500)
-
-    def _open_eyes(self) -> None:
-        self._eyes_close_timer.stop()
-        if self.publisher is not None:
-            self.publisher.open_eyes()
+        self.eyes.open_now()

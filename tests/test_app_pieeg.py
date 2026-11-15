@@ -20,6 +20,7 @@ from signal2speech import app as app_module  # noqa: E402
 from signal2speech.app import App  # noqa: E402
 from signal2speech.core import ActionIds, InputSources, Outcome, TargetIds  # noqa: E402
 from signal2speech.eeg import app_live  # noqa: E402
+from signal2speech.eeg import devices  # noqa: E402
 from signal2speech.eeg import lsl_source as lsl  # noqa: E402
 
 T1, T2 = TargetIds.TARGET_1, TargetIds.TARGET_2
@@ -121,7 +122,7 @@ def test_a_failed_check_leaves_key_1_as_the_only_confirm(make, monkeypatch):
                                 or "calibration failed" in app.sim.reasons[0])
     assert app.window.input_label.text().startswith("Choose: Keyboard · Confirm: key 1 · ")
     assert app.window.input_label.text().endswith("eye check failed")
-    assert "key 1" in app.window.confirm_hint()
+    assert "the eye check failed" in app.window.confirm_hint()
 
     app.ask()
     app.window.press_target(T2)
@@ -135,6 +136,7 @@ def test_live_label_and_arming_follow_the_check(make):
     app, _ = make(stream_is="live")
     sim = app.sim
     assert app.handler.live_eeg_confirm_armed is False and app.window.eye_confirm is False
+    assert "the eye check hasn't run yet" in app.window.confirm_hint()
     assert app.window.input_label.text() == \
         "Choose: Keyboard · Confirm: key 1 · Live EEG (PiEEG Octopus 16): eye check not run yet"
     assert sim._finish({**CLEAN, "false_triggers": 1}) is False
@@ -142,9 +144,11 @@ def test_live_label_and_arming_follow_the_check(make):
     assert sim._finish(CLEAN) is True
     assert app.handler.live_eeg_confirm_armed is True and app.window.eye_confirm is True
     assert app.window.input_label.text() == "Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)"
-    assert "Live EEG (PiEEG Octopus 16)" in app.report_text()
+    assert app.root.windowTitle() == "Signal2Speech · " + app.window.input_label.text()
     sim.close()
     assert app.handler.live_eeg_confirm_armed is False      # closing disarms
+    # The report is written on quit, after close: it still names what really confirmed.
+    assert "- **Input:** Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)" in app.report_text()
 
 
 def test_recorded_and_simulated_streams_are_never_labelled_live(make):
@@ -170,10 +174,33 @@ def test_the_board_never_chooses(qapp):
     (["--input", "pieeg"], "say what is publishing"),
     (["--input", "pieeg", "--pieeg-self-test", "--pieeg", "live"], "can't be labelled live"),
     (["--input", "pieeg", "--pieeg", "live", "--arm-live-confirm"], "check in this session decides"),
+    (["--input", "pieeg", "--pieeg", "live", "--p300"], "the board only confirms"),
+    (["--input", "pieeg", "--pieeg", "live", "--closures", "1"], "at least 2"),
+    (["--input", "live", "--pieeg", "live"], "only for --input pieeg"),
+    (["--input", "keyboard", "--channels", "3,7"], "only for --input pieeg"),
 ])
 def test_cli_refuses_unlabelled_or_unsafe_runs(qapp, capsys, args, message):
     assert app_module.main(args) == 2
     assert message in capsys.readouterr().err
+
+
+def test_a_stream_error_during_the_check_fails_safe(make, monkeypatch):
+    """Any failure mid-check leaves key 1 confirming instead of ending the demo."""
+    app, _ = make(stream_is="live")
+    sim = app.sim
+
+    class Relay:
+        name, channels, rate, rows = "S2S-Gone", 16, 250.0, 1
+
+        def stop(self):
+            pass
+    sim.relay, sim.device = Relay(), devices.PIEEG_OCTOPUS16
+
+    def gone(*a, **k):
+        raise RuntimeError("LSL stream 'S2S-Gone' disappeared")
+    monkeypatch.setattr(lsl, "choose_channels", gone)
+    assert sim.calibrate() is False
+    assert "disappeared" in sim.reasons[0] and not app.handler.live_eeg_confirm_armed
 
 
 def test_cli_without_a_stream_exits_3_with_board_help(qapp, monkeypatch, capsys):

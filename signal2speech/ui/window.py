@@ -187,6 +187,7 @@ class SelectionWindow(QMainWindow):
         self.keyboard = keyboard
         self.flash_enabled = flash
         self.eye_confirm: Optional[bool] = None   # False once eye-closure calibration failed (#103)
+        self.eye_off_reason = "its calibration failed"   # shown when eye_confirm is False (#172)
         self._preview: Optional[Choice] = None
         self.setWindowTitle("Signal2Speech")
         self.setStyleSheet(_STYLE)
@@ -311,7 +312,7 @@ class SelectionWindow(QMainWindow):
     def confirm_hint(self) -> str:
         """The Confirm-round hint, matching what really confirms (#103)."""
         if self.eye_confirm is False:
-            return ("Confirm: key 1  (eye-closure confirm is off: its calibration failed)   ·   "
+            return (f"Confirm: key 1  (eye-closure confirm is off: {self.eye_off_reason})   ·   "
                     "Cancel: key 2 or Esc")
         if (self.input_source == InputSources.LIVE_EEG
                 and not self.handler.live_eeg_confirm_armed):

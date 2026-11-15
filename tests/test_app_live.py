@@ -209,7 +209,7 @@ def test_hints_follow_failed_calibrations(qapp, make, monkeypatch):
     assert "Press 1 or 2" in app.window.hint.text() and not app.window.flasher.running
     assert list(live.script) == [1]             # the Choose value was the keyboard's
     app.window.press_target(T2)
-    assert live._eyes_close_timer.isActive()    # the Confirm value (1) still closes the eyes
+    assert live.eyes.closing()                  # the Confirm value (1) still closes the eyes
 
     app2, _ = make(InputSources.LIVE_EEG, arm_live_confirm=True, confirm_timeout_ms=0)
     monkeypatch.setattr(app2.sim, "_calibrate_p300", lambda labels, wait: True)
