@@ -378,6 +378,27 @@ Offline results on 2026-11-14 (1–30 Hz band-pass, 100 ms bins, shrinkage LDA, 
 
 Each subject has 150 target and 1,050 non-target flashes over about 4 minutes. These show our pipeline finds a real P300 in real human EEG. They are **not** a result for our wearer or our two-tile layout. The dataset's files state no licence; it's provided by g.tec for this hackathon, so cite g.tec and don't redistribute it.
 
+### How many flashes the chooser needs (#151)
+
+`python -m signal2speech.evidence.dataset <folder> --curve` answers this on g.tec's recordings (add `--plot file.svg` for the chart). It asks the two-tile question our app asks: given `n` responses to the attended stimulus and `n` to an unattended one, does our classifier score the attended ones higher?
+
+| Subject | 1 flash | 2 flashes | 3 flashes | 5 flashes | 10 flashes |
+| --- | --- | --- | --- | --- | --- |
+| S1 | 96 % | 100 % | 100 % | 100 % | 100 % |
+| S2 | 94 % | 99 % | 100 % | 100 % | 100 % |
+| S3 | 87 % | 92 % | 95 % | 99 % | 100 % |
+| S4 | 95 % | 98 % | 99 % | 100 % | 100 % |
+| S5 | 95 % | 98 % | 99 % | 100 % | 100 % |
+| Mean | 94 % | 97 % | 99 % | 100 % | 100 % |
+
+![Right tile picked, by flashes averaged per tile](media/151-flashes.svg)
+
+- **Method.** Our chooser's features and classifier (40 ms bin means, shrinkage LDA), cross-validated on five separate blocks of time, 400 random draws per block. Chance is 50 %. With the target and non-target labels scrambled, the same code scores 42–46 %, as it should.
+- **Why blocks of time.** Flashes come faster than an epoch lasts, so neighbouring epochs share samples. Testing on a separate stretch of the recording keeps the classifier from being tested on EEG it has nearly seen.
+- **Why this is higher than the 0.59–0.85 above.** That figure asks "is this one flash a target?" against a fixed threshold, with seven non-targets for every target. This one asks "which of two is the target?", which is the easier question and the one a two-tile chooser faces.
+- **Decision: keep 5 flashes per tile** (`p300.FLASHES_PER_TILE`). Three would do on these clean, separate epochs. But in the app the responses overlap, and the weakest subject needs five to reach 99 %. Run the app's own way, with overlapping recorded responses, five flashes give 80–95 % at the normal 0.25 s spacing and 90–100 % at 0.5 s ([table](../integration/README.md#recorded-human-eeg-chooses-the-tile-104)). No parameter in `signal2speech/eeg/p300.py` changes.
+- **Label.** Recorded (g.tec P300 Speller dataset), offline. Five people who are not our wearer, on a different electrode layout from the Unicorn's. It shows the method works on real human P300. It does not predict a live wearer's accuracy.
+
 ## Devices and channels (#150)
 
 g.tec's g.Pype is the whole pipeline. The program works out which amplifier it's reading (`signal2speech/eeg/devices.py`) and uses the right channels for the eyes-closed confirm, which needs the back of the head.
