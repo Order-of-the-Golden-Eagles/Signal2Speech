@@ -398,6 +398,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - To prove the test isn't toothless, it also breaks the handler three ways on purpose (double output, a cancel that keeps the preview, ignored round IDs), and it catches each one
 - No product code changed. This is software evidence with keyboard and simulated input, not live-EEG accuracy
 
+## 11/14/26 - 9:17 PM - Long Le - #130 #131 Response times and a session report ([PR #141](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/141))
+- Every confirm now shows how fast the app responded: time to the map change and time until speech starts, in the transcript and the bottom strip
+    - On a Mac: map 2–30 ms, speech about 15 ms with a bundled clip and about 50 ms with the computer voice
+- When the app closes, it writes a short report to `logs/session-<time>.md`: commit, input, counts of previews, confirms, and cancels, the response times, and a timeline. It never contains EEG or keys. `--no-report` turns it off
+- The report is ready to paste into the rehearsal log, so every practice run leaves evidence behind
+- Found and fixed two bugs while testing: the map time got overwritten in the strip, and closing the app could raise an error from the sound player. Tests use a fake clock. Not yet measured on the judging laptop
+
 ## 11/14/26 - 9:20 PM - In Young Song - #138 PiEEG's simulator drives the eye-closure confirm ([PR #144](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/144))
 - PiEEG's own simulated EEG now runs through our g.Pype pipeline: a keyboard preview, then PiEEG's "eyes closed" alpha burst confirms it, and the map changes and the line is spoken once
     - `python python_quickstart.py --sim --lsl` (PiEEG's starter), then `python -m signal2speech.eeg.pieeg_lsl --demo`. Setup is in `docs/eeg-hardware/pieeg.md`
