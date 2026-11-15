@@ -363,3 +363,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - They're made with espeak-ng, an open-source voice whose output we can share freely. It sounds robotic but clear. `python data/openorbit/audio/make_audio.py` regenerates them
 - A test fails if the contract wording or the dataset's comparison line changes without regenerating the audio, so the words heard always match the words on screen. AI replies still use the live OS voice
 - Checked on a Mac: the app played the bundled clip (Qt status Ready, played to the end), and the phonemes say "A-Q-I" and "Washtenaw" correctly. Not yet heard through the judging laptop's speakers
+
+## 11/14/26 - 8:51 PM - Long Le - #5 Live AI replies verified in the app (PR pending)
+- A typed question now gets real Claude replies in the AI demo window in about 2 seconds, and the confirmed reply is spoken once
+    - `python -m signal2speech.ai`, with `ANTHROPIC_API_KEY` in `.env`
+- Found a demo risk: without #116's grounding, Claude answered the AQI question wrongly ("Wayne"), when Washtenaw rose more. Don't ask data questions in the AI demo until #116 merges
+- Verified with keyboard input on a Mac, with a fresh question and the demo question. Not yet tried on the judging laptop
