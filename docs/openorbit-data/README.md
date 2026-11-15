@@ -39,7 +39,7 @@ Windows 11, Python 3.12, and the pinned `requirements-lock.txt`.
 
 ## Known limits
 
-- **June 26 is mostly cloud** on both MODIS Terra and Aqua, so the "before" image shows little ground. The AQI rows carry the before and after. The decision on this is deferred.
+- **June 26 is mostly cloud** on both MODIS Terra and Aqua, so the "before" image shows little ground. The AQI rows carry the before and after. **Settled (#153):** the view captions it "mostly cloud", and the [science note](science-note.md) explains it.
 - **Stretched map:** the images are plain lat/lon grids, so they look about 1.35 times wider east to west than the ground really is.
 - **No bundled audio:** the spoken lines use the offline Windows voice, because no `data/openorbit/audio/<action_id>.wav` is bundled.
 
@@ -54,7 +54,7 @@ Windows 11, Python 3.12, and the pinned `requirements-lock.txt`.
 **Research notes:**
 
 - **The demo area has no wildfire hotspots.** Inside the southeast Michigan image bounds, NASA FIRMS has only a handful of detections on June 26 and 28, 2023. Nearly all are type 2 ("other static land source"), clustered around the River Rouge industrial area. So a hotspot layer on the current map would show factories, not wildfires.
-- **The fires were in Quebec and Ontario,** more than 1,000 km away. On June 26 most detections were in central Quebec. NOAA's June 28 smoke bulletin puts the thickest smoke "from western Quebec through southern Ontario and into portions of the Midwestern and Upper Midwest". That's why the hotspot view (#31) uses a wider "where the smoke came from" map.
+- **The fires were mostly in Quebec,** at a median of about 1,340 km (86% of the 9,457 vegetation-fire detections). A few small detections were closer: 7 within 200 km, the nearest 84 km away. On June 26 most detections were in central Quebec. NOAA's June 28 smoke bulletin puts the thickest smoke "from western Quebec through southern Ontario and into portions of the Midwestern and Upper Midwest". That's why the hotspot view (#31) uses a wider "where the smoke came from" map.
 - **Data without a key:**
   - The yearly country files need no key, for example `https://firms.modaps.eosdis.nasa.gov/data/country/viirs-jpss1/2023/viirs-jpss1_2023_Canada.csv`. That one is about 138 MB, but one day is about 650 KB.
   - The area API needs a free `MAP_KEY` that is sent by email.
@@ -62,3 +62,5 @@ Windows 11, Python 3.12, and the pinned `requirements-lock.txt`.
 - **What a detection means:** a satellite pixel (375 m for VIIRS, 1 km for MODIS) with at least one hot spot in it, at a UTC time. It is not a fire outline, and it doesn't measure burned area. `type` 0 means a presumed vegetation fire.
 - **Credit line:** "We acknowledge the use of data and/or imagery from NASA's Fire Information for Resource Management System (FIRMS), part of NASA's LANCE and ESDIS." Use "NASA FIRMS" in captions.
 - **Verified (#32):** the research counts were re-counted from the downloaded files and match: 8 detections in the demo area on June 26 and 5 on June 28, all type 2. The June 26 Canada file has 7,959 rows.
+
+**Science note (#153):** [science-note.md](science-note.md) covers what the MODIS images and daily county AQI are, which pollutant set each value (Washtenaw June 26 was ozone), and what the app does and doesn't claim. It's for the Beyond the Horizon judges.

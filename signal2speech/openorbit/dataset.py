@@ -35,6 +35,9 @@ class CountyChange:
     after: int
     before_category: str
     after_category: str
+    # The pollutant that set each day's county AQI (EPA "Defining Parameter"), e.g. Ozone, PM2.5.
+    before_pollutant: str = ""
+    after_pollutant: str = ""
 
     @property
     def change(self) -> int:
@@ -161,7 +164,9 @@ def load_dataset(root: Optional[Path] = None) -> Dataset:
         except KeyError as missing:
             raise ValueError(f"aqi_rows.csv has no row for {missing}. {REBUILD_HINT}") from None
         changes.append(CountyChange(county, int(before["aqi"]), int(after["aqi"]),
-                                    before["category"], after["category"]))
+                                    before["category"], after["category"],
+                                    before.get("defining_parameter", ""),
+                                    after.get("defining_parameter", "")))
 
     places = tuple(Place(p["id"], p["label"], p.get("short", p["label"]), p["county"],
                          float(p["lat"]), float(p["lon"])) for p in meta["places"])

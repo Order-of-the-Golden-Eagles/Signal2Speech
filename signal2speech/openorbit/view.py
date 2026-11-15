@@ -108,11 +108,12 @@ class MapImage(QWidget):
     labelled place markers drawn on top."""
 
     def __init__(self, dataset: Dataset, date: str, caption: Optional[str] = None,
-                 parent: Optional[QWidget] = None):
+                 parent: Optional[QWidget] = None, caption_short: Optional[str] = None):
         super().__init__(parent)
         self._ds = dataset
         self.date = date
         self.caption = caption
+        self.caption_short = caption_short    # used when the full caption won't fit the image
         self._pixmap = QPixmap(str(dataset.images[date]))
         self.setMinimumSize(200, 111)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -137,14 +138,25 @@ class MapImage(QWidget):
         font.setBold(True)
         return font
 
-    def caption_layout(self) -> Optional[Tuple[QFont, QRectF]]:
+    def caption_text(self) -> Optional[str]:
+        """The caption that fits: the full one, else the short one (never wider than the image)."""
         if not self.caption:
+            return None
+        r = self.image_rect()
+        metrics = QFontMetricsF(self._font(r.height() / 18))
+        if self.caption_short and metrics.horizontalAdvance(self.caption) + 32 > r.width():
+            return self.caption_short
+        return self.caption
+
+    def caption_layout(self) -> Optional[Tuple[QFont, QRectF]]:
+        text = self.caption_text()
+        if not text:
             return None
         r = self.image_rect()
         font = self._font(r.height() / 18)
         metrics = QFontMetricsF(font)
         box = QRectF(r.left() + 8, r.top() + 8,
-                     metrics.horizontalAdvance(self.caption) + 16, metrics.height() + 6)
+                     metrics.horizontalAdvance(text) + 16, metrics.height() + 6)
         return font, box
 
     def marker_radius(self) -> float:
@@ -215,7 +227,7 @@ class MapImage(QWidget):
         if caption:
             font, box = caption
             painter.setFont(font)
-            self._draw_box_text(painter, box, self.caption)
+            self._draw_box_text(painter, box, self.caption_text())
 
         font, radius, labels = self.label_layout()
         for _, point in self.marker_points():
@@ -443,7 +455,10 @@ class OpenOrbitView(QWidget):
         images = QHBoxLayout()
         images.setSpacing(10)
         for date in (BEFORE, AFTER):
-            images.addWidget(MapImage(ds, date, caption=_long_date(date)), 1)
+            # June 26 was overcast for both MODIS satellites: the white is cloud, not clear air (#153).
+            caption = _long_date(date) + (" · mostly cloud" if date == BEFORE else "")
+            images.addWidget(MapImage(ds, date, caption=caption,
+                                      caption_short=_long_date(date)), 1)
         layout.addLayout(images, 1)
         layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
 
@@ -485,7 +500,28 @@ class OpenOrbitView(QWidget):
         top, runner = by_after[0], by_after[1]
         second = (f"Highest {_short_date(AFTER)} AQI: {top.county}, {top.after} "
                   f"({top.after - runner.after} more than {runner.county}).")
-        return [first, second]
+        lines = [first, second]
+        pollutants = self._pollutant_line()
+        return lines + ([pollutants] if pollutants else [])
+
+    def _pollutant_line(self) -> str:
+        """Which pollutant set each county AQI, when it isn't the same everywhere (#153).
+
+        Says nothing if any value's pollutant is unknown, so it never claims "all" falsely.
+        Ties go to the alphabetically first pollutant, so the text is the same every run.
+        """
+        ds = self.dataset
+        cells = [(c.county, d, p) for c in ds.changes
+                 for d, p in ((BEFORE, c.before_pollutant), (AFTER, c.after_pollutant))]
+        if not cells or any(not p for _, _, p in cells):
+            return ""
+        kinds = sorted({p for _, _, p in cells})
+        if len(kinds) < 2:
+            return ""
+        common = min(kinds, key=lambda k: (-sum(p == k for _, _, p in cells), k))
+        odd = [f"{county} {_short_date(d)} ({p})" for county, d, p in cells if p != common]
+        return (f"Each county AQI is set by its highest pollutant AQI that day: "
+                f"{common} for all values except {', '.join(odd)}.")
 
 
 __all__ = ["FiresMap", "MapImage", "OpenOrbitView"]

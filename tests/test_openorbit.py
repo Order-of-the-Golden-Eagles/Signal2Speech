@@ -280,3 +280,55 @@ def test_fire_dots_and_home_marker_land_on_the_image(qapp):
     assert len(dots) == len(view.fires.points)
     assert all(rect.contains(p) for _, p in dots)
     assert rect.contains(fires_map.home_point())
+
+
+def test_defining_pollutants_are_loaded_and_shown(qapp):
+    """#153: the view says which pollutant set each AQI when they differ, from the data."""
+    from signal2speech.openorbit.view import OpenOrbitView
+    ds = load_dataset()
+    w = ds.change_for("Washtenaw")
+    assert (w.before_pollutant, w.after_pollutant) == ("Ozone", "PM2.5")
+    wayne = ds.change_for("Wayne")
+    assert (wayne.before_pollutant, wayne.after_pollutant) == ("PM2.5", "PM2.5")
+    line = OpenOrbitView(ds)._pollutant_line()
+    assert line.endswith("PM2.5 for all values except Washtenaw Jun 26 (Ozone).")
+
+
+def test_cloudy_before_image_is_captioned(qapp):
+    """#153: June 26 was overcast; the caption says so, so white isn't read as clean air."""
+    from signal2speech.openorbit.view import MapImage, OpenOrbitView
+    view = OpenOrbitView(load_dataset())
+    view.compare_air_quality()
+    captions = [m.caption for m in view.findChildren(MapImage)]
+    assert any(c and c.endswith("mostly cloud") and "June 26" in c for c in captions)
+    assert not any(c and "June 28" in c and "cloud" in c for c in captions)
+
+
+def test_pollutant_line_is_stable_and_never_overclaims(qapp):
+    """#153 review: ties pick the same pollutant every run; an unknown pollutant means no line."""
+    from dataclasses import replace
+
+    from signal2speech.openorbit.view import OpenOrbitView
+    ds = load_dataset()
+    w, wayne = ds.change_for("Washtenaw"), ds.change_for("Wayne")
+    tie = replace(ds, changes=(replace(w, before_pollutant="PM2.5", after_pollutant="PM2.5"),
+                               replace(wayne, before_pollutant="Ozone", after_pollutant="Ozone")))
+    assert "Ozone for all values except Washtenaw Jun 26 (PM2.5), Washtenaw Jun 28 (PM2.5)" in \
+        OpenOrbitView(tie)._pollutant_line()              # 2-2 tie: alphabetical first wins
+    unknown = replace(ds, changes=(w, replace(wayne, after_pollutant="")))
+    assert OpenOrbitView(unknown)._pollutant_line() == ""
+    same = replace(ds, changes=(replace(w, before_pollutant="PM2.5"), wayne))
+    assert OpenOrbitView(same)._pollutant_line() == ""
+
+
+def test_long_caption_falls_back_to_the_date_on_a_small_image(qapp):
+    """#153 review: at the smallest image size the caption box stays inside the image."""
+    from signal2speech.openorbit.view import MapImage
+    m = MapImage(load_dataset(), BEFORE, caption="June 26, 2023 · mostly cloud",
+                 caption_short="June 26, 2023")
+    for width in (200, 240, 1440):
+        m.resize(width, round(width * 800 / 1440))
+        _, box = m.caption_layout()
+        assert m.image_rect().contains(box), width
+    m.resize(1440, 800)
+    assert m.caption_text() == "June 26, 2023 · mostly cloud"
