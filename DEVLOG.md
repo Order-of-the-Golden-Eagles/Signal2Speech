@@ -367,6 +367,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Updated the script for what's on `main` now: the real map with its 8 s reveal, fullscreen, F1 key help, and the confirm countdown. Submission fields live only in `submission-checklist.md`
 - Checked: every relative link in the folder resolves. Docs only
 
+## 11/14/26 - 8:33 PM - MagicJester2764 - #10 Git hook tests no longer touch your real repo ([PR #126](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/126))
+- Found a nasty bug: when the pre-push hook runs the tests, one of them (`tests/test_githooks.py`) was making commits and changing settings in the developer's *real* repository instead of its own scratch copy
+    - It switched the repo to "bare" (so `git status` stopped working), replaced your name and email with "Hook Test", and left a fake `.env` staged
+- Fixed by giving that test a clean environment, plus a new test that proves it can't reach an outer repo even when git's hook variables are set
+- The hook itself now clears git's variables before running the tests, so no other test or tool can do the same thing
+- Verified by pushing through the real pre-push hook: the tests passed, and the repo's settings, history, and staged files were unchanged afterwards. A new test also checks this on every run, in both ways a hook can set git's variables
+- If you pushed with the hooks turned on, check your repo with the steps in `docs/MEMORY.md`
+
 ## 11/14/26 - 8:13 PM - Vasanth Anbukumar - #23 Plain-language prompts in the live-run guide ([PR #127](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/127))
 - The guided headset test (`python -m signal2speech.eeg.live --source hybridblack`) now speaks to the wearer in plain words: "WEARER: look at the tile with the YELLOW border… count it silently", "If YES, close your eyes for about 2 seconds"
 - Steps read as what's happening ("checking the signal", "learning how your brain reacts to the flashes", "learning your eyes-closed YES signal") instead of jargon
@@ -385,14 +393,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - They're made with espeak-ng, an open-source voice whose output we can share freely. It sounds robotic but clear. `python data/openorbit/audio/make_audio.py` regenerates them
 - A test fails if the contract wording or the dataset's comparison line changes without regenerating the audio, so the words heard always match the words on screen. AI replies still use the live OS voice
 - Checked on a Mac: the app played the bundled clip (Qt status Ready, played to the end), and the phonemes say "A-Q-I" and "Washtenaw" correctly. Not yet heard through the judging laptop's speakers
-
-## 11/14/26 - 8:33 PM - MagicJester2764 - #10 Git hook tests no longer touch your real repo ([PR #126](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/126))
-- Found a nasty bug: when the pre-push hook runs the tests, one of them (`tests/test_githooks.py`) was making commits and changing settings in the developer's *real* repository instead of its own scratch copy
-    - It switched the repo to "bare" (so `git status` stopped working), replaced your name and email with "Hook Test", and left a fake `.env` staged
-- Fixed by giving that test a clean environment, plus a new test that proves it can't reach an outer repo even when git's hook variables are set
-- The hook itself now clears git's variables before running the tests, so no other test or tool can do the same thing
-- Verified by pushing through the real pre-push hook: the tests passed, and the repo's settings, history, and staged files were unchanged afterwards. A new test also checks this on every run, in both ways a hook can set git's variables
-- If you pushed with the hooks turned on, check your repo with the steps in `docs/MEMORY.md`
 
 ## 11/14/26 - 8:44 PM - Vasanth Anbukumar - #23 On-screen and spoken cues for the wearer ([PR #127](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/127))
 - The guided test now tells the wearer what to do on the tile window itself (a big yellow instruction line) and out loud with the laptop's offline voice: "Look at the yellow tile", "Close your eyes", "The app picked tile 2. If that's right, close your eyes"
@@ -421,6 +421,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The report is ready to paste into the rehearsal log, so every practice run leaves evidence behind
 - Found and fixed two bugs while testing: the map time got overwritten in the strip, and closing the app could raise an error from the sound player. Tests use a fake clock. Not yet measured on the judging laptop
 
+## 11/14/26 - 9:33 PM - MagicJester2764 - #105 Devpost draft text, fact-checked ([PR #146](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/146))
+- The whole Devpost entry is ready to paste: tonight's steps, the story sections, Built with, the track, and the AI answer
+    - In `docs/demo-submission/submission-checklist.md`. A person still has to submit it on Devpost and in the event app before midnight
+- Every claim was checked against the code. Two were fixed: we don't have "required" CI checks (just CI on every change), and the AI-reply wording depends on whether #116 is merged when we submit
+- The text never says the headset was used on a real wearer, because it hasn't been yet
+- Two AI answers are ready, one for each state of #116, so we never claim a feature that isn't merged when we submit
 ## 11/14/26 - 9:20 PM - In Young Song - #138 PiEEG's simulator drives the eye-closure confirm ([PR #144](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/144))
 - PiEEG's own simulated EEG now runs through our g.Pype pipeline: a keyboard preview, then PiEEG's "eyes closed" alpha burst confirms it, and the map changes and the line is spoken once
     - `python python_quickstart.py --sim --lsl` (PiEEG's starter), then `python -m signal2speech.eeg.pieeg_lsl --demo`. Setup is in `docs/eeg-hardware/pieeg.md`
@@ -435,13 +441,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Every start and exit is logged to `logs/launcher-<time>.log`. If it gives up, it says to switch to the fallback build
 - Checked with real processes: a clean quit stopped the launcher, and a crashing app was restarted after 1 s, then given up on with a clear message. Tests use a fake process. The judging-laptop session and the stage script now use it
 
-## 11/14/26 - 9:33 PM - MagicJester2764 - #105 Devpost draft text, fact-checked ([PR #146](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/146))
-- The whole Devpost entry is ready to paste: tonight's steps, the story sections, Built with, the track, and the AI answer
-    - In `docs/demo-submission/submission-checklist.md`. A person still has to submit it on Devpost and in the event app before midnight
-- Every claim was checked against the code. Two were fixed: we don't have "required" CI checks (just CI on every change), and the AI-reply wording depends on whether #116 is merged when we submit
-- The text never says the headset was used on a real wearer, because it hasn't been yet
-- Two AI answers are ready, one for each state of #116, so we never claim a feature that isn't merged when we submit
-
+## 11/14/26 - 9:43 PM - MagicJester2764 - #110 An AI assistant can read the brain pipeline ([PR #155](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/155))
+- Claude (Desktop or Code) can now ask Signal2Speech about its live signal pipeline and get real numbers back: `python -m signal2speech.mcp`
+    - It answers questions like "Is the wearer's P300 visible?" from the actual averaged brain response, and can open the evidence window
+- Every answer says whether the data is Simulated or Live EEG, and only summaries are sent, never raw brain data
+- On the simulator it picked up a clear P300 (about 4.8 µV at 276 ms) and got 3 of 3 choices right
+- With the real headset it reports signal quality and the eye-closure signal. The P300 needs tiles on screen, so use the app or the evidence view for that
+- Still to do: record the 30-second clip for the video (#34), and try it with a real wearer
+- Code review follow-up: the evidence window closes when the assistant disconnects, a missing or busy headset fails cleanly instead of hanging, and the accuracy figure counts every sequence, including ones with no answer
 ## 11/14/26 - 9:36 PM - Long Le - #132 Video title card, closing card, and diagram ([PR #147](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/147))
 - The submission video has its three graphics ready in `docs/demo-submission/media/`: a title card, a closing card with the repo link and AI-use note, and an architecture diagram for shot 9
 - They're drawn by a script, so changing a name or a line is one command: `python docs/demo-submission/make_graphics.py`
@@ -455,15 +462,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `python -m signal2speech.evidence.dataset path/to/p300-speller` prints the numbers: a 7–11 µV target vs non-target difference in all five people, and our chooser's method classifies single flashes at 0.59–0.85 balanced accuracy (chance is 0.50)
 - The dataset stays out of git. The docs say where to download it; cite g.tec and don't redistribute it
 - Verified: the window on the judging laptop with subject S4, and tests that build a small fake file in the same format and check the flashes line up to the sample. Still not a result for our wearer or our two-tile layout
-
-## 11/14/26 - 9:43 PM - MagicJester2764 - #110 An AI assistant can read the brain pipeline ([PR #155](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/155))
-- Claude (Desktop or Code) can now ask Signal2Speech about its live signal pipeline and get real numbers back: `python -m signal2speech.mcp`
-    - It answers questions like "Is the wearer's P300 visible?" from the actual averaged brain response, and can open the evidence window
-- Every answer says whether the data is Simulated or Live EEG, and only summaries are sent, never raw brain data
-- On the simulator it picked up a clear P300 (about 4.8 µV at 276 ms) and got 3 of 3 choices right
-- With the real headset it reports signal quality and the eye-closure signal. The P300 needs tiles on screen, so use the app or the evidence view for that
-- Still to do: record the 30-second clip for the video (#34), and try it with a real wearer
-- Code review follow-up: the evidence window closes when the assistant disconnects, a missing or busy headset fails cleanly instead of hanging, and the accuracy figure counts every sequence, including ones with no answer
 
 ## 11/14/26 - 9:47 PM - Long Le - #134 Saved phrases you can edit ([PR #148](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/148))
 - The offline saved phrases now come from `data/phrases.json`, so a user or caregiver can change them without touching code. One pair per line, and each pair is what the two tiles say
@@ -483,27 +481,25 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `python -m signal2speech --help` lists the same tools, and `python -m signal2speech demo-keyboard` runs one directly. The README quickstart uses it now
 - Checked on a Mac: the buttons start the right commands, and the evidence view is grayed out here because g.Pype isn't installed. The smoke check correctly shows FAIL for the same reason. It should pass on the judging laptop
 
-## 11/14/26 - 11:03 PM - Long Le - #128 Judge Q&A cites the response times ([PR #157](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/157))
-- The judge Q&A now answers "How fast does it respond?" with the measured times: map change in 2–30 ms and speech starting in about 15–50 ms after a confirm
-- It's honest about where the time really goes: the P300 choice takes a flash sequence (about 2.5–3.5 s), and the alpha confirm lands about 1.2–1.5 s after the eyes close. Those EEG numbers come from simulated data until the headset run
-- With the fuzz test answer already in the Q&A, every sub-issue of #128 is done and its "done when" is met
-
 ## 11/14/26 - 11:08 PM - MagicJester2764 - #153 Science note for the Beyond the Horizon judges ([PR #159](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/159))
 - Wrote down exactly what the NASA and EPA data is and what we do and don't claim, for judges who know the science: `docs/openorbit-data/science-note.md`
 - Found a subtle point a scientist would catch: Washtenaw's "before" air quality (32) was set by ozone, not by smoke particles. The app now says which pollutant set each number, and the note explains why the comparison still holds
 - The June 26 satellite image is mostly cloud, and the screen now says so, so nobody reads white cloud as clean air
 - Checked against EPA and NASA documentation and news reports of the June 28 smoke alert. The judge Q&A has three science answers ready
 - After review, corrected the fire distances from FIRMS data (most fires about 1,340 km away in Quebec, a few small ones closer, nearest 84 km), made Wayne the like-for-like PM2.5 comparison, and kept the June 26 caption inside the image on small screens. Verified with `pytest tests/test_openorbit.py` (keyboard and offscreen only)
-
-## 11/14/26 - 11:14 PM - Long Le - #106 Real Claude replies re-checked after grounding ([PR #158](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/158))
-- Re-tested the AI demo window on the current code (Claude Sonnet 5.5 with grounded replies): a fresh question got two good replies in about 2 seconds, and the confirmed one was spoken once
-- The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
-- With the AI provider unreachable, saved phrases appear right away, labelled offline. A real Wi-Fi-off run is still part of the judging-laptop session
+## 11/14/26 - 11:03 PM - Long Le - #128 Judge Q&A cites the response times ([PR #157](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/157))
+- The judge Q&A now answers "How fast does it respond?" with the measured times: map change in 2–30 ms and speech starting in about 15–50 ms after a confirm
+- It's honest about where the time really goes: the P300 choice takes a flash sequence (about 2.5–3.5 s), and the alpha confirm lands about 1.2–1.5 s after the eyes close. Those EEG numbers come from simulated data until the headset run
+- With the fuzz test answer already in the Q&A, every sub-issue of #128 is done and its "done when" is met
 
 ## 11/14/26 - 11:22 PM - MagicJester2764 - #160 Video recording plan ([PR #161](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/161))
 - Worked out what to record for the demo video and handed it to Vasanth as #160: a screen recording only, no headset, 2:30 or less, which fits both the Devpost and g.tec limits
     - Exact commands, what each shot shows, the narration, and how to export. Every brain-signal shot is labelled Simulated or Keyboard
 - The Devpost checklist now uses the grounded-Claude AI answer (#116 merged) and enters the Beyond the Horizon prize (#153)
+## 11/14/26 - 11:14 PM - Long Le - #106 Real Claude replies re-checked after grounding ([PR #158](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/158))
+- Re-tested the AI demo window on the current code (Claude Sonnet 5.5 with grounded replies): a fresh question got two good replies in about 2 seconds, and the confirmed one was spoken once
+- The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
+- With the AI provider unreachable, saved phrases appear right away, labelled offline. A real Wi-Fi-off run is still part of the judging-laptop session
 
 ## 11/15/26 - 11:59 PM - Long Le - #174 One visual design and redesigned tiles (PR pending)
 - The app now has one visual design: `signal2speech/ui/theme.py` sets the colours, text sizes, spacing, and corners, and every screen we built uses it
