@@ -574,3 +574,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `P` (or `--practice`) runs a 30 s "look at tile 1 and count its flashes" warm-up that never sends anything
 - Holding `H` for 2 s says "I need help, please." from any screen, at most once every 10 s, without touching the current question. `--help-by-eyes` adds a long eye closure as a trigger, off by default.
 - Verified with the keyboard and the simulated input in 27 new headless tests (no false help triggers in 400 random key taps; attract stops with no leftover speech; practice uses no simulated picks). Not yet tried: the Spanish voice on Windows, the eye-closure help trigger on the headset, and practice feeding live calibration (needs #23).
+## 11/15/26 - 1:53 AM - Vasanth Anbukumar - #199 The board session's spoken cues work off Windows too ([PR #202](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/202))
+- On macOS or Linux, the voice-guided board session (`python -m signal2speech.eeg.board_session`) would have spoken its first instruction and gone silent for the rest. It now speaks every cue
+    - Same cause and same fix as the app's backup voice: each cue is spoken from its own short-lived helper process
+- The library run isn't affected either way: on the judging laptop the session uses Windows' own voice, which always spoke every cue
+- If no voice works at all, the cue is still printed and the session carries on
+- Verified on the judging laptop by switching the Windows voice off: three cues in a row spoke for 2.3 s, 2.1 s and 2.2 s. Two new tests. Not tried on a real Mac or Linux machine
