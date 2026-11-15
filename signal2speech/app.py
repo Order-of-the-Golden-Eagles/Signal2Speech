@@ -53,10 +53,17 @@ ROOT = Path(__file__).resolve().parents[1]
 MAP_ACTIONS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
 CONFIRM_TIMEOUT_MS = 15_000   # longer than alpha calibration's ~1.5 s closure plus reading time
 
-BLOCKED_INPUTS = {
-    InputSources.RECORDED: "Recorded replay is blocked: it isn't wired into the app yet. Record "
-                           "and replay work in the evidence view (python -m signal2speech.evidence, #48).",
-}
+BLOCKED_INPUTS: dict = {}     # every input is wired in: recorded runs since #104
+
+#: Where --input recorded looks for g.tec's P300 Speller dataset when --recording isn't given.
+#: The dataset is for Hack the Nest projects only and is never committed.
+RECORDING_ENV = "SIGNAL2SPEECH_GTEC"
+DEFAULT_RECORDING = Path(__file__).resolve().parents[2] / "gtec_p300" / "p300-speller" / "S4.mat"
+RECORDING_HELP = """--input recorded needs one subject file of g.tec's P300 Speller dataset.
+  1. Get it from the Data Science section of https://github.com/unicorn-bi/Hackathon
+  2. Unpack it outside the repo (it is for Hack the Nest projects only: never commit it).
+  3. Run: python -m signal2speech.app --input recorded --recording path/to/p300-speller/S4.mat
+     or set SIGNAL2SPEECH_GTEC to that file."""
 
 
 # ── Output side ──────────────────────────────────────────────
@@ -303,6 +310,7 @@ class App:
                  p300: bool = False, arm_live_confirm: bool = False,
                  live_options: Optional[dict] = None,
                  pieeg: Optional[dict] = None,
+                 recording=None,
                  clock: Callable[[], float] = time.monotonic, cues: bool = False,
                  attract: bool = False, attract_idle_ms: Optional[int] = None,
                  help_by_eyes: bool = False, practice_s: Optional[float] = None,
@@ -312,8 +320,7 @@ class App:
                              "confirm only (#172)")
         if input_source in BLOCKED_INPUTS:
             raise ValueError(BLOCKED_INPUTS[input_source])
-        if input_source not in (InputSources.KEYBOARD, InputSources.SIMULATED,
-                                InputSources.LIVE_EEG):
+        if input_source not in InputSources.ALL:
             raise ValueError(f"Unknown input: {input_source}")
         self.input_source = input_source
         self.muted = mute
@@ -345,6 +352,7 @@ class App:
         self.keyboard = InputAdapter(self.handler, InputSources.KEYBOARD)
         self.window = SelectionWindow(self.handler, self.keyboard, input_source=input_source,
                                       flash=input_source in (InputSources.SIMULATED,
+                                                             InputSources.RECORDED,
                                                              InputSources.LIVE_EEG))
         self.choices: List[Choice] = load_demo_choices()
 
@@ -367,8 +375,23 @@ class App:
 
         self.sim = None
         sim_label = ""
-        if input_source == InputSources.LIVE_EEG or (input_source == InputSources.SIMULATED
-                                                     and p300):
+        if input_source == InputSources.RECORDED:
+            # #104: real recorded g.tec responses answer each flash; the live pipeline decides.
+            from signal2speech.eeg import p300 as p300_mod
+            from signal2speech.eeg.app_live import RecordedEegInput
+            if recording is None:
+                raise ValueError("recorded input needs a recording: pass recording=<S4.mat>")
+            responses = (recording if isinstance(recording, p300_mod.RecordedResponses)
+                         else p300_mod.RecordedResponses.from_gtec(recording))
+            self.sim = RecordedEegInput(h, self.window, self.log, responses=responses,
+                                        script=sim_script or [2, 1], **(live_options or {}))
+            sim_label = self.sim.connection_label()
+            self.window.set_input_text(self.sim.strip_text(), InputSources.RECORDED)
+            alpha = getattr(self.sim, "alpha", None)
+            if alpha is not None and hasattr(alpha, "progress"):
+                alpha.progress.connect(self.window.set_eye_progress, Qt.ConnectionType.QueuedConnection)
+        elif input_source == InputSources.LIVE_EEG or (input_source == InputSources.SIMULATED
+                                                       and p300):
             # #103: P300 chooses and the alpha switch confirms, on one g.Pype pipeline.
             from signal2speech.eeg.app_live import LiveEegInput
             self.sim = LiveEegInput(
@@ -797,6 +820,12 @@ class App:
         lines += ([f"- {c['time']} · {c['source']}: “{c['text']}”" for c in self.sink.help_calls]
                   or ["Not used this session."])
         extra = [f"- **Practice rounds:** {self.practice.runs}"]
+        if hasattr(self.sim, "usage"):                 # #104: recorded responses, counted
+            u = self.sim.usage()
+            extra.append(f"- **Recorded responses played:** {u['target_responses']} attended and "
+                         f"{u['nontarget_responses']} unattended, from {u['recording']}. "
+                         f"Played more than once: {u['played_twice']}. Which tile was attended "
+                         "followed the script; the classifier's picks are real.")
         if self.attract is not None:
             extra.append(f"- **Attract-mode loops:** {self.attract.runs} (simulated, left out of the counts)")
         lines += ["", "## Other", ""] + extra
@@ -847,6 +876,9 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="python -m signal2speech.app")
     p.add_argument("--input", default=InputSources.KEYBOARD,
                    choices=["keyboard", "simulated", "recorded", "live", "pieeg"])
+    p.add_argument("--recording", type=Path, default=None,
+                   help="--input recorded: a subject file of g.tec's P300 Speller dataset, e.g. "
+                        "S4.mat (or set SIGNAL2SPEECH_GTEC). Real recorded responses answer the flashes")
     p.add_argument("--sim", default="2,1", help="simulated classes in order, e.g. '2,1' "
                                                 "(choose target-2, then confirm)")
     p.add_argument("--keys", default="", help="keyboard presses after start, e.g. '2,1'")
@@ -932,13 +964,23 @@ def main(argv=None) -> int:
     if source in BLOCKED_INPUTS:
         print(BLOCKED_INPUTS[source], file=sys.stderr)
         return 2
+    recording = None
+    if source == InputSources.RECORDED:
+        import os
+        recording = args.recording or os.environ.get(RECORDING_ENV) or DEFAULT_RECORDING
+        if not Path(recording).is_file():
+            print(f"No recording at {recording}\n{RECORDING_HELP}", file=sys.stderr)
+            return 2
+    elif args.recording is not None:
+        print("--recording: only for --input recorded", file=sys.stderr)
+        return 2
 
     qapp = QApplication.instance() or QApplication(sys.argv[:1])
     script = [int(s) for s in args.sim.split(",") if s.strip()]
     if any(s not in (1, 2) for s in script):
         print(f"--sim takes 1s and 2s, e.g. 2,1; got {args.sim!r}", file=sys.stderr)
         return 2
-    live_path = (source == InputSources.LIVE_EEG or pieeg is not None
+    live_path = (source in (InputSources.LIVE_EEG, InputSources.RECORDED) or pieeg is not None
                  or (source == InputSources.SIMULATED and args.p300))
 
     def setup_help() -> str:
@@ -950,13 +992,13 @@ def main(argv=None) -> int:
                   # Never over a board session: the eye check runs 90 s with no key presses, and a
                   # simulated demo must not start on top of a wearer's calibration or live input.
                   attract=not (args.no_attract or args.screenshot or args.keys
-                               or args.input in ("pieeg", "live")),
+                               or args.input in ("pieeg", "live", "recorded")),
                   help_by_eyes=args.help_by_eyes,
                   confirm_timeout_ms=int(args.confirm_timeout * 1000),
                   p300=args.p300, arm_live_confirm=args.arm_live_confirm,
                   live_options={"calibration_sequences": args.calibration,
                                 "alpha_calib_s": args.alpha_calib_s},
-                  pieeg=pieeg)
+                  pieeg=pieeg, recording=recording)
     except Exception as err:
         if not live_path:
             raise
