@@ -523,7 +523,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - First-run check: `python -m signal2speech.eeg.lsl_source --input live --check` detects the board, measures the sample rate, and reports each pin's contact in about 10 seconds, with no prompts
 - Verified against PiEEG's own script (their simulator publishing the real stream): detected as the Octopus 16 at 250 samples per second. Also verified with a stream that really sends 244 per second, as some boards do, and on our simulated 16-pin stream, where it found the flat pin and the loose pin, used the other 14, and confirmed once per closure. Not yet tried on a real board or a real person
 
-## 11/15/26 - 1:21 AM - Vasanth Anbukumar - #150 Voice-guided test and recording session for the board (PR pending)
+## 11/15/26 - 1:21 AM - Vasanth Anbukumar - #150 Voice-guided test and recording session for the board ([PR #198](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/198))
 - One command now runs the whole library session and the wearer only has to listen: `python -m signal2speech.eeg.board_session --input live --consent`
     - Every instruction is spoken, then a beep starts the timed part, so timing doesn't depend on how fast anyone reads
     - Six phases in about 5 minutes: pin contact, which pins respond, calibration, false triggers at rest, a closure test, and a four-choice test
