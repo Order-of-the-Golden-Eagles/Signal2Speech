@@ -545,7 +545,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The alpha switch got a read-only progress signal for the ring, and its decision logic didn't change. Scripted simulated input fills the same ring
 - Checked with tests for each ring state (filling, emptying on early release, completing exactly once) and in screenshots. The live eye-closure ring needs g.Pype, so it hasn't been seen on this Mac
 
-## 11/15/26 - 1:15 AM - Long Le - #176 #177 Readable conversation and sound cues (PR pending)
+## 11/15/26 - 1:15 AM - Long Le - #176 #177 Readable conversation and sound cues ([PR #192](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/192))
 - The panel under the map now reads like a conversation: Options (and where they came from), Previewed, Said aloud or Showed the map and said, or Nothing was said, each with the input that caused it
     - Press `F2` to swap to the developer log; the session report in `logs/` keeps both
 - Preview, confirm, and cancel each play a short, quiet tone, so a wearer with closed eyes knows the pick registered. The confirm tone ends before speech starts, so they never overlap.
