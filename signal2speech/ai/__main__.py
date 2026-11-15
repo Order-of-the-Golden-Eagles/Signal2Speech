@@ -28,7 +28,7 @@ from .replies import (HELP_PHRASES, TIMEOUT_S, ReplySet, ReplySuggester, languag
 
 #: The main screen: the reply cards get more of the width than the conversation beside them.
 CHAT_SPLIT = (3, 2)
-CHAT_TILE_HEIGHT = 300
+CHAT_TILE_HEIGHT = 270
 CHAT_TILE_PX = (30, 20)        # title size on the reply cards: from, and down to for long replies
 CHAT_LOG_HEIGHT = 300          # the conversation box: room for one question and its answer
 SUITE_HELP = "\n".join([
@@ -110,10 +110,12 @@ class AnsweringDemo:
             tap.on_rows = self.panel.trace.feed
             if input_source == InputSources.RECORDED:
                 self.panel.trace.idle_note = "plays when the cards flash"
+            from signal2speech.ui.brain_trace import UNICORN_CHANNELS
             self.panel.trace.set_source({
                 InputSources.LIVE_EEG: "Live EEG, headset",
                 InputSources.RECORDED: "Recorded g.tec EEG",
-            }.get(input_source, "Simulated, not a brain"))
+            }.get(input_source, "Simulated, not a brain"),
+                UNICORN_CHANNELS if input_source == InputSources.LIVE_EEG else ())
         self.app.on_text_scale.append(self._style_banner)
         self._map_on = True
         self._show_map(False)
