@@ -10,10 +10,17 @@ import os
 import time
 from pathlib import Path
 
+import importlib.util
+
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
+
+# g.Pype can't be installed everywhere (e.g. macOS 12, Intel Macs). These tests need it; the
+# rest of the file is pure Python. CI installs g.Pype, so they still run there (#98).
+needs_gpype = pytest.mark.skipif(importlib.util.find_spec("gpype") is None,
+                                 reason="needs g.Pype: pip install -r requirements-lock.txt")
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
@@ -150,6 +157,7 @@ def test_keyboard_disconnect_key_during_preview(qapp, rig):
     assert cleared == ["disconnect"] and outputs(app) == (0, 0)
 
 
+@needs_gpype
 def test_gpype_stream_stop_during_preview(qapp, rig):
     app, log, cleared = rig(SIM, sim_script=[2, 1], confirm_delay_ms=1500, confirm_timeout_ms=0)
     preview(qapp, app, SIM)
@@ -185,6 +193,7 @@ def test_held_or_repeated_confirm_key_outputs_once(qapp, rig):
     assert outputs(app) == (1, 1)
 
 
+@needs_gpype
 def test_duplicate_simulated_decision_outputs_once(qapp, rig):
     app, log, cleared = rig(SIM, sim_script=[2, 1], confirm_delay_ms=200, confirm_timeout_ms=0)
     preview(qapp, app, SIM)
@@ -217,6 +226,7 @@ def test_stale_choose_decision_cannot_confirm(qapp, rig, source):
     assert app.handler.current is not None and outputs(app) == (0, 0)
 
 
+@needs_gpype
 def test_late_simulated_decision_from_a_closed_round_is_dropped(qapp, rig):
     app, log, cleared = rig(SIM, sim_script=[2], confirm_timeout_ms=0)
     preview(qapp, app, SIM)

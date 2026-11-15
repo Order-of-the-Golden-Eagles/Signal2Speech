@@ -27,3 +27,7 @@ Verify confirmation, cancellation, duplicate events, disconnects, and offline la
 Run: `QT_QPA_PLATFORM=offscreen pytest tests/test_recovery.py -v` (18 tests, about 8 s). Recorded input is the contract's sample events replayed with `source: recorded`. Live EEG recovery is #23.
 
 **Gap (not in #26):** nothing notices a stream that **stalls without stopping**, for example the headset going silent. Only an explicit stop or disconnect clears the round. A sample-count watchdog that calls `handler.disconnect()` belongs with the live run (#23).
+
+## Tests on machines without g.Pype (#98)
+
+g.Pype can't be installed everywhere: macOS 12, Intel Macs, and ARM Linux. Tests that need it carry a `needs_gpype` skip marker (`tests/test_diagnostics.py`, `tests/test_recovery.py`), so `pytest` is green there with a visible reason (`pytest -rs`). CI installs g.Pype from `requirements-lock.txt` and still runs them on Windows, macOS, and Linux. Mark only the tests that need it, never a whole file.

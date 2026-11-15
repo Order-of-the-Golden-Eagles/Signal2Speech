@@ -1,10 +1,17 @@
 """#41: one hardware-free smoke command, plus metadata-only diagnostics."""
 import os
 
+import importlib.util
+
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
+
+# g.Pype can't be installed everywhere (e.g. macOS 12, Intel Macs). These tests need it; the
+# rest of the file is pure Python. CI installs g.Pype, so they still run there (#98).
+needs_gpype = pytest.mark.skipif(importlib.util.find_spec("gpype") is None,
+                                 reason="needs g.Pype: pip install -r requirements-lock.txt")
 np = pytest.importorskip("numpy")
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
@@ -33,6 +40,7 @@ def run(mode="dev"):
     return code, "\n".join(lines)
 
 
+@needs_gpype
 def test_smoke_passes_on_a_good_checkout(qapp):
     code, out = run()
     assert code == 0, out
@@ -45,6 +53,7 @@ def test_smoke_passes_on_a_good_checkout(qapp):
     assert "SMOKE PASS" in out
 
 
+@needs_gpype
 def test_judging_mode_turns_skips_into_failures(qapp, tmp_path, monkeypatch):
     monkeypatch.setattr(d, "DATA_DIR", tmp_path / "no-bundle")
     code, out = run("judging")
@@ -52,6 +61,7 @@ def test_judging_mode_turns_skips_into_failures(qapp, tmp_path, monkeypatch):
     assert "FAIL  openorbit assets" in out and "SMOKE FAIL" in out
 
 
+@needs_gpype
 def test_smoke_fails_when_a_confirm_produces_output_twice(qapp, monkeypatch):
     """Deliberate breakage (#38): the check must go red, not just green."""
     original = AppSink.execute
@@ -108,6 +118,7 @@ def test_attach_logs_input_connection_and_timing(qapp):
     assert all(r["input"] == "keyboard" and r["connection"] == "n/a" for r in diag.rows[3:])
 
 
+@needs_gpype
 def test_app_smoke_flag(qapp):
     assert main(["--smoke"]) == 0
 
@@ -145,6 +156,7 @@ def test_demo_numbers_need_the_exact_rise_next_to_each_county():
     assert d.check_demo_numbers("Washtenaw's AQI rose a lot. Wayne's rose 186 and 168.").status == "FAIL"
 
 
+@needs_gpype
 def test_environment_warns_off_3_12_and_survives_odd_versions(monkeypatch):
     import gpype
     monkeypatch.setattr(d.platform, "python_version", lambda: "3.13.1")
