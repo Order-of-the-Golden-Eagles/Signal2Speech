@@ -199,6 +199,7 @@ class LiveEegInput:
         # The quiet switch only makes sense on a real headset: simulated eyes make alpha bursts.
         eye_mode = eye_mode if source in ("hybridblack", "unicorn-lsl") else "alpha"
         self.eye_mode = eye_mode
+        self.blink = None
         self.input_source = (InputSources.RECORDED if self.recorded else
                              InputSources.SIMULATED if self.simulated else InputSources.LIVE_EEG)
         self.script = deque(script)
@@ -230,7 +231,14 @@ class LiveEegInput:
 
         self.nodes, self.alpha, self.bursts = build_live_graph(
             handler, source, self.input_source, placeholder=placeholder, enable_oscar=enable_oscar,
-            recorded=recorded, eye_mode=eye_mode)
+            recorded=recorded, eye_mode="alpha" if eye_mode == "blink" else eye_mode)
+        if eye_mode == "blink":
+            # A double blink confirms. It goes through the alpha switch's own confirm path, whose
+            # eye-closure threshold is never calibrated in this mode, so only blinks confirm.
+            from .blink_confirm import BlinkSwitch
+            self.blink = BlinkSwitch(  # a blink pair reads as "closed, then open again" to the alpha switch
+                lambda t: (self.alpha.rising.emit(t), self.alpha.falling.emit(t)), log)
+            self.nodes.pipeline.connect(self.nodes.eeg, self.blink.tap)
         # A display-only tap on the filtered EEG, for the app's small "Brain Activity" graph. It
         # reads the same 1-30 Hz signal the chooser cuts its epochs from and changes nothing.
         self.trace_tap = am._Tap(name="brain_activity_display")
@@ -273,6 +281,8 @@ class LiveEegInput:
                  f"Unicorn Hybrid Black · {'OSCAR on' if self.enable_oscar else 'OSCAR off'}"]
         if not self.simulated and self.eye_mode == "quiet":
             parts.append("eye switch: signal quiets when the eyes close")
+        if not self.simulated and self.eye_mode == "blink":
+            parts.append("confirm: double blink (an eye signal, not brain activity)")
         if self.p300_ok is False:
             parts.append("P300 off (calibration failed)")
         if self.alpha_ok is False:
@@ -385,7 +395,8 @@ class LiveEegInput:
         w.set_connection(self.connection_label())
         self.log(f"calibration: {status}")
         self.calibrated = True
-        self._guide("Calibration is done. To say a reply, close your eyes for two seconds." if self.alpha_ok
+        self._guide(("Calibration is done. To say a reply, blink twice quickly." if self.blink is not None
+                     else "Calibration is done. To say a reply, close your eyes for two seconds.") if self.alpha_ok
                     else "Calibration is done. The eye check didn't pass, so hold key one to confirm.")
         return bool(self.p300_ok and self.alpha_ok)
 
@@ -433,6 +444,8 @@ class LiveEegInput:
 
     def _calibrate_alpha(self, wait) -> bool:
         """The eye check, spoken step by step. A failed try gets one more."""
+        if self.blink is not None:
+            return self._calibrate_blink(wait)
         for attempt in range(1, self.alpha_attempts + 1):
             ok = self._alpha_attempt(wait, attempt)
             if ok or attempt == self.alpha_attempts:
@@ -481,6 +494,38 @@ class LiveEegInput:
             return False                                     # threshold stays at "never fires"
         self.log(f"Alpha switch calibrated: ratio {self.alpha_calibration.ratio:.1f}")
         return True
+
+    def _calibrate_blink(self, wait) -> bool:
+        """Double-blink confirm: rest, then three prompts to blink twice. A failed try gets one more."""
+        w, b = self.window, self.blink
+        for attempt in range(1, self.alpha_attempts + 1):
+            try:
+                w.hint.setText("")
+                w.prompt.setText("Blink check: look at the screen and keep your eyes still for 6 s")
+                self._guide("Now the blink check. Look at the screen and try not to blink." if attempt == 1
+                            else "Let's try the blink check once more. Look at the screen and try not to blink.")
+                wait(0.5)
+                start = b.count()
+                wait(6.0)
+                rest = b.since(start)
+                windows = []
+                for i in range(3):
+                    w.prompt.setText(f"Blink check {i + 1}/3: blink twice, quickly and firmly (low beep)")
+                    self._guide("Blink twice now." if i else "When you hear the low beep, blink twice, quickly and firmly.")
+                    self._eye_cue("close")
+                    start = b.count()
+                    wait(2.5)
+                    windows.append(b.since(start))
+                    wait(0.8)
+                b.calibrate(rest, windows)
+                self.log("Alpha switch calibrated: double blink")
+                return True
+            except CalibrationAborted:
+                raise
+            except Exception as err:
+                self.log(f"Blink calibration failed (try {attempt}): {type(err).__name__}: {err}. "
+                         "Key 1 still confirms.")
+        return False
 
     def _guide(self, text: str) -> None:
         """Speak one calibration instruction and wait until it is finished, so the wearer hears

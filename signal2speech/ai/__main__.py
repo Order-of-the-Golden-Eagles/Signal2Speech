@@ -463,8 +463,9 @@ def main(argv=None) -> int:
                    help="live: the Unicorn Hybrid Black headset chooses (P300); see --arm-live-confirm")
     p.add_argument("--p300", action="store_true",
                    help="with --input simulated: rehearse the headset path on simulated signals")
-    p.add_argument("--eye-switch", choices=["quiet", "alpha"], default="quiet",
-                   help="headset: how a closed-eyes confirm is detected. quiet (default): the signal "
+    p.add_argument("--eye-switch", choices=["blink", "quiet", "alpha"], default="blink",
+                   help="headset: how a confirm is detected. blink (default): a quick double blink, an "
+                        "eye signal the electrodes pick up. quiet: the signal "
                         "goes flatter when the eyes close, as blinks and eye movements stop. alpha: "
                         "the 8-13 Hz rhythm at the back of the head rises")
     p.add_argument("--via-suite", action="store_true",
@@ -537,6 +538,8 @@ def main(argv=None) -> int:
               + (f"\n{SUITE_HELP if args.via_suite else PAIRING_HELP}" if source == InputSources.LIVE_EEG else ""), file=sys.stderr)
         return 3
     demo.read_s = max(0, args.read_seconds)
+    if getattr(demo.app.sim, "blink", None) is not None:
+        demo.app.window.eye_action = "blink twice quickly"
     demo.root.show()
     bring_to_front(demo.root)
     if hasattr(demo.app.sim, "calibrate") and not (args.no_start_button or args.question or args.screenshot

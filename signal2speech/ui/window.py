@@ -267,6 +267,7 @@ class SelectionWindow(QMainWindow):
         #: True: a round's cards don't start flashing by themselves; the app starts them later
         #: (a headset wearer first reads the replies).
         self.flash_hold = False
+        self.eye_action = "close your eyes for 2 s"   # what an eye confirm asks for, on screen
         self.eye_confirm: Optional[bool] = None   # False once eye-closure calibration failed (#103)
         self.eye_off_reason = "its calibration failed"   # shown when eye_confirm is False (#172)
         self._preview: Optional[Choice] = None
@@ -476,7 +477,7 @@ class SelectionWindow(QMainWindow):
                 and not self.handler.live_eeg_confirm_armed):
             return ("Confirm: hold 1  (eye-closure confirm is off until #23 says it's safe)   ·   "
                     "Cancel: hold 2, or Esc")
-        return "Confirm: close your eyes for 2 s, or hold 1   ·   Cancel: hold 2, or Esc"
+        return f"Confirm: {self.eye_action}, or hold 1   ·   Cancel: hold 2, or Esc"
 
     def eyes_can_confirm(self) -> bool:
         """Whether an eye closure can confirm right now (mirrors confirm_hint)."""
