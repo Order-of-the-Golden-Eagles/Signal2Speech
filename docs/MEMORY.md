@@ -18,6 +18,7 @@
 
 ## Verification and next checkpoint
 
+- **Science note (#153, Beyond the Horizon):** [docs/openorbit-data/science-note.md](openorbit-data/science-note.md) states what we claim and what we don't. Washtenaw's June 26 AQI (32) was set by **ozone**; the other three values were set by PM2.5. The satellite image doesn't measure air quality. The smoke event is documented (EGLE PM2.5 action day, NWS: Canadian smoke). The view captions June 26 "mostly cloud" and names the defining pollutants. Judge answers are in judge-qa.md.
 - **Check your clone if you pushed with the hooks on (fixed by the `test_githooks` env fix):** git exports `GIT_DIR` to hooks, so `tests/test_githooks.py` ran its git commands against your *real* repo during the pre-push pytest. Run `git config --local --list`. If you see `core.bare=true`, `user.name=Hook Test`, `user.email=test@example.com`, `commit.gpgsign=false`, or an absolute `core.hookspath`, fix them:
   1. `git --git-dir=.git config --local core.bare false`
   2. `git config --local core.hooksPath .githooks`

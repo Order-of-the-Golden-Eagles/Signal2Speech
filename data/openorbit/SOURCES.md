@@ -13,7 +13,7 @@ Retrieved 2026-11-14 with [`build_dataset.py`](build_dataset.py). Rebuild with `
 | Washtenaw | 32 (Good) | 218 | **+186** | Very Unhealthy | PM2.5 |
 | Wayne | 58 (Moderate) | 226 | **+168** | Very Unhealthy | PM2.5 |
 
-The script checks these values and stops if EPA's file disagrees, so they match the README and `docs/MEMORY.md`. **Washtenaw had the larger increase (+186). Wayne had the higher June 28 AQI (226, 8 points higher).**
+The script checks these values and stops if EPA's file disagrees, so they match the README and `docs/MEMORY.md`. **June 26 defining pollutants:** Washtenaw **Ozone** (1 site reporting), Wayne PM2.5 (10 sites). Washtenaw's +186 therefore starts from an ozone-set value. See the [science note](../../docs/openorbit-data/science-note.md) for what that means. **Washtenaw had the larger increase (+186). Wayne had the higher June 28 AQI (226, 8 points higher).**
 
 Context from the same file: the smoke arrived on June 27 (Washtenaw 214, Wayne 186), and June 28 is the highest day for both counties between June 24 and 30.
 

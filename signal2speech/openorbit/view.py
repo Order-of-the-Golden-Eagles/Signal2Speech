@@ -443,7 +443,9 @@ class OpenOrbitView(QWidget):
         images = QHBoxLayout()
         images.setSpacing(10)
         for date in (BEFORE, AFTER):
-            images.addWidget(MapImage(ds, date, caption=_long_date(date)), 1)
+            # June 26 was overcast for both MODIS satellites: the white is cloud, not clear air (#153).
+            caption = _long_date(date) + (" · mostly cloud" if date == BEFORE else "")
+            images.addWidget(MapImage(ds, date, caption=caption), 1)
         layout.addLayout(images, 1)
         layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
 
@@ -485,7 +487,23 @@ class OpenOrbitView(QWidget):
         top, runner = by_after[0], by_after[1]
         second = (f"Highest {_short_date(AFTER)} AQI: {top.county}, {top.after} "
                   f"({top.after - runner.after} more than {runner.county}).")
-        return [first, second]
+        lines = [first, second]
+        pollutants = self._pollutant_line()
+        return lines + ([pollutants] if pollutants else [])
+
+    def _pollutant_line(self) -> str:
+        """Which pollutant set each county AQI, when it isn't the same everywhere (#153)."""
+        ds = self.dataset
+        cells = [(c.county, d, p) for c in ds.changes
+                 for d, p in ((BEFORE, c.before_pollutant), (AFTER, c.after_pollutant)) if p]
+        kinds = {p for _, _, p in cells}
+        if len(kinds) < 2:
+            return ""
+        common = max(kinds, key=lambda k: sum(p == k for _, _, p in cells))
+        odd = [f"{county} {_short_date(d)}: {p.lower() if p == 'Ozone' else p}"
+               for county, d, p in cells if p != common]
+        return (f"Each county AQI is its highest pollutant that day: {common} everywhere "
+                f"except {', '.join(odd)}.")
 
 
 __all__ = ["FiresMap", "MapImage", "OpenOrbitView"]

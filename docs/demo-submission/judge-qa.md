@@ -63,3 +63,21 @@ The handler drops the pending preview and speaks nothing. We switch to the keybo
 
 **Why OpenOrbit?**
 It shows the same controls driving something other than speech: a NASA satellite image and EPA air-quality data for a real event, June 26 to 28, 2023 in southeast Michigan. *Status: the map view is in PR #65. Until it merges, `main` shows a labelled stand-in.*
+
+## Science questions (Beyond the Horizon, #153)
+
+Full detail in the [science note](../openorbit-data/science-note.md).
+
+**"Does the satellite image show the air quality?"**
+No. The image is MODIS Terra true color (bands 1-4-3, 250 m), a late-morning snapshot of how the scene looked from orbit. The gray haze on June 28 matches the PM2.5 peak, but the image doesn't measure PM2.5. The AQI numbers come from EPA's ground monitors and cover the whole day. That's why the screen credits NASA and EPA separately.
+
+**"Is Washtenaw's +186 a fair comparison with Wayne's +168?"**
+On the AQI scale, yes. Those are EPA's daily county values. But Washtenaw's June 26 value of 32 came from one monitor and was set by ozone. PM2.5 set the other three values, and Wayne is PM2.5 on both days. Any PM2.5 in Washtenaw on June 26 was at or below 32, so the PM2.5-only rise there is at least as large. The app also shows the other answer: Wayne was worse on June 28 (226 vs 218).
+
+**"How do you know it was wildfire smoke, and not local pollution?"**
+Three independent sources agree:
+- Michigan's EGLE declared a PM2.5 Air Quality Action Day on June 28, and the National Weather Service attributed it to Canadian wildfire smoke held down by an inversion.
+- NASA FIRMS shows thousands of vegetation-fire detections in Quebec and Ontario, and none in southeast Michigan.
+- PM2.5 jumped region-wide (both counties, 10 Wayne monitors) from Good or Moderate to Very Unhealthy in a day.
+
+We show a correlation during a documented smoke event. We don't claim to attribute each AQI point to smoke.

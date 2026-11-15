@@ -62,3 +62,5 @@ Windows 11, Python 3.12, and the pinned `requirements-lock.txt`.
 - **What a detection means:** a satellite pixel (375 m for VIIRS, 1 km for MODIS) with at least one hot spot in it, at a UTC time. It is not a fire outline, and it doesn't measure burned area. `type` 0 means a presumed vegetation fire.
 - **Credit line:** "We acknowledge the use of data and/or imagery from NASA's Fire Information for Resource Management System (FIRMS), part of NASA's LANCE and ESDIS." Use "NASA FIRMS" in captions.
 - **Verified (#32):** the research counts were re-counted from the downloaded files and match: 8 detections in the demo area on June 26 and 5 on June 28, all type 2. The June 26 Canada file has 7,959 rows.
+
+**Science note (#153):** [science-note.md](science-note.md) covers what the MODIS images and daily county AQI are, which pollutant set each value (Washtenaw June 26 was ozone), and what the app does and doesn't claim. It's for the Beyond the Horizon judges.

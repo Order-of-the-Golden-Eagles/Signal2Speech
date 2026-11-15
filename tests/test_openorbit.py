@@ -280,3 +280,24 @@ def test_fire_dots_and_home_marker_land_on_the_image(qapp):
     assert len(dots) == len(view.fires.points)
     assert all(rect.contains(p) for _, p in dots)
     assert rect.contains(fires_map.home_point())
+
+def test_defining_pollutants_are_loaded_and_shown(qapp):
+    """#153: the view says which pollutant set each AQI when they differ, from the data."""
+    from signal2speech.openorbit.view import OpenOrbitView
+    ds = load_dataset()
+    w = ds.change_for("Washtenaw")
+    assert (w.before_pollutant, w.after_pollutant) == ("Ozone", "PM2.5")
+    wayne = ds.change_for("Wayne")
+    assert (wayne.before_pollutant, wayne.after_pollutant) == ("PM2.5", "PM2.5")
+    line = OpenOrbitView(ds)._pollutant_line()
+    assert line.endswith("PM2.5 everywhere except Washtenaw Jun 26: ozone.")
+
+
+def test_cloudy_before_image_is_captioned(qapp):
+    """#153: June 26 was overcast; the caption says so, so white isn't read as clean air."""
+    from signal2speech.openorbit.view import MapImage, OpenOrbitView
+    view = OpenOrbitView(load_dataset())
+    view.compare_air_quality()
+    captions = [m.caption for m in view.findChildren(MapImage)]
+    assert any(c and c.endswith("mostly cloud") and "June 26" in c for c in captions)
+    assert not any(c and "June 28" in c and "cloud" in c for c in captions)
