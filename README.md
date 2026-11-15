@@ -28,7 +28,7 @@ The same tools without the launcher (`python -m signal2speech --help` lists them
 | Simulated brain signals through a real g.Pype pipeline | `python -m signal2speech.app --input simulated --sim 2,1` |
 | **Recorded human EEG from g.tec's dataset chooses the tile**, as a walkthrough of a headset session (needs the dataset, see [For reviewers](#for-reviewers-reproduce-our-numbers-on-gtec-data)) | `python -m signal2speech.app --input recorded --recording path/to/S4.mat` |
 | Keys choose, a simulated board's eye closure confirms. On two real PiEEG boards we measured no usable EEG ([findings](docs/eeg-hardware/README.md#pieeg-octopus-16-on-real-people-no-usable-eeg-2026-11-15)) | `python -m signal2speech.app --input pieeg --pieeg-self-test` |
-| Phrase selection: type a question, pick one of two suggested replies, preview it, confirm, and it is spoken | `python -m signal2speech.ai` |
+| Phrase selection: type a question, two suggested replies appear, one is picked, previewed, confirmed and spoken. With `--input recorded`, g.tec's recorded brain data does the picking | `python -m signal2speech.ai` (add `--input recorded`) |
 | The g.Pype evidence view (scopes, OSCAR, averaged P300) | `python -m signal2speech.evidence --source generator` |
 | A hardware-free check of the whole demo | `python -m signal2speech.app --smoke` |
 

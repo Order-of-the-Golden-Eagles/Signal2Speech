@@ -213,6 +213,8 @@ class LiveEegInput:
         self._reflashing = False
         self._last_attended: Optional[str] = None
         self._start_hung = False
+        #: Shown under the tiles when a round opens and the script has nothing for it.
+        self.idle_hint = "Simulated script finished: press 1 or 2"
         self.p300_calibration: dict = {}
         self.alpha_calibration: Optional[am.Calibration] = None
 
@@ -441,7 +443,7 @@ class LiveEegInput:
                 attended = self._last_attended
             elif not self.script:                        # script spent: keys take over
                 self.window.flasher.stop()
-                self.window.hint.setText("Simulated script finished: press 1 or 2")
+                self.window.hint.setText(self.idle_hint)
                 return
             else:
                 attended = TILES[self.script.popleft() - 1]   # tile the synthetic brain attends
