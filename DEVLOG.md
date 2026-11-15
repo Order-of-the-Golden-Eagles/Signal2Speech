@@ -607,3 +607,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Licences to know about: Piper is GPL-3.0, so we run it as a separate program. The voice we chose is for non-commercial use with credit. The 63 MB voice file is not in the repo
 - Lines with numbers in them are spoken 25 % slower, so the figures are easy to catch
 - Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux
+
+## 11/15/26 - 4:10 AM - MagicJester2764 - #165 Soak test for the judging hour (PR pending)
+- Anyone can leave the demo running for an hour by itself and get a pass/fail report: no double outputs, no crashes, steady memory, same speed at the end as at the start
+    - `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` writes `logs/soak-<time>.md`
+- It goes through the same crash-safe launcher we'll use at the table, and kills the app once on purpose to prove it comes back
+- First full run (simulated input, dev machine, muted) passed: 169 confirms and 169 spoken lines with 0 doubles, 0 crashes, back within 1.1 s after the kill, selection time 3.1 s at the start and 3.2 s at the end
+- Still needed: the same hour on the judging laptop with Wi-Fi off and sound on (Part D of the judging laptop session). This was not live EEG

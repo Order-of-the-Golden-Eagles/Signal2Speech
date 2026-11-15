@@ -68,6 +68,15 @@ Follow [CLAUDE.md](../../CLAUDE.md#project-board-after-every-merge):
 - **#4 passes:** close it as completed, and set Done. Its sub-issues are already closed.
 - **#42:** stays In Progress until `judging-draft` and `judging-final` are tagged, as described in [judging-build.md](judging-build.md#freeze-and-rollback-42).
 
+## Part D (optional): the judging-hour soak (#165)
+
+About 65 minutes, with Wi-Fi off and the laptop on its charger. Nobody needs to watch it. Leave the volume on if you can: speech is part of what's tested.
+
+| # | Do | Expect |
+| --- | --- | --- |
+| D1 | `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` | The app opens fullscreen, calibrates on simulated input, then answers by itself, round after round. At 30 minutes it's killed on purpose and comes back within a few seconds. A progress line prints every minute. |
+| D2 | When it finishes, open the `logs/soak-<time>.md` it names | **Verdict: PASS.** 0 double outputs, 0 crashes, memory stable, and the kill test restarted the app. Paste the whole report into #165. |
+
 ## If a step fails
 
 | Symptom | Do |

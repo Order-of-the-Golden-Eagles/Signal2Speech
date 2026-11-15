@@ -12,6 +12,32 @@ Verify confirmation, cancellation, duplicate events, disconnects, and offline la
 - `python -m signal2speech.app --smoke`: one confirm and one cancel through the real app with fake output, plus the demo numbers, assets, and a g.Pype stream. It exits 0 or 1. Use `--smoke=judging` on the judging laptop. See [DevOps](../devops/README.md#smoke-check-41).
 - Live EEG, audio, and Wi-Fi-off are manual checks. The smoke lists them under MANUAL. Record live results separately.
 
+## Soak test: the judging hour (#165)
+
+Judging lasts an hour, and judges come back. `tests/soak/soak.py` runs the real app through the crash-safe launcher (#133) for that long, with its own simulated input, and checks it doesn't crash, double up an output, leak memory, or slow down.
+
+```
+python tests/soak/soak.py --minutes 60 --p300 --kill-at 30      # the judging-laptop run (about 61 min)
+python tests/soak/soak.py --minutes 5 --windowed --mute          # a quick check
+```
+
+- **What it drives:** `tools/demo_launcher.py -- --input simulated --p300 --sim <script>`. That's the live code path (P300 chooser and alpha switch) on the g.Pype Generator, labelled Simulated. The script repeats choose → preview → confirm, three times out of four, and choose → preview → no eye closure, so the confirm timeout cancels. It's long enough that it never runs out. Without `--p300` it uses the plain simulated decoder.
+- **What it reads:** the app's transcript as it streams, with each line stamped on arrival. The raw copy goes to `logs/soak-<time>.log`.
+- **Pass needs all of these:**
+  - **0 double outputs:** every `Confirmed` has exactly one map action and one spoken line, and no output appears on a cancelled or timed-out round.
+  - **0 unplanned app exits and 0 Python tracebacks.**
+  - **Memory stable:** the app's RSS, sampled every minute with psutil, grows less than +50 MB or +15% (whichever is larger) after start-up.
+  - **The kill test:** with `--kill-at`, the app is killed on purpose once, and the launcher must start a new one. The report gives both times: when the new process appeared, and when it was logging again.
+- **Report:** `logs/soak-<time>.md` has the verdict, the exact command, the machine, round counts, crashes, memory start vs end, and the median selection time (Choose round opens → preview) and confirm → map time, first 10 minutes vs last 10. Paste it into #165. `logs/` stays out of git.
+- **Tests:** `tests/test_soak.py` pins the pass/fail parsing (double outputs, cancels with output, restarts, a run cut mid-confirm) without starting the app.
+
+### Results
+
+| Where | Input | Run | Result |
+| --- | --- | --- | --- |
+| Dev machine (Linux, 8 CPUs, offscreen, muted), 11/15/26 03:09–04:09 | Simulated, `--p300` | `--minutes 60 --p300 --kill-at 30 --windowed --mute` | **PASS.** 226 previews, 169 confirms, 56 cancels (all by the confirm timeout), 169 map actions and 169 spoken lines, **0 double outputs**, 0 crashes, 0 Python errors. Kill at 30 min: a new app process after 1.1 s, logging again after 5.4 s. Memory: first app process 226 → 241 MB over minutes 2–30 (peak 302 MB during start-up). After the restart, the progress lines read 299–303 MB from minute 53 to 59. (That run's report covered only the first process; the soak now gives a row per app process.) Selection time (Choose round opens → preview), median: 3.10 s in the first 10 min, 3.20 s in the last 10. Confirm → map: 1 ms both. |
+| Judging laptop, Wi-Fi off | Simulated, `--p300` | Not run yet. Part D of the [judging laptop session](../devops/judging-laptop-session.md#part-d-optional-the-judging-hour-soak-165) | |
+
 ## Recovery checks (#26)
 
 `tests/test_recovery.py` runs every case through the real `App` with a fake map and speaker. It asserts that nothing fires an extra map action or spoken line.
