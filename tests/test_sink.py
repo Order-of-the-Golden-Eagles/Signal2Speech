@@ -174,6 +174,7 @@ def test_spoken_form_says_known_abbreviations_in_full_and_spells_unknown_ones():
     assert spoken_form("Send me the PDF.") == "Send me the P.D.F."          # no doubled full stop
     assert spoken_form("NASA imagery. OK? Yes, I am.") == "NASA imagery. OK? Yes, I am."
     assert spoken_form("Yes, please.") == "Yes, please."
+    assert spoken_form("MODIS Terra imagery") == "Moe-diss Terra imagery"   # a name the voice gets wrong
 
 
 def test_find_voice_honours_off_and_an_explicit_file(tmp_path, monkeypatch):

@@ -38,6 +38,10 @@ EXPANSIONS: Dict[str, str] = {
     "EEG": "electroencephalogram",
     "BCI": "brain-computer interface",
 }
+#: Names the voice gets wrong: give it a spelling that sounds right.
+RESPELLINGS: Dict[str, str] = {
+    "MODIS": "Moe-diss",
+}
 #: Abbreviations people say as a word, and short words written in capitals: leave them alone.
 SAID_AS_WORDS = frozenset({"NASA", "FIRMS", "MODIS", "GIBS", "LED", "OK", "NO", "YES", "AM", "PM"})
 _ABBREVIATION = re.compile(r"\b[A-Z]{2,5}\b")
@@ -117,6 +121,8 @@ def spoken_form(text: str) -> str:
         word = match.group(0)
         if word in EXPANSIONS:
             return EXPANSIONS[word]
+        if word in RESPELLINGS:
+            return RESPELLINGS[word]
         if word in SAID_AS_WORDS:
             return word
         dotted = ".".join(word) + "."
