@@ -56,7 +56,7 @@ def test_window_buttons_launch_and_gray_out(qapp):
     win.buttons["demo-simulated"].click()
     assert spawned[-1][1:] == ["-m", "signal2speech.app", "--input", "simulated", "--sim", "2,1",
                                "--fullscreen"]
-    assert win.status.text() == "Started: Demo · Simulated"
+    assert win.status.text() == "Started: NASA example · Simulated"
     win.close()
 
 
@@ -64,7 +64,7 @@ def test_window_reports_a_failed_start(qapp):
     win = entry.run_window(spawn=lambda cmd: False, find_spec=have)
     assert win.buttons["evidence"].isEnabled()
     win.buttons["ai"].click()
-    assert win.status.text() == "Couldn't start AI Answering · Keyboard"
+    assert win.status.text() == "Couldn't start Signal2Speech · Keyboard"
     win.close()
 
 

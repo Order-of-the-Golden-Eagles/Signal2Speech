@@ -26,7 +26,19 @@ This is the question judges care about most. Learn this table.
 
 The app's bottom row of pills always names the input: **Keyboard**, **Simulated**, **Recorded**, or **Live EEG**. Never say "live". Never say "the user chose" about a recorded run.
 
-## The two demos
+## The app, and how to run it
+
+It is one app. The main screen is the question box and two replies. The NASA air-quality question is an example inside it: click **Example: NASA air quality**. The top of the window says what the app is and the three steps to use it.
+
+| Input | Command | Label on screen |
+| --- | --- | --- |
+| Recorded g.tec EEG (today's default) | `python -m signal2speech.ai --input recorded` | Recorded |
+| Unicorn headset on a person | `python -m signal2speech.ai --input live` | Live EEG |
+| Keys only | `python -m signal2speech.ai` | Keyboard |
+
+With the headset: the brain signal chooses, and holding key 1 confirms. Add `--arm-live-confirm` so closing the eyes confirms, but only after the guided check (`python -m signal2speech.eeg.live --source hybridblack`) says it is safe for that wearer. If a judge wears it, they need the one-minute calibration first. The headset path has passed on simulated signals only, so don't promise an accuracy.
+
+The older stand-alone runs still work:
 
 Both need about 90 seconds of setup after launch. Start them before the judge arrives. Run one at a time, because both talk.
 

@@ -18,13 +18,14 @@ pip install -r requirements-lock.txt
 python -m signal2speech
 ```
 
-A launcher opens with a button for each tool, and each button says which input it uses. Click **Demo · Keyboard**, then press **2** (Compare counties), then hold **1** for 2 s (confirm). The map changes and one line is spoken. Press **2** at the preview, or **Esc**, to cancel, and nothing happens.
+A launcher opens with a button for each tool, and each button says which input it uses. Click **Signal2Speech · Keyboard**, the main app: type a question and press Enter, press **1** or **2** to pick a reply, then hold **1** for 2 s to confirm, and it is spoken. For the NASA example, click **Example: NASA air quality** in the app, press **2** (Compare counties), then hold **1** for 2 s (confirm). The map changes and one line is spoken. Press **2** at the preview, or **Esc**, to cancel, and nothing happens.
 
 The same tools without the launcher (`python -m signal2speech --help` lists them):
 
 | Also try | Command |
 | --- | --- |
-| The demo with keyboard input | `python -m signal2speech.app --input keyboard` |
+| **The main app:** ask any question, pick a reply, confirm, spoken. NASA example inside. `--input keyboard`, `simulated`, `recorded` (g.tec EEG) or `live` (Unicorn headset) | `python -m signal2speech.ai` |
+| The NASA example alone, keyboard input | `python -m signal2speech.app --input keyboard` |
 | Simulated brain signals through a real g.Pype pipeline | `python -m signal2speech.app --input simulated --sim 2,1` |
 | **Recorded human EEG from g.tec's dataset chooses the tile**, as a walkthrough of a headset session (needs the dataset, see [For reviewers](#for-reviewers-reproduce-our-numbers-on-gtec-data)) | `python -m signal2speech.app --input recorded --recording path/to/S4.mat` |
 | Keys choose, a simulated board's eye closure confirms. On two real PiEEG boards we measured no usable EEG ([findings](docs/eeg-hardware/README.md#pieeg-octopus-16-on-real-people-no-usable-eeg-2026-11-15)) | `python -m signal2speech.app --input pieeg --pieeg-self-test` |
