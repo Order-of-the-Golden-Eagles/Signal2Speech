@@ -10,9 +10,9 @@ Deadlines are Eastern time: **draft on Devpost and the event app by Saturday mid
 | Repo link | https://github.com/Order-of-the-Golden-Eagles/Signal2Speech | Public (checked 11/14, 7:45 PM) |
 | Team (all four) | Vasanth Anbukumar (`vas2000-personal`), Long Le (`LongNguyenThanhLe`), Nate (`MagicJester2764`), In Young Song (`InYoung-Song`) | Names ready. Confirm Devpost invites |
 | Main track | **Mind and Machine** (the g.tec track). Pick exactly one. | Ready (#105) |
-| Sponsor and special prizes | Select every prize we actually qualify for; unselected prizes aren't entered. Don't select ones we don't use (Gemini, Solana, MongoDB, and so on). Ask Vasanth before adding Best Beginner or Computer Science. | Decide on Devpost |
+| Sponsor and special prizes | Select every prize we actually qualify for; unselected prizes aren't entered. **Include Beyond the Horizon** (space and Earth data, NASA-backed): the [science note](../openorbit-data/science-note.md) (#153) is our evidence. Don't select ones we don't use (Gemini, Solana, MongoDB, and so on). Ask Vasanth before adding Best Beginner or Computer Science. | Decide on Devpost |
 | Schools | Ask each teammate. Don't guess. | Ask |
-| Video link | YouTube or Vimeo, 3:00 or less (g.tec's rules cap it at 2:30). See [shot-list.md](shot-list.md). Leave it empty for the draft. | Not recorded (#34) |
+| Video link | YouTube or Vimeo, 2:30 or less: a screen recording with simulated input, no headset. Vasanth records it from [#160](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/160). Leave it empty for the draft. | Assigned (#160) |
 | Thumbnail | `docs/demo-submission/media/app-compare-reveal.jpg` (JPG, PNG, or GIF up to 5 MB) | Ready |
 | Tagline | Answer without speaking or typing: pick, preview, and confirm the exact words with a brain-computer interface. | Draft |
 | Built with | `Python`, `g.Pype`, `g.tec Unicorn Hybrid Black`, `PySide6`, `Qt`, `Qt TextToSpeech`, `pyttsx3`, `scikit-learn`, `NumPy`, `SciPy`, `Claude`, `Anthropic API`, `NASA MODIS`, `NASA GIBS`, `EPA AirData`, `pytest`, `GitHub Actions`. Type each and pick it from the dropdown. NASA MODIS imagery is fetched through GIBS, matching the video credits. | Ready |
@@ -20,7 +20,7 @@ Deadlines are Eastern time: **draft on Devpost and the event app by Saturday mid
 
 ### AI disclosure (draft)
 
-Paste one of these into "Generative AI in your hack", and select Claude under "AI tools used". **Check #116 first:** use the first version while #116 is open, and the second only once it's merged.
+Paste one of these into "Generative AI in your hack", and select Claude under "AI tools used". **#116 merged on 11/14, so use the second version** (Sonnet, grounded). The first is kept for the record.
 
 **While #116 is open** (what `main` does today: `claude-opus-5-5`, replies not grounded):
 
@@ -101,7 +101,7 @@ Verify on a real wearer with the Unicorn, add more than two choices per round, s
 | Over 280 tests; CI on Windows, macOS, and Linux | ✅ 283 collected. Every PR and every push to `main` runs on Windows, Ubuntu, and macOS. PRs run the full suite on Windows and Ubuntu (py3.12), and the fast suite on macOS and Ubuntu (py3.13). `main` runs the full suite everywhere. | `.github/workflows/tests.yml` |
 | Alpha confirm is a different signal from the P300 choice | ✅ The story doesn't claim one can't affect the other, only that a confirm counts only in its own separate step | `SelectionHandler` rounds |
 | "Required CI" | ❌ Not used. `main` has no branch protection, so the story says "CI on every pull request". Auto-merge is enabled. | repo settings |
-| Grounded replies, Sonnet 5.5 | ⏳ Only after #116 merges. Until then, use the conditional wording above. | #116 |
+| Grounded replies, Sonnet 5.5 | ✅ #116 merged 11/14. Use the second AI answer, and add the grounding sentence to the story's AI bullet. | #116 |
 | Spoken calibration cues | ✅ In the guided live run | `signal2speech/eeg/live.py` (#78) |
 | Headset lost in transit | Team statement (Vasanth). Not something the repo can check. | #105 plan |
 > We used Claude (Anthropic) as a coding assistant during the hackathon. In the app, AI Answering can suggest reply options using Claude (`claude-sonnet-5-5`) when an API key is configured. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with LDA, the alpha switch) is our own g.Pype pipeline, not an AI model.
