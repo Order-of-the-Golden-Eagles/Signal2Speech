@@ -48,3 +48,25 @@ The standalone sink only prints the `ConfirmedAction`. It plays no audio and cha
 - **Bottom strip on small screens:** the input label always shows in full. Connection and last-outcome text can clip, and their full text is in the tooltip and the transcript. With keyboard input the connection field is hidden, because there's nothing to report.
 - **Long text shrinks to fit (#95).** Tile text starts at 56 px, and preview text at 44 px. If a long reply doesn't fit, the font steps down to a 32 px floor (`signal2speech/ui/fit.py`). Tiles recompute on relabel and resize, never on a flash, so flash timing stays steady. The preview is capped at about 28% of the window height so it doesn't squeeze the tiles. A 12-word AI reply fits at 1280×720 at 54 px.
 - **Confirm countdown (#96).** During a Confirm round, a muted line under the preview reads "No answer cancels in N s". It reads the same timer as #26's timeout, so it can't disagree with when the cancel happens. It hides on confirm, cancel, disconnect, or a new question. With `--confirm-timeout 0` it never appears.
+
+## Colour contrast (#135)
+
+Every text colour lives in `signal2speech/ui/palette.py`, and `tests/test_contrast.py` checks each pair against WCAG AA: 4.5:1, or 3:1 for bold text of 24 px or more. It also checks the help overlay drawn over a white flashing tile, and fails if a raw `#rrggbb` appears in the window or overlay code. The only fix needed was **Recorded**'s input-label purple: `#a855f7` (4.4:1) became `#c084fc`.
+
+| Text | Colours | Contrast | Needs |
+| --- | --- | ---: | ---: |
+| label text | `#f5f7fa` on `#0b0d10` | 18.1:1 | 4.5:1 |
+| prompt | `#cbd5e1` on `#0b0d10` | 13.1:1 | 4.5:1 |
+| hint | `#cbd5e1` on `#0b0d10` | 13.1:1 | 4.5:1 |
+| preview | `#ffe066` on `#0b0d10` | 14.9:1 | 3.0:1 |
+| countdown | `#94a3b8` on `#0b0d10` | 7.6:1 | 4.5:1 |
+| tile | `#ffffff` on `#1e2630` | 15.3:1 | 3.0:1 |
+| tile while flashing | `#000000` on `#ffffff` | 21.0:1 | 3.0:1 |
+| strip text | `#e2e8f0` on `#151a21` | 14.2:1 | 4.5:1 |
+| input label keyboard | `#3b82f6` on `#151a21` | 4.8:1 | 4.5:1 |
+| input label simulated | `#f59e0b` on `#151a21` | 8.1:1 | 4.5:1 |
+| input label recorded | `#c084fc` on `#151a21` | 6.6:1 | 4.5:1 |
+| input label live-eeg | `#22c55e` on `#151a21` | 7.7:1 | 4.5:1 |
+| help text | `#f5f7fa` on `#0b0d10` | 18.1:1 | 4.5:1 |
+| help keys | `#ffe066` on `#0b0d10` | 14.9:1 | 3.0:1 |
+| help footer | `#94a3b8` on `#0b0d10` | 7.6:1 | 4.5:1 |

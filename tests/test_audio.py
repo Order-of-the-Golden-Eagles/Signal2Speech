@@ -12,7 +12,7 @@ from signal2speech.speech import AUDIO_DIR, BUNDLED_CLIPS, bundled_clip  # noqa:
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = json.loads((AUDIO_DIR / "manifest.json").read_text(encoding="utf-8"))
 CONTRACT = {c["actionId"]: c["spokenText"]
-            for c in json.loads((ROOT / "contracts" / "demo-round.json").read_text())["choices"]}
+            for c in json.loads((ROOT / "contracts" / "demo-round.json").read_text(encoding="utf-8"))["choices"]}
 
 
 @pytest.mark.parametrize("action", sorted(BUNDLED_CLIPS))
