@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional
 
 from PySide6.QtCore import QEvent, QObject, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QKeySequence, QPainter, QPainterPath, QPen, QShortcut
-from PySide6.QtWidgets import (QApplication, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
                                QPlainTextEdit, QSizePolicy, QTextEdit, QVBoxLayout, QWidget)
 
 from signal2speech.core import (ActionIds, Choice, InputAdapter, InputSources, Outcome, Round, RoundKind,
@@ -280,7 +280,13 @@ class SelectionWindow(QMainWindow):
         # don't: a wrapping label asks for more height, and that pushed the preview screen over
         # 720 at the largest text size.
         self.prompt = WrapWhenLong("Waiting for a round", objectName="prompt")
-        col.addWidget(self.prompt)
+        # Three bands. The tiles sit in the middle one and never move: the prompt and the preview
+        # live above them, the countdown and the hint below, and the two outer bands share the
+        # spare height equally, which keeps the tiles centred.
+        top = QVBoxLayout()
+        top.setSpacing(P.M)
+        col.addLayout(top, 1)
+        top.addWidget(self.prompt)
         # #175: the consent screen. What will happen, the exact words, and the confirm ring.
         self.preview_box = QWidget()
         pcol = QVBoxLayout(self.preview_box)
@@ -303,16 +309,12 @@ class SelectionWindow(QMainWindow):
         prow.addWidget(self.ring, 0, Qt.AlignmentFlag.AlignVCenter)
         pcol.addLayout(prow)
         self.preview_box.setVisible(False)
-        col.addWidget(self.preview_box)
+        top.addWidget(self.preview_box)
+        top.addStretch(1)
         # Seconds left before an unanswered Confirm round cancels (#26, #96). App drives it.
         self.countdown = QLabel("", objectName="countdown")
         self.countdown.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.countdown.setVisible(False)
-        col.addWidget(self.countdown)
-        # Nothing below this line moves. The prompt stays at the top, the tiles and the hint
-        # stay at the bottom, and the preview appears in the space between. Tiles that jump when
-        # the preview shows are hard to keep looking at, and a jumping screen looks unfinished.
-        col.addStretch(1)
 
         row = QHBoxLayout()
         row.setSpacing(P.XL)
@@ -326,18 +328,25 @@ class SelectionWindow(QMainWindow):
         self.hint = QLabel("", objectName="hint")
         self.hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.hint.setWordWrap(True)       # large text (#195) must wrap, not widen the window
-        col.addWidget(self.hint)
-        for held in (*self.tiles.values(), self.hint):     # hidden on a reveal, but keep their place
+        bottom = QVBoxLayout()
+        bottom.setSpacing(P.M)
+        bottom.addWidget(self.countdown)
+        bottom.addWidget(self.hint)
+        bottom.addStretch(1)
+        col.addLayout(bottom, 1)
+        for held in (*self.tiles.values(), self.hint, self.countdown):   # hidden, but keep their place
             policy = held.sizePolicy()
             policy.setRetainSizeWhenHidden(True)
             held.setSizePolicy(policy)
 
         strip = QFrame(objectName="strip")
-        srow = QGridLayout(strip)
-        srow.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
-        srow.setHorizontalSpacing(P.L)
-        srow.setVerticalSpacing(P.S)
-        self._strip_grid = srow
+        srow = QVBoxLayout(strip)
+        srow.setContentsMargins(P.L, P.S, P.L, P.M)
+        srow.setSpacing(P.S)
+        self._strip_rows = (QHBoxLayout(), QHBoxLayout())
+        for r in self._strip_rows:
+            r.setSpacing(P.M)
+            srow.addLayout(r)
         self._strip_long: Optional[bool] = None
         # Two inputs, a device name and a status make a long line (recorded input #104, PiEEG
         # #172). A long input label gets a line of its own across the strip (see _layout_strip);
@@ -347,15 +356,12 @@ class SelectionWindow(QMainWindow):
         self.connection_label = self._strip_label()
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()
-        # At large text sizes (#195) the round id may clip; the input label never does.
-        self.round_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.round_label.setMinimumWidth(1)
-        # The last outcome can be long; let it clip instead of forcing the window wide.
-        # The transcript and the tooltip keep the full text.
-        self.outcome_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        # The connection text can be long ("scripted, no g.Pype (...)"); let it clip too.
-        # The input label never clips: it's what keeps simulated input from looking live.
-        self.connection_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        # Pills hug their text. If the row runs out of room they shrink and clip (the tooltip
+        # and the developer log keep the full text); the input pill never does.
+        for pill in (self.round_label, self.connection_label, self.outcome_label):
+            pill.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+            pill.setMinimumWidth(1)
+        self.input_label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
         self._layout_strip(False)
         col.addWidget(strip)
         self.strip = strip                 # App moves it to span the whole window
@@ -398,35 +404,24 @@ class SelectionWindow(QMainWindow):
     STRIP_LONG_LABEL = 40
 
     def _layout_strip(self, long_label: bool) -> None:
-        """One row when the input label is short. When it is long, it takes the whole first row
-        and the round, connection and last outcome share the second, so nothing is squeezed into
-        a narrow column or cut off."""
+        """One row of pills when the input label is short. When it is long, it takes the first
+        row to itself and the round, connection and last outcome go on the second."""
         if long_label == self._strip_long:
             return
         self._strip_long = long_label
-        g = self._strip_grid
-        for w in (self.input_label, self.round_label, self.connection_label, self.outcome_label):
-            g.removeWidget(w)
-        if long_label:
-            g.addWidget(self.input_label, 0, 0, 1, 3)
-            row, first = 1, 0
-        else:
-            g.addWidget(self.input_label, 0, 0)
-            row, first = 0, 1
-        g.addWidget(self.round_label, row, first)
-        g.addWidget(self.connection_label, row, first + 1)
-        g.addWidget(self.outcome_label, row, first + 2)
-        self._strip_first = first
-        self._stretch_strip()
+        first, second = self._strip_rows
+        for row in (first, second):
+            while row.count():
+                row.takeAt(0)
+        first.addWidget(self.input_label)
+        rest = second if long_label else first
+        for pill in (self.round_label, self.connection_label, self.outcome_label):
+            rest.addWidget(pill)
+        first.addStretch(1)
+        second.addStretch(1)
 
     def _stretch_strip(self) -> None:
-        """Share the strip's width. A hidden connection label gives its share to the others."""
-        g, first = self._strip_grid, self._strip_first
-        for c in range(4):
-            g.setColumnStretch(c, 0)
-        g.setColumnStretch(first, 2)            # round: short, but never cut off
-        g.setColumnStretch(first + 1, 0 if self.connection_label.isHidden() else 4)
-        g.setColumnStretch(first + 2, 4)        # last outcome
+        """Kept for callers: the pills size themselves now."""
 
     def set_input_source(self, source: str) -> None:
         """Label the decoder actually feeding the handler, so Simulated never reads as Live."""
@@ -596,6 +591,7 @@ class SelectionWindow(QMainWindow):
 
     # ── Helpers ──────────────────────────────────────────────
     PREVIEW_MAX_PX = P.PREVIEW        # before the text scale (#195)
+    PREVIEW_MIN_PX = P.PREVIEW_MIN
 
     def apply_text_scale(self) -> None:
         """Re-style after theme.set_scale (#195). Tiles and preview refit; flashing is untouched."""
@@ -630,10 +626,10 @@ class SelectionWindow(QMainWindow):
             return
         font = QFont(self.preview.font())
         font.setBold(True)
-        width = max(self.width() - 2 * P.XL - 2 * P.M - 6 - 150 - P.L, 1)   # margins, accent bar, ring
+        width = max(self.width() - 2 * P.XL - 2 * P.M - 6 - self.ring.width() - P.L, 1)   # margins, accent bar, ring
         height = max(int(self.height() * 0.28), 80)
         self.preview_px = fit_pixel_size(self.preview.text(), font, width, height,
-                                         P.px(self.PREVIEW_MAX_PX), P.TILE_TITLE_MIN)
+                                         P.px(self.PREVIEW_MAX_PX), self.PREVIEW_MIN_PX)
         self.preview.setStyleSheet(f"font-size: {self.preview_px}px;")
         # Reserve the fitted text's height, so the layout squeezes the tiles, never the words.
         font.setPixelSize(self.preview_px)

@@ -240,7 +240,7 @@ def test_window_fits_twelve_word_reply_at_1280x720(ui):
                      tile.height() - 2 * Tile.INSET) or tile.font_px == MIN_PX
     w.press_target(T1)
     app.processEvents()
-    assert MIN_PX <= w.preview_px <= w.PREVIEW_MAX_PX
+    assert w.PREVIEW_MIN_PX <= w.preview_px <= w.PREVIEW_MAX_PX
 
 
 # ── #174: redesigned tiles ───────────────────────────────────

@@ -48,8 +48,9 @@ HELP_BG = BG              # the overlay is BG at 92% opacity over the window
 DISPLAY = 56              # the largest text on screen
 TILE_TITLE = 40           # tile titles at full size: readable, without filling the screen
 TITLE = 36                # screen titles
-PREVIEW = 44              # the words to be spoken
-HEADING = 28              # prompts, panel titles
+PREVIEW = 24              # the words to be spoken: small enough for five words a line
+PREVIEW_MIN = 20          # long replies shrink no further
+HEADING = 24              # prompts, panel titles
 BODY = 22                 # hints, buttons, descriptions
 CAPTION = 18              # strip, footers, small print
 TILE_TITLE_MIN = 32       # long tile and preview text shrinks no further (#95)
@@ -113,6 +114,8 @@ ACTION_TINT = {
     ActionIds.CANCEL: "#fb7185",                # rose
 }
 TINT_BG_ALPHA = 0.10
+#: Corner radius of the status pills: half their height, so the ends are round.
+PILL_RADIUS = 15
 
 
 def window_qss() -> str:
@@ -126,8 +129,10 @@ QLabel#preview {{ font-size: {px(PREVIEW)}px; font-weight: 700; color: {ACCENT};
 QLabel#hint {{ font-size: {px(BODY)}px; color: {MUTED}; }}
 QLabel#previewHeader {{ font-size: {px(BODY)}px; font-weight: 600; color: {MUTED}; }}
 QLabel#countdown {{ font-size: {px(BODY)}px; color: {QUIET}; }}
-QFrame#strip {{ background: {STRIP_BG}; border-top: 2px solid {STRIP_BORDER}; }}
-QLabel.strip {{ font-size: {px(CAPTION)}px; font-family: {FONT}; color: {STRIP_TEXT}; }}
+QFrame#strip {{ background: transparent; border: none; }}
+QLabel.strip {{ font-size: {px(CAPTION - 2)}px; font-family: {FONT}; color: {STRIP_TEXT};
+                background: {STRIP_BG}; border: 1px solid {STRIP_BORDER};
+                border-radius: {PILL_RADIUS}px; padding: 5px 14px; }}
 """
 
 

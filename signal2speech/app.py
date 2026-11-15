@@ -908,6 +908,8 @@ def main(argv=None) -> int:
                    help="live/--p300: seconds of eyes open, then closed, for the alpha switch")
     p.add_argument("--practice", action="store_true",
                    help="start with the 30 s practice round (#196); P starts it any time")
+    p.add_argument("--no-intro", action="store_true",
+                   help="skip the opening animation of the two cards")
     p.add_argument("--no-attract", action="store_true",
                    help="don't loop the simulated demo after 60 s idle (#193)")
     p.add_argument("--help-by-eyes", action="store_true",
@@ -1019,8 +1021,19 @@ def main(argv=None) -> int:
     qapp.aboutToQuit.connect(app.close)
     if not args.no_report:
         qapp.aboutToQuit.connect(lambda: print(f"session report: {app.write_report()}", flush=True))
+    def opening() -> None:
+        """The two cards alone, then they settle on the left and the panels fade in."""
+        if args.screenshot or args.keys or args.no_intro:
+            return
+        from signal2speech.ui.intro import play_intro
+        qapp.processEvents()                       # the tiles need their final places first
+        play_intro(app.root, app.window, app.choices,
+                   reveal=[w for w in (app.view, app.conversation, app.window.strip)
+                           if isinstance(w, QWidget)])
+
     if hasattr(app.sim, "calibrate"):          # #103: open the stream and calibrate first
         app.root.showFullScreen() if args.fullscreen else app.root.show()
+        opening()
         try:
             app.sim.start()
         except Exception as err:               # g.Pype raises various errors for a missing device
@@ -1056,6 +1069,8 @@ def main(argv=None) -> int:
         guards.append(guard)
 
     app.root.showFullScreen() if args.fullscreen else app.root.show()
+    if not hasattr(app.sim, "calibrate"):
+        opening()
     if not (args.practice and app.start_practice()):
         app.ask()
     keymap = {"1": TargetIds.TARGET_1, "2": TargetIds.TARGET_2}
