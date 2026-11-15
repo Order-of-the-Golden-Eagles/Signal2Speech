@@ -553,6 +553,12 @@ def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
     a realtime pipeline with an unfitted scorer, so to calibrate and select in one run pass a
     placeholder model and refit with ``P300Chooser.finish_calibration()``.
     """
+    # Check the arguments before building anything: a half-built pipeline that is never started
+    # or closed crashed the interpreter at exit on Linux (a segfault after every test had passed).
+    if source not in ("generator", "recorded", "hybridblack"):
+        raise ValueError(f"Unknown source {source!r}: use generator, recorded or hybridblack")
+    if source == "recorded" and recorded is None:
+        raise ValueError("source 'recorded' needs RecordedResponses")
     p = gp.Pipeline()
     marker = gp.Marker(name="p300_flash")
     synth = None
@@ -564,8 +570,6 @@ def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
         p.connect(marker, synth[SyntheticP300.PORT_TRIGGER])
         upstream = synth
     elif source == "recorded":
-        if recorded is None:
-            raise ValueError("source 'recorded' needs RecordedResponses")
         # The Generator only sets the clock: RecordedP300 replaces its output with recorded EEG.
         src = gp.Generator(sampling_rate=RATE, channel_count=EEG_CHANNELS, signal_frequency=10,
                            signal_amplitude=0, noise_amplitude=1, name="p300_source")
@@ -573,11 +577,9 @@ def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
         p.connect(src, synth)
         p.connect(marker, synth[SyntheticP300.PORT_TRIGGER])
         upstream = synth
-    elif source == "hybridblack":
+    else:
         src = gp.HybridBlack(enable_oscar=enable_oscar, name="p300_source")
         upstream = src
-    else:
-        raise ValueError(f"Unknown source {source!r}: use generator, recorded or hybridblack")
     bandpass = gp.Bandpass(f_lo=1, f_hi=30, name="p300_bandpass")
     p.connect(upstream, bandpass)
 
