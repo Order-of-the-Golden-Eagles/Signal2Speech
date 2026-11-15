@@ -43,3 +43,8 @@ Add `--mute` for silent runs. `--confirm-timeout SECONDS` (default 15; 0 = never
 - With no picks left, a sequence waits for `set_next(cls)`.
 - `disconnect_stream()` stops the stream and calls `handler.disconnect()` (#26).
 - Standalone: `python -m signal2speech.eeg.simulated --ui --picks 2,1`. See [EEG Hardware](../eeg-hardware/README.md#simulated-input-21--works) for the threading details.
+
+## Confirm-to-output timing and the session report (#130, #131)
+
+- **Timing:** every confirm logs `timing: confirm→map N ms` (until the map call returns) and `timing: confirm→speech N ms` (until the audio actually starts: Qt's voice reports Speaking, or the bundled clip reports playing). The bottom strip shows the latest values after "Last:". Measured on a Mac (macOS 12): map 2–30 ms, speech 14–17 ms for a bundled clip, and about 50 ms for the OS voice. Muted runs have no speech time.
+- **Session report:** on exit, `python -m signal2speech.app` writes `logs/session-<time>.md` (gitignored). It has the date, commit, input, connection, and voice, the counts of previews, confirms, cancels, clears, and rejections, a confirm-to-output table, and the timeline. It's built only from handler outcomes and timings. Any line that looks like raw samples (20+ decimal numbers) is dropped. `--no-report` turns it off. Paste it into the rehearsal log in `docs/demo-submission/submission-checklist.md`.

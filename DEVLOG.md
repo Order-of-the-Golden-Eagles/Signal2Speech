@@ -397,3 +397,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - A long run of 3,000,000 operations found 0 violations. The judge Q&A now cites it
 - To prove the test isn't toothless, it also breaks the handler three ways on purpose (double output, a cancel that keeps the preview, ignored round IDs), and it catches each one
 - No product code changed. This is software evidence with keyboard and simulated input, not live-EEG accuracy
+
+## 11/14/26 - 9:17 PM - Long Le - #130 #131 Response times and a session report (PR pending)
+- Every confirm now shows how fast the app responded: time to the map change and time until speech starts, in the transcript and the bottom strip
+    - On a Mac: map 2–30 ms, speech about 15 ms with a bundled clip and about 50 ms with the computer voice
+- When the app closes, it writes a short report to `logs/session-<time>.md`: commit, input, counts of previews, confirms, and cancels, the response times, and a timeline. It never contains EEG or keys. `--no-report` turns it off
+- The report is ready to paste into the rehearsal log, so every practice run leaves evidence behind
+- Found and fixed two bugs while testing: the map time got overwritten in the strip, and closing the app could raise an error from the sound player. Tests use a fake clock. Not yet measured on the judging laptop

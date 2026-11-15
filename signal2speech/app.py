@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -74,13 +76,23 @@ class Transcript:
 class AppSink:
     """The only place output happens. SelectionHandler calls execute once per confirm."""
 
-    def __init__(self, view: MapView, speaker: Speaker, log: Callable[[str], None]):
+    def __init__(self, view: MapView, speaker: Speaker, log: Callable[[str], None],
+                 clock: Callable[[], float] = time.monotonic):
         self.view = view
         self.speaker = speaker
         self.log = log
+        self.clock = clock
         self.last_action: Optional[str] = None
+        # #130: one entry per confirm. map_ms is confirm -> map call returned; speech_ms is
+        # confirm -> audio actually started (None until it does, or if nothing is audible).
+        self.timings: List[dict] = []
+        self.on_timing: Optional[Callable[[dict], None]] = None
 
     def execute(self, action: ConfirmedAction) -> None:
+        t0 = self.clock()
+        entry = {"action": action.action_id, "source": action.source, "map_ms": None,
+                 "speech_ms": None}
+        self.timings.append(entry)
         self.last_action = action.action_id
         if action.action_id == ActionIds.SHOW_SATELLITE:
             self.log(f"OUTPUT map: show_satellite()  [{action.source}]")
@@ -88,14 +100,25 @@ class AppSink:
         elif action.action_id == ActionIds.COMPARE_AIR_QUALITY:
             self.log(f"OUTPUT map: compare_air_quality()  [{action.source}]")
             self.view.compare_air_quality()
-        elif action.action_id == ActionIds.SPEAK_REPLY:
-            pass
-        else:
+        if action.action_id in MAP_ACTIONS:
+            entry["map_ms"] = round((self.clock() - t0) * 1000, 1)
+        if action.action_id not in MAP_ACTIONS and action.action_id != ActionIds.SPEAK_REPLY:
             self.log(f"IGNORED unknown action {action.action_id!r}")
+            self.timings.remove(entry)
             return
         if action.spoken_text:
             self.log(f"OUTPUT speak: \"{action.spoken_text}\"")
+            if hasattr(self.speaker, "on_started"):
+                def started(entry=entry, t0=t0):
+                    entry["speech_ms"] = round((self.clock() - t0) * 1000, 1)
+                    self._report(entry)
+                self.speaker.on_started = started
             self.speaker.say(action.spoken_text, action.action_id)
+        self._report(entry)
+
+    def _report(self, entry: dict) -> None:
+        if self.on_timing is not None:
+            self.on_timing(entry)
 
 
 class PendingMapView(QLabel):
@@ -197,7 +220,8 @@ class App:
                  reveal_ms: int = 8000,
                  confirm_timeout_ms: int = CONFIRM_TIMEOUT_MS,
                  p300: bool = False, arm_live_confirm: bool = False,
-                 live_options: Optional[dict] = None):
+                 live_options: Optional[dict] = None,
+                 clock: Callable[[], float] = time.monotonic):
         if input_source in BLOCKED_INPUTS:
             raise ValueError(BLOCKED_INPUTS[input_source])
         if input_source not in (InputSources.KEYBOARD, InputSources.SIMULATED,
@@ -213,7 +237,10 @@ class App:
         if speaker is None:
             speaker = MutedSpeaker(self.log) if mute else OfflineSpeaker(self.log)
         self.speaker = speaker
-        self.sink = AppSink(self.view, speaker, self.log)
+        self.sink = AppSink(self.view, speaker, self.log, clock=clock)
+        self.sink.on_timing = self._show_timing
+        self.started_at = time.strftime("%Y-%m-%d %H:%M:%S")
+        self.events: List[str] = []          # #131: timeline for the session report
         self.handler = SelectionHandler(self.sink)
         self.keyboard = InputAdapter(self.handler, InputSources.KEYBOARD)
         self.window = SelectionWindow(self.handler, self.keyboard, input_source=input_source,
@@ -226,6 +253,10 @@ class App:
         h.on_preview.append(lambda c: self.log(f"preview (no output): \"{c.spoken_text or c.label}\""))
         h.on_cleared.append(lambda r: self.log(f"cleared ({r}): no output"))
         h.on_handled.append(self._log_outcome)
+        h.on_round_opened.append(lambda r: self._event(f"round {r.id} ({r.kind.value}) opened"))
+        h.on_cleared.append(lambda r: self._event(f"cleared ({r}), no output"))
+        h.on_handled.append(lambda e, o: self._event(
+            f"{o.value}" + (f" · {e.source} {e.eventId} {e.roundId}->{e.targetId}" if e else "")))
 
         self.sim = None
         sim_label = ""
@@ -325,6 +356,9 @@ class App:
     def _after_confirm(self, _e, outcome: Outcome) -> None:
         if outcome is not Outcome.Confirmed:
             return
+        if self.sink.timings:
+            # The window rewrote "Last:" after the sink measured; put the timing note back.
+            self._show_timing(self.sink.timings[-1])
         if self.sink.last_action in MAP_ACTIONS and isinstance(self.view, QWidget):
             self._set_reveal(True)
             self._reopen.start(self.reveal_ms)
@@ -366,6 +400,69 @@ class App:
         else:
             self._stop_confirm_timeout()
 
+    def _event(self, text: str) -> None:
+        self.events.append(f"{time.strftime('%H:%M:%S')} {text}")
+
+    def _show_timing(self, entry: dict) -> None:
+        """Show the latest confirm-to-output times in the strip; log each one once (#130)."""
+        logged = entry.setdefault("_logged", set())
+        for key, label in (("map_ms", "confirm→map"), ("speech_ms", "confirm→speech")):
+            if entry[key] is not None and key not in logged:
+                logged.add(key)
+                self.log(f"timing: {label} {entry[key]:.0f} ms")
+        parts = [f"{name} {entry[key]:.0f} ms" for key, name in (("map_ms", "map"), ("speech_ms", "speech"))
+                 if entry[key] is not None]
+        if parts:
+            self.window.add_outcome_note(" · ".join(parts))
+
+    def report_text(self) -> str:
+        """#131: a plain summary of this session. Built only from handler outcomes, the
+        transcript's own words, and timings. Never EEG samples, never secrets."""
+        from collections import Counter
+        counts = Counter(line.split(" ", 2)[1].split(" ·")[0] for line in self.events
+                         if line.split(" ", 2)[1].startswith(("Previewed", "Confirmed", "Cancelled",
+                                                               "Rejected")))
+        cleared = sum(1 for line in self.events if " cleared (" in line)
+        try:
+            commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+                                    capture_output=True, text=True, timeout=5).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            commit = ""
+        lines = [f"# Signal2Speech session · {self.started_at}", "",
+                 f"- **Commit:** `{commit or 'unknown'}`",
+                 f"- **Input:** {INPUT_LABELS[self.input_source]}",
+                 f"- **Connection:** {self.window.connection_label.text().removeprefix('Connection: ')}"
+                 if self.window.connection_label.isVisibleTo(self.window) else "- **Connection:** n/a",
+                 f"- **Speech:** {getattr(self.speaker, 'backend', type(self.speaker).__name__)}",
+                 "", "## Counts", "",
+                 "| Previewed | Confirmed | Cancelled | Cleared (cancel, disconnect, timeout) | Rejected |",
+                 "| ---: | ---: | ---: | ---: | ---: |",
+                 f"| {counts['Previewed']} | {counts['Confirmed']} | {counts['Cancelled']} | {cleared} | "
+                 f"{sum(v for k, v in counts.items() if k.startswith('Rejected'))} |",
+                 "", "## Confirm to output", ""]
+        if self.sink.timings:
+            lines += ["| # | Action | Input | Confirm → map | Confirm → speech |",
+                      "| ---: | --- | --- | ---: | ---: |"]
+            fmt = lambda v: "—" if v is None else f"{v:.0f} ms"
+            for i, t in enumerate(self.sink.timings, 1):
+                lines.append(f"| {i} | {t['action']} | {t['source']} | {fmt(t['map_ms'])} | "
+                             f"{fmt(t['speech_ms'])} |")
+        else:
+            lines.append("No confirms this session.")
+        lines += ["", "## Timeline", ""] + [f"- {e}" for e in self.events]
+        safe = [ln for ln in lines if not _looks_like_samples(ln)]
+        if len(safe) != len(lines):
+            safe.append("")
+            safe.append(f"_{len(lines) - len(safe) + 1} line(s) dropped: they looked like raw samples._")
+        return "\n".join(safe) + "\n"
+
+    def write_report(self, folder: Optional[Path] = None) -> Path:
+        folder = folder or (ROOT / "logs")
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"session-{time.strftime('%Y%m%d-%H%M%S')}.md"
+        path.write_text(self.report_text(), encoding="utf-8")
+        return path
+
     def _log_round(self, rnd: Round) -> None:
         labels = ", ".join(f"{c.target_id}={c.label}" for c in rnd.choices)
         self.log(f"round {rnd.id} {rnd.kind.value}: {labels}")
@@ -373,6 +470,11 @@ class App:
     def _log_outcome(self, e: Optional[SelectionEvent], o: Outcome) -> None:
         ev = f"{e.source} {e.eventId} {e.roundId}->{e.targetId}" if e else "malformed"
         self.log(f"{o.value}: {ev}")
+
+
+def _looks_like_samples(line: str) -> bool:
+    """A run of 20+ numbers in one line looks like signal data, which never goes in a report."""
+    return len(re.findall(r"-?\d+\.\d+", line)) >= 20
 
 
 def _timeout_seconds(text: str) -> float:
@@ -397,6 +499,8 @@ def main(argv=None) -> int:
     p.add_argument("--confirm-timeout", type=_timeout_seconds, default=CONFIRM_TIMEOUT_MS / 1000,
                    help="seconds before an unanswered Confirm round cancels (0 = never)")
     p.add_argument("--fullscreen", action="store_true", help="start fullscreen (F11 toggles, F1 shows keys)")
+    p.add_argument("--no-report", action="store_true",
+                   help="don't write logs/session-<time>.md on exit (#131)")
     p.add_argument("--p300", action="store_true",
                    help="with --input simulated: run the live path (#103) on the Generator")
     p.add_argument("--arm-live-confirm", action="store_true",
@@ -437,6 +541,8 @@ def main(argv=None) -> int:
               file=sys.stderr)
         return 3
     qapp.aboutToQuit.connect(app.close)
+    if not args.no_report:
+        qapp.aboutToQuit.connect(lambda: print(f"session report: {app.write_report()}", flush=True))
     if hasattr(app.sim, "calibrate"):          # #103: open the stream and calibrate first
         app.root.showFullScreen() if args.fullscreen else app.root.show()
         try:

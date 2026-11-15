@@ -39,6 +39,7 @@ class MutedSpeaker:
     def __init__(self, log: Log):
         self.log = log
         self.said: List[str] = []
+        self.on_started: Optional[Callable[[], None]] = None   # never fires: nothing is audible
 
     def say(self, text: str, clip: Optional[str] = None) -> None:
         self.said.append(text)
@@ -53,6 +54,9 @@ class OfflineSpeaker(QObject):
         self.audio_dir = audio_dir
         self._sound = None
         self._pyttsx3 = None
+        # Called once when audio actually starts for the latest say() (#130 timing).
+        self.on_started: Optional[Callable[[], None]] = None
+        self._awaiting_start = False
         self.tts = self._make_qt_tts() if use_qt_tts else None
         self.backend = ("Qt TextToSpeech (" + self.tts.engine() + ")") if self.tts else self._pyttsx3_name()
 
@@ -68,7 +72,14 @@ class OfflineSpeaker(QObject):
         if tts.state() == QTextToSpeech.State.Error:
             return None
         tts.stateChanged.connect(lambda s: self.log(f"speech engine: {s.name}"))
+        tts.stateChanged.connect(lambda s: self._started() if s.name == "Speaking" else None)
         return tts
+
+    def _started(self) -> None:
+        if self._awaiting_start:
+            self._awaiting_start = False
+            if self.on_started is not None:
+                self.on_started()
 
     def _pyttsx3_name(self) -> str:
         try:
@@ -78,10 +89,21 @@ class OfflineSpeaker(QObject):
         return "pyttsx3"
 
     def say(self, text: str, clip: Optional[str] = None) -> None:
+        self._awaiting_start = True
         wav = bundled_clip(clip, self.audio_dir)
         if wav is not None:
             from PySide6.QtMultimedia import QSoundEffect
             self._sound = QSoundEffect(self)
+            sound = self._sound
+            if hasattr(sound, "playingChanged"):
+                def on_playing(sound=sound) -> None:
+                    try:
+                        playing = sound.isPlaying()
+                    except RuntimeError:          # Qt already deleted it (app quitting)
+                        return
+                    if playing:
+                        self._started()
+                sound.playingChanged.connect(on_playing)
             self._sound.setSource(QUrl.fromLocalFile(str(wav)))
             self._sound.play()
             self.log(f"speech: bundled {wav.relative_to(ROOT) if wav.is_relative_to(ROOT) else wav}")
@@ -101,4 +123,5 @@ class OfflineSpeaker(QObject):
         if self._pyttsx3 is None:
             self._pyttsx3 = pyttsx3.init()
         self._pyttsx3.say(text)
+        self._started()
         self._pyttsx3.runAndWait()

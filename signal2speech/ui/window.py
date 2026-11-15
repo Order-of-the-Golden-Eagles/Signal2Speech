@@ -289,6 +289,12 @@ class SelectionWindow(QMainWindow):
     # ── Helpers ──────────────────────────────────────────────
     PREVIEW_MAX_PX = 44
 
+    def add_outcome_note(self, note: str) -> None:
+        """Append e.g. "map 3 ms · speech 180 ms" to the last outcome in the strip (#130)."""
+        base = self.outcome_label.text().split("  ⏱ ")[0]
+        self.outcome_label.setText(f"{base}  ⏱ {note}")
+        self.outcome_label.setToolTip(self.outcome_label.text())
+
     def set_countdown(self, seconds) -> None:
         """Show "Cancels in N s" under the preview, or hide it with None."""
         if seconds is None:
