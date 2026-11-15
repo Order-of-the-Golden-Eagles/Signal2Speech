@@ -435,3 +435,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The offline saved phrases now come from `data/phrases.json`, so a user or caregiver can change them without touching code. One pair per line, and each pair is what the two tiles say
 - If the file is missing or has a mistake (a phrase too long, the same phrase twice, broken JSON), the app falls back to the built-in phrases and the transcript says exactly why
 - The file ships with the same six pairs as before, so nothing changes until someone edits it. Tests cover a good file, every kind of bad file, and no file
+
+## 11/14/26 - 9:57 PM - Long Le - #135 Colour-contrast check (PR pending)
+- Every text colour in the app is now checked automatically against the WCAG readability standard, including the tiles, the flash, the preview, the countdown, every input label, and the help overlay
+- One colour failed: the purple "Recorded" input label was slightly too dark (4.4:1, needs 4.5). It's now a lighter purple (6.6:1). Nothing else changed visually
+- All colours now live in one file, `signal2speech/ui/palette.py`, and the test fails if someone adds a raw colour code elsewhere, so new colours get checked too
+- The ratios for every pair are listed in `docs/accessibility-ui/README.md`

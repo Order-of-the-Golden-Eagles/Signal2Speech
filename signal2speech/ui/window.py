@@ -18,22 +18,22 @@ from signal2speech.core import (Choice, InputAdapter, InputSources, Outcome, Rou
 
 from .fit import fit_pixel_size
 from .flash import FlashScheduler
+from . import palette as P
 
 INPUT_LABELS = {InputSources.KEYBOARD: "Keyboard", InputSources.SIMULATED: "Simulated",
                 InputSources.RECORDED: "Recorded", InputSources.LIVE_EEG: "Live EEG"}
-_INPUT_COLORS = {InputSources.KEYBOARD: "#3b82f6", InputSources.SIMULATED: "#f59e0b",
-                 InputSources.RECORDED: "#a855f7", InputSources.LIVE_EEG: "#22c55e"}
+_INPUT_COLORS = P.INPUT_COLORS
 _TILE_ORDER = (TargetIds.TARGET_1, TargetIds.TARGET_2)
 
-_STYLE = """
-QMainWindow, QWidget#root { background: #0b0d10; }
-QLabel { color: #f5f7fa; }
-QLabel#prompt { font-size: 32px; font-weight: 600; color: #cbd5e1; }
-QLabel#preview { font-size: 44px; font-weight: 700; color: #ffe066; padding: 16px; }
-QLabel#hint { font-size: 24px; color: #cbd5e1; }
-QLabel#countdown { font-size: 22px; color: #94a3b8; }
-QFrame#strip { background: #151a21; border-top: 2px solid #2a3340; }
-QLabel.strip { font-size: 20px; font-family: Menlo, Consolas, monospace; color: #e2e8f0; }
+_STYLE = f"""
+QMainWindow, QWidget#root {{ background: {P.BG}; }}
+QLabel {{ color: {P.TEXT}; }}
+QLabel#prompt {{ font-size: 32px; font-weight: 600; color: {P.MUTED}; }}
+QLabel#preview {{ font-size: 44px; font-weight: 700; color: {P.ACCENT}; padding: 16px; }}
+QLabel#hint {{ font-size: 24px; color: {P.MUTED}; }}
+QLabel#countdown {{ font-size: 22px; color: {P.QUIET}; }}
+QFrame#strip {{ background: {P.STRIP_BG}; border-top: 2px solid {P.STRIP_BORDER}; }}
+QLabel.strip {{ font-size: 20px; font-family: Menlo, Consolas, monospace; color: {P.STRIP_TEXT}; }}
 """
 
 
@@ -89,11 +89,11 @@ class Tile(QLabel):
 
     def _apply(self) -> None:
         if not self._label:
-            bg, fg, border = "#11151a", "#11151a", "#1f2630"
+            bg, fg, border = P.TILE_EMPTY_BG, P.TILE_EMPTY_BG, P.TILE_EMPTY_BORDER
         elif self.lit:
-            bg, fg, border = "#ffffff", "#000000", "#ffffff"
+            bg, fg, border = P.TILE_LIT_BG, P.TILE_LIT_TEXT, P.TILE_LIT_BG
         else:
-            bg, fg, border = "#1e2630", "#ffffff", "#475569"
+            bg, fg, border = P.TILE_BG, P.TILE_TEXT, P.TILE_BORDER
         self.setStyleSheet(f"background:{bg}; color:{fg}; border:4px solid {border};"
                            f"border-radius:18px; font-size:{self.font_px}px; font-weight:700;"
                            "padding:24px;")
@@ -203,7 +203,7 @@ class SelectionWindow(QMainWindow):
         """Label the decoder actually feeding the handler, so Simulated never reads as Live."""
         self.input_source = source
         self.input_label.setText(f"Input: {INPUT_LABELS.get(source, source)}")
-        self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(source, '#e2e8f0')};"
+        self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(source, P.STRIP_TEXT)};"
                                        "font-weight:700;")
 
     def set_connection(self, state: str) -> None:
