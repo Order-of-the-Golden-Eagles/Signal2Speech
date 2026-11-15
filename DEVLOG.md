@@ -441,6 +441,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `python -m signal2speech.evidence.dataset path/to/p300-speller` prints the numbers: a 7–11 µV target vs non-target difference in all five people, and our chooser's method classifies single flashes at 0.59–0.85 balanced accuracy (chance is 0.50)
 - The dataset stays out of git. The docs say where to download it; cite g.tec and don't redistribute it
 - Verified: the window on the judging laptop with subject S4, and tests that build a small fake file in the same format and check the flashes line up to the sample. Still not a result for our wearer or our two-tile layout
+
 ## 11/14/26 - 9:47 PM - Long Le - #134 Saved phrases you can edit ([PR #148](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/148))
 - The offline saved phrases now come from `data/phrases.json`, so a user or caregiver can change them without touching code. One pair per line, and each pair is what the two tiles say
 - If the file is missing or has a mistake (a phrase too long, the same phrase twice, broken JSON), the app falls back to the built-in phrases and the transcript says exactly why
