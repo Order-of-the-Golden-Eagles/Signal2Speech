@@ -99,7 +99,7 @@ def test_text_size_steps_between_80_and_160_percent_and_resets(qapp):
     seen = [app.step_text(1) for _ in range(10)]
     assert seen[-1] == 1.6 and sorted(set(seen)) == [s for s in T.SCALE_STEPS if s > 1.0]
     assert app.toast.text() == "Text size 160%" and app.toast.isVisibleTo(app.root)
-    assert f"font-size: {T.px(T.HEADING)}px" in app.window.styleSheet() and T.px(T.HEADING) == 45
+    assert f"font-size: {T.px(T.HEADING)}px" in app.window.styleSheet() and T.px(T.HEADING) == round(T.HEADING * 1.6)
     assert f"font-size: {T.px(T.BODY - 2)}px" in app.conversation.styleSheet()
     assert f"font-size:{T.px(T.TITLE - 2)}px" in app.help.text()
     assert [app.step_text(-1) for _ in range(10)][-1] == 0.8

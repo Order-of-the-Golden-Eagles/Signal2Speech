@@ -318,16 +318,20 @@ class RecordedResponses:
     ``target`` are responses to the stimulus the recorded person was attending, ``nontarget`` to
     the others. Both are (trials, samples, channels) in microvolts, starting at the flash. Each is
     used once, in a shuffled order; ``reused`` counts how many had to be played a second time.
+    The order is different on every launch unless a ``seed`` is given, so each run is a fresh
+    draw of real responses and can come out differently, including wrong.
     """
 
     def __init__(self, target: np.ndarray, nontarget: np.ndarray, name: str = "recording",
-                 seed: int = 0):
+                 seed: Optional[int] = None):
         target, nontarget = np.asarray(target, float), np.asarray(nontarget, float)
         if target.ndim != 3 or nontarget.ndim != 3 or not len(target) or not len(nontarget):
             raise ValueError("need (trials, samples, channels) target and non-target responses")
         if target.shape[2] != EEG_CHANNELS or nontarget.shape[2] != EEG_CHANNELS:
             raise ValueError(f"responses need {EEG_CHANNELS} channels")
         self.name = name
+        #: A short form for the status strip, which has little room.
+        self.short_name = name.replace("P300 Speller dataset, ", "dataset ")
         self.pools = {True: target, False: nontarget}
         self._rng = random.Random(seed)
         self._order = {True: [], False: []}
@@ -336,7 +340,7 @@ class RecordedResponses:
         self._lock = threading.Lock()
 
     @classmethod
-    def from_gtec(cls, path, seed: int = 0) -> "RecordedResponses":
+    def from_gtec(cls, path, seed: Optional[int] = None) -> "RecordedResponses":
         """From one subject file of g.tec's P300 Speller dataset (``S4.mat``), band-passed
         1-30 Hz and baseline-corrected the way the evidence report does it."""
         from signal2speech.evidence import dataset

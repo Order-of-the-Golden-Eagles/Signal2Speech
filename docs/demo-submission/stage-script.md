@@ -18,6 +18,8 @@ python -m signal2speech.app --input recorded --sim 2,1,1,1,2,1,1,1 --fullscreen
 
 - `--sim` is the script: pick tile 2 and confirm, pick tile 1 and confirm, and so on. Eight numbers give four exchanges, about 15 seconds each.
 - Wait for `Calibration done: P300 ready · eye-closure confirm ready`, then the first question appears.
+- **It opens with the two cards alone,** which then settle on the left while the map panel fades in. `--no-intro` skips that.
+- **It runs as a walkthrough.** The card the wearer would be looking at is outlined and marked "The wearer looks here", and three guidance lines are spoken during setup, starting with "This is a walkthrough on recorded brain data. Nobody is wearing a headset." Decide before the judge arrives whether you want them: `--no-gaze-mark` and `--no-narration` turn them off. With the mark on, say out loud that it shows the scripted attention, not the classifier's answer.
 - **Don't touch keys 1 or 2 while the tiles flash.** A key press picks at once and beats the recorded data to it.
 - After the script runs out, keys take over (1 or 2 to choose, hold 1 to confirm, hold 2 to cancel). Restart the app for the next judge.
 - One launch has enough recorded responses for 20 choices before any is replayed. Restarting resets that.

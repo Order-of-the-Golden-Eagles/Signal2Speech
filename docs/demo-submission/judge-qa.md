@@ -70,6 +70,9 @@ The live path is the same code: `RecordedEegInput` is `LiveEegInput` with a diff
 **Did you try any real hardware?**
 Yes. We borrowed a PiEEG Octopus 16 and tested it on two people overnight. It connected and recorded well, but with clean contact it showed no eyes-closed alpha and no response to a flickering square. Our best explanation is that its reference pin sits within 2 cm of its signal pins, which cancels a brain rhythm before it's measured. We kept ten recordings and wrote up the numbers in `docs/eeg-hardware/README.md`. We'd rather show you that than a shaky live trick.
 
+**Why do the pictures start on June 24 when the air-quality numbers start on June 26?**
+They cover different things, and the screen says so. The images run from June 24 because that is the last day the ground was visible: June 25, 26 and 27 were overcast on every NASA satellite we checked. The EPA air-quality numbers we hold are for June 26 and June 28, so the table and the spoken line compare those two days.
+
 **Why didn't you use a blink or a jaw clench as the switch?**
 Because those are eye and muscle signals, not EEG, and we didn't want to call them brain control. We did measure them at the back of the head: both were too faint to use as a switch there.
 

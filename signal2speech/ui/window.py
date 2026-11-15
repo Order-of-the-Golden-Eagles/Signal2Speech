@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Callable, Dict, Optional
 
-from PySide6.QtCore import QEvent, QObject, QRectF, Qt
+from PySide6.QtCore import QEvent, QObject, QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QKeySequence, QPainter, QPainterPath, QPen, QShortcut
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
                                QPlainTextEdit, QSizePolicy, QTextEdit, QVBoxLayout, QWidget)
@@ -19,7 +19,8 @@ from signal2speech.core import (ActionIds, Choice, InputAdapter, InputSources, O
 from .confirm_ring import HOLD_S, ConfirmRing
 from .fit import fit_pixel_size
 from .flash import FlashScheduler
-from .icons import draw_icon
+from .fade import fade_in
+from .icons import draw_emoji, draw_icon
 from . import theme as P
 
 INPUT_LABELS = {InputSources.KEYBOARD: "Keyboard", InputSources.SIMULATED: "Simulated",
@@ -76,7 +77,8 @@ class Tile(QLabel):
     INSET = P.BORDER_W + P.L          # border + padding, each side
     TOP = 64                          # icon and key badge row
 
-    MAX_PX = P.DISPLAY                # tile titles at full size, before the text scale (#195)
+    MAX_PX = P.TILE_TITLE             # tile titles at full size, before the text scale (#195)
+    HEIGHT = 250                      # a tile is a target to look at, not a poster
 
     @property
     def BOTTOM(self) -> int:          # one-line description row
@@ -95,7 +97,12 @@ class Tile(QLabel):
         self.note: Optional[str] = None   # replaces the description (practice round, #196)
         self.highlight = False            # accent outline: "look here" (practice round, #196)
         self.font_px = self.MAX_PX
-        self.setMinimumSize(300, 210)   # fits two tiles plus the map at 1280x720 (#94, #195)
+        self.setMinimumSize(240, 190)   # fits two tiles plus the map at 1280x720 (#94, #195)
+        self.setMaximumHeight(self.HEIGHT)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+    def sizeHint(self) -> QSize:      # the height it takes when there's room; it never grows past it
+        return QSize(300, self.HEIGHT)
 
     @property
     def label(self) -> str:
@@ -154,6 +161,9 @@ class Tile(QLabel):
             "selected": (P.TILE_SELECTED_BG, P.TILE_SELECTED_TEXT, P.TILE_SELECTED_BORDER, P.TILE_SELECTED_TEXT),
             "idle": (P.TILE_BG, P.TILE_TEXT, P.TILE_BORDER, P.MUTED),
         }[state]
+        tint = P.ACTION_TINT.get(self.action_id) if state == "idle" else None
+        if tint:
+            border = tint
         if self.highlight and state == "idle":
             border = P.ACCENT
         p = QPainter(self)
@@ -163,6 +173,10 @@ class Tile(QLabel):
         path = QPainterPath()
         path.addRoundedRect(body, P.RADIUS_L, P.RADIUS_L)
         p.fillPath(path, QColor(bg))
+        if tint:                                   # a faint wash of the tile's own colour
+            wash = QColor(tint)
+            wash.setAlphaF(P.TINT_BG_ALPHA)
+            p.fillPath(path, wash)
         p.setPen(QPen(QColor(border), P.BORDER_W))
         p.drawPath(path)
         inner = QRectF(self.rect()).adjusted(self.INSET, self.INSET, -self.INSET, -self.INSET)
@@ -177,15 +191,18 @@ class Tile(QLabel):
             return
         # Top row: icon on the left, key badge on the right.
         if self.icon:
-            draw_icon(p, "check" if state == "selected" else self.icon,
-                      QRectF(inner.left(), inner.top(), 48, 48), fg)
+            box = QRectF(inner.left(), inner.top(), 48, 48)
+            if state == "lit":      # the flash stays plain black on white, exactly as before
+                draw_icon(p, self.icon, box, fg)
+            else:
+                draw_emoji(p, "check" if state == "selected" else self.icon, box)
         badge = QRectF(inner.right() - 48, inner.top(), 48, 48)
         if state == "lit":     # keep the flash plain white: outline only, no filled block
             p.setPen(QPen(QColor(P.TILE_LIT_TEXT), 3))
             p.setBrush(Qt.BrushStyle.NoBrush)
         else:
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(P.ACCENT))
+            p.setBrush(QColor(tint or P.ACCENT))
         p.drawRoundedRect(badge, P.RADIUS_S, P.RADIUS_S)
         p.setPen(QColor(P.TILE_LIT_TEXT if state == "lit" else P.ON_ACCENT))
         f = QFont(self.font())
@@ -263,7 +280,13 @@ class SelectionWindow(QMainWindow):
         # don't: a wrapping label asks for more height, and that pushed the preview screen over
         # 720 at the largest text size.
         self.prompt = WrapWhenLong("Waiting for a round", objectName="prompt")
-        col.addWidget(self.prompt)
+        # Three bands. The tiles sit in the middle one and never move: the prompt and the preview
+        # live above them, the countdown and the hint below, and the two outer bands share the
+        # spare height equally, which keeps the tiles centred.
+        top = QVBoxLayout()
+        top.setSpacing(P.M)
+        col.addLayout(top, 1)
+        top.addWidget(self.prompt)
         # #175: the consent screen. What will happen, the exact words, and the confirm ring.
         self.preview_box = QWidget()
         pcol = QVBoxLayout(self.preview_box)
@@ -286,12 +309,12 @@ class SelectionWindow(QMainWindow):
         prow.addWidget(self.ring, 0, Qt.AlignmentFlag.AlignVCenter)
         pcol.addLayout(prow)
         self.preview_box.setVisible(False)
-        col.addWidget(self.preview_box)
+        top.addWidget(self.preview_box)
+        top.addStretch(1)
         # Seconds left before an unanswered Confirm round cancels (#26, #96). App drives it.
         self.countdown = QLabel("", objectName="countdown")
         self.countdown.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.countdown.setVisible(False)
-        col.addWidget(self.countdown)
 
         row = QHBoxLayout()
         row.setSpacing(P.XL)
@@ -300,38 +323,48 @@ class SelectionWindow(QMainWindow):
             tile = Tile(target, key)
             self.tiles[target] = tile
             row.addWidget(tile, 1)
-        col.addLayout(row, 1)
+        col.addLayout(row, 0)
 
         self.hint = QLabel("", objectName="hint")
         self.hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.hint.setWordWrap(True)       # large text (#195) must wrap, not widen the window
-        col.addWidget(self.hint)
+        bottom = QVBoxLayout()
+        bottom.setSpacing(P.M)
+        bottom.addWidget(self.countdown)
+        bottom.addWidget(self.hint)
+        bottom.addStretch(1)
+        col.addLayout(bottom, 1)
+        for held in (*self.tiles.values(), self.hint, self.countdown):   # hidden, but keep their place
+            policy = held.sizePolicy()
+            policy.setRetainSizeWhenHidden(True)
+            held.setSizePolicy(policy)
 
         strip = QFrame(objectName="strip")
-        srow = QHBoxLayout(strip)
-        srow.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
-        srow.setSpacing(P.L)
-        # Two inputs, a device name and a status make a long line (PiEEG, #172). Then it wraps,
-        # so the window never has to grow past the screen to fit it.
-        self.input_label = WrapWhenLong(limit=60)
+        srow = QVBoxLayout(strip)
+        srow.setContentsMargins(P.L, P.S, P.L, P.M)
+        srow.setSpacing(P.S)
+        self._strip_rows = (QHBoxLayout(), QHBoxLayout())
+        for r in self._strip_rows:
+            r.setSpacing(P.M)
+            srow.addLayout(r)
+        self._strip_long: Optional[bool] = None
+        # Two inputs, a device name and a status make a long line (recorded input #104, PiEEG
+        # #172). A long input label gets a line of its own across the strip (see _layout_strip);
+        # it still wraps as a last resort, so the window never grows past the screen to fit it.
+        self.input_label = WrapWhenLong(limit=110)
         self.input_label.setProperty("class", "strip")
         self.connection_label = self._strip_label()
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()
-        srow.addWidget(self.input_label)
-        # At large text sizes (#195) the round id may clip; the input label never does.
-        self.round_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.round_label.setMinimumWidth(1)
-        srow.addWidget(self.round_label, 1)
-        # The last outcome can be long; let it clip instead of forcing the window wide.
-        # The transcript and the tooltip keep the full text.
-        self.outcome_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        # The connection text can be long ("scripted, no g.Pype (...)"); let it clip too.
-        # The input label never clips: it's what keeps simulated input from looking live.
-        self.connection_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        srow.addWidget(self.connection_label, 1)
-        srow.addWidget(self.outcome_label, 1)
+        # Pills hug their text. If the row runs out of room they shrink and clip (the tooltip
+        # and the developer log keep the full text); the input pill never does.
+        for pill in (self.round_label, self.connection_label, self.outcome_label):
+            pill.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+            pill.setMinimumWidth(1)
+        self.input_label.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+        self._layout_strip(False)
         col.addWidget(strip)
+        self.strip = strip                 # App moves it to span the whole window
         self.setCentralWidget(root)
 
         self.set_input_source(input_source)
@@ -367,9 +400,33 @@ class SelectionWindow(QMainWindow):
         lbl.setProperty("class", "strip")
         return lbl
 
+    #: An input label longer than this gets its own line in the strip.
+    STRIP_LONG_LABEL = 40
+
+    def _layout_strip(self, long_label: bool) -> None:
+        """One row of pills when the input label is short. When it is long, it takes the first
+        row to itself and the round, connection and last outcome go on the second."""
+        if long_label == self._strip_long:
+            return
+        self._strip_long = long_label
+        first, second = self._strip_rows
+        for row in (first, second):
+            while row.count():
+                row.takeAt(0)
+        first.addWidget(self.input_label)
+        rest = second if long_label else first
+        for pill in (self.round_label, self.connection_label, self.outcome_label):
+            rest.addWidget(pill)
+        first.addStretch(1)
+        second.addStretch(1)
+
+    def _stretch_strip(self) -> None:
+        """Kept for callers: the pills size themselves now."""
+
     def set_input_source(self, source: str) -> None:
         """Label the decoder actually feeding the handler, so Simulated never reads as Live."""
         self.input_source = source
+        self._layout_strip(False)
         self.input_label.setText(f"Input: {INPUT_LABELS.get(source, source)}")
         self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(source, P.STRIP_TEXT)};"
                                        "font-weight:700;")
@@ -377,6 +434,7 @@ class SelectionWindow(QMainWindow):
     def set_input_text(self, text: str, color_source: str) -> None:
         """Name two inputs at once, e.g. 'Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)'
         (#172). ``input_source`` stays the chooser's; the colour is the confirm's when it's on."""
+        self._layout_strip(len(text) > self.STRIP_LONG_LABEL)
         self.input_label.setText(text)
         self.input_label.setToolTip(text)
         self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(color_source, P.STRIP_TEXT)};"
@@ -387,6 +445,7 @@ class SelectionWindow(QMainWindow):
         self.connection_label.setToolTip(self.connection_label.text())
         # Keyboard has no connection to report; hide "n/a" so small screens keep room (#94).
         self.connection_label.setVisible(state != "n/a")
+        self._stretch_strip()
 
     def _set_round_text(self, rnd: Optional[Round]) -> None:
         self.round_label.setText(f"Round: {rnd.id} ({rnd.kind.value})" if rnd else "Round: —")
@@ -465,7 +524,10 @@ class SelectionWindow(QMainWindow):
             self.preview.setText(f"“{self._preview_text()}”")
             self.ring.reset()
             self.ring.label = "Hold 1\nor close eyes" if self.eyes_can_confirm() else "Hold 1"
+            was_hidden = self.preview_box.isHidden()
             self.preview_box.setVisible(True)
+            if was_hidden:
+                fade_in(self.preview_box, P.BG)       # the words arrive, they don't pop
             self._fit_preview()
             self.hint.setText(self.confirm_hint())
         else:
@@ -516,7 +578,10 @@ class SelectionWindow(QMainWindow):
                                             else "✓ Spoken")
                 self.preview.setText(f"“{spoken.spoken_text or spoken.label}”")
                 self.ring.mark_confirmed(filled_by)
+                was_hidden = self.preview_box.isHidden()
                 self.preview_box.setVisible(True)
+                if was_hidden:
+                    fade_in(self.preview_box, P.BG)       # the words arrive, they don't pop
             self.prompt.setText("Confirmed · sent to output")
             chosen = last.find(e.targetId) if (last is not None and e is not None) else None
             tile = self.tiles.get(e.targetId) if e is not None else None
@@ -526,6 +591,7 @@ class SelectionWindow(QMainWindow):
 
     # ── Helpers ──────────────────────────────────────────────
     PREVIEW_MAX_PX = P.PREVIEW        # before the text scale (#195)
+    PREVIEW_MIN_PX = P.PREVIEW_MIN
 
     def apply_text_scale(self) -> None:
         """Re-style after theme.set_scale (#195). Tiles and preview refit; flashing is untouched."""
@@ -560,10 +626,10 @@ class SelectionWindow(QMainWindow):
             return
         font = QFont(self.preview.font())
         font.setBold(True)
-        width = max(self.width() - 2 * P.XL - 2 * P.M - 6 - 150 - P.L, 1)   # margins, accent bar, ring
+        width = max(self.width() - 2 * P.XL - 2 * P.M - 6 - self.ring.width() - P.L, 1)   # margins, accent bar, ring
         height = max(int(self.height() * 0.28), 80)
         self.preview_px = fit_pixel_size(self.preview.text(), font, width, height,
-                                         P.px(self.PREVIEW_MAX_PX), P.TILE_TITLE_MIN)
+                                         P.px(self.PREVIEW_MAX_PX), self.PREVIEW_MIN_PX)
         self.preview.setStyleSheet(f"font-size: {self.preview_px}px;")
         # Reserve the fitted text's height, so the layout squeezes the tiles, never the words.
         font.setPixelSize(self.preview_px)

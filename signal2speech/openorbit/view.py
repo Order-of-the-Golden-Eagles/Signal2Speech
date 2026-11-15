@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (QGridLayout, QHBoxLayout, QLabel, QSizePolicy, QStackedLayout,
                                QVBoxLayout, QWidget)
 
@@ -46,6 +46,11 @@ AQI_COLORS = {
 }
 
 BLANK_HINT = "The map appears after a confirmed choice."
+#: Under the flowing image on the comparison screen: what the numbers do and don't cover.
+COMPARE_SCOPE_NOTE = ("Air quality below compares June 26 with June 28, the two days we hold EPA data for. "
+                      "The images start on June 24, the last day the ground was visible.")
+#: How faint the idle picture is. Low enough that nobody takes it for the revealed map.
+IDLE_OPACITY = 0.30
 # Text sizes in px. They keep the view inside the app's output panel (#4) next to the selection
 # tiles on a 1536x864 screen (1920x1080 at 125%). The images take the remaining space.
 TITLE_PX, BODY_PX, SMALL_PX = 26, 17, 13
@@ -103,6 +108,27 @@ def _clamp(box: QRectF, bounds: QRectF) -> QRectF:
     return QRectF(x, y, box.width(), box.height())
 
 
+#: Images sit in a rounded frame with a thin border, like the app's other panels.
+IMAGE_RADIUS = 14
+IMAGE_BORDER = "#3b4656"
+
+
+def _round_clip(painter: QPainter, rect: QRectF) -> QPainterPath:
+    """Clip drawing to a rounded rectangle and return its outline, for the border afterwards."""
+    path = QPainterPath()
+    path.addRoundedRect(rect, IMAGE_RADIUS, IMAGE_RADIUS)
+    painter.setClipPath(path)
+    return path
+
+
+def _round_border(painter: QPainter, path: QPainterPath) -> None:
+    painter.setClipping(False)
+    painter.setBrush(Qt.NoBrush)
+    painter.setPen(QPen(QColor(IMAGE_BORDER), 2))
+    painter.drawPath(path)
+
+
+
 class MapImage(QWidget):
     """One satellite image, scaled to fit with its aspect ratio kept, with a date caption and
     labelled place markers drawn on top."""
@@ -115,6 +141,9 @@ class MapImage(QWidget):
         self.caption = caption
         self.caption_short = caption_short    # used when the full caption won't fit the image
         self._pixmap = QPixmap(str(dataset.images[date]))
+        self.opacity = 1.0                    # below 1 draws the whole map faintly (idle panel, #182)
+        self._under: Optional[QPixmap] = None  # the previous day, while the next one fades in over it
+        self._blend = 1.0
         self.setMinimumSize(200, 111)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
@@ -213,6 +242,7 @@ class MapImage(QWidget):
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
+        painter.setOpacity(self.opacity)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
         r = self.image_rect()
@@ -221,7 +251,12 @@ class MapImage(QWidget):
             painter.drawText(r, Qt.AlignCenter, f"Image missing: {self.date}")
             painter.end()
             return
+        frame = _round_clip(painter, r)
+        if self._under is not None and self._blend < 1.0:      # cross-fade between two days
+            painter.drawPixmap(r, self._under, QRectF(self._under.rect()))
+            painter.setOpacity(self.opacity * self._blend)
         painter.drawPixmap(r, self._pixmap, QRectF(self._pixmap.rect()))
+        painter.setOpacity(self.opacity)
 
         caption = self.caption_layout()
         if caption:
@@ -239,7 +274,35 @@ class MapImage(QWidget):
         painter.setFont(font)
         for _, _, box, text in labels:
             self._draw_box_text(painter, box, text)
+        _round_border(painter, frame)
         painter.end()
+
+    def show_day(self, date: str, caption: str, fade_ms: int = 0) -> None:
+        """Switch to another day's image (same bounds), fading it in over the current one."""
+        new = QPixmap(str(self._ds.images[date]))
+        self._under = self._pixmap if fade_ms > 0 and not self._pixmap.isNull() else None
+        self._pixmap, self.date, self.caption, self.caption_short = new, date, caption, caption
+        if self._under is None:
+            self._blend = 1.0
+            self.update()
+            return
+        from PySide6.QtCore import QVariantAnimation
+        anim = getattr(self, "_fade", None)
+        if anim is None:
+            anim = self._fade = QVariantAnimation(self)
+            anim.valueChanged.connect(self._set_blend)
+        anim.stop()
+        anim.setDuration(fade_ms)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        self._blend = 0.0
+        anim.start()
+
+    def _set_blend(self, value) -> None:
+        self._blend = float(value)
+        if self._blend >= 1.0:
+            self._under = None
+        self.update()
 
     @staticmethod
     def _draw_box_text(painter: QPainter, box: QRectF, text: str) -> None:
@@ -257,6 +320,8 @@ class FiresMap(QWidget):
     def __init__(self, fires: Fires, home: Tuple[float, float], parent: Optional[QWidget] = None):
         super().__init__(parent)
         self._fires = fires
+        #: Show only detections up to this date (the day-by-day sequence). None shows them all.
+        self.until: Optional[str] = None
         self._home = home
         self._pixmap = QPixmap(str(fires.image))
         self._colors = {date: QColor(FIRE_COLORS[min(i, len(FIRE_COLORS) - 1)])
@@ -290,10 +355,13 @@ class FiresMap(QWidget):
             painter.drawText(r, Qt.AlignCenter, "Fire map image missing")
             painter.end()
             return
+        frame = _round_clip(painter, r)
         painter.drawPixmap(r, self._pixmap, QRectF(self._pixmap.rect()))
         dot = max(1.2, r.width() / 450)
         painter.setPen(Qt.NoPen)
         for date, point in self.dot_points():
+            if self.until is not None and date > self.until:   # not detected yet on this day
+                continue
             painter.setBrush(self._colors.get(date, QColor(FIRE_COLORS[0])))
             painter.drawEllipse(point, dot, dot)
 
@@ -316,6 +384,7 @@ class FiresMap(QWidget):
         painter.drawRoundedRect(box, 4, 4)
         painter.setPen(QColor(TEXT))
         painter.drawText(box, Qt.AlignCenter, text)
+        _round_border(painter, frame)
         painter.end()
 
 
@@ -369,21 +438,78 @@ class OpenOrbitView(QWidget):
         run()
         return True
 
+    # ── Day by day: the satellite view plays the days leading up to the smoke ──
+    LAPSE_STEP_MS = 1300      # a new day starts this often
+    LAPSE_FADE_MS = 900       # and takes this long to flow in over the last one
+
+    def _lapse_caption(self, date: str, note: str) -> str:
+        return _long_date(date) + (f" · {note}" if note else "")
+
+    def _start_timelapse(self) -> None:
+        """Play the days in order and stop on the last one (June 28, the smoke). One day at a time
+        is all a daily satellite pass gives; the cloudy days are shown as they were."""
+        frames = self.dataset.timelapse if self.dataset is not None else ()
+        image = getattr(self, "cmp_image" if self._mode == "compare" else "sat_image", None)
+        if image is None or len(frames) < 2:
+            return
+        self._lapse_image = image
+        from PySide6.QtCore import QTimer
+        from signal2speech.ui import fade
+        timer = getattr(self, "_lapse_timer", None)
+        if timer is None:
+            timer = self._lapse_timer = QTimer(self)
+            timer.timeout.connect(self._lapse_next)
+        timer.stop()
+        if not fade.ENABLED:                              # tests, --screenshot: straight to the result
+            date, note = frames[-1]
+            image.show_day(date, self._lapse_caption(date, note))
+            self.lapse_index = len(frames) - 1
+            self._fires_until(None)
+            return
+        self.lapse_index = 0
+        date, note = frames[0]
+        image.show_day(date, self._lapse_caption(date, note))
+        self._fires_until(date)
+        timer.start(self.LAPSE_STEP_MS)
+
+    def _fires_until(self, date: Optional[str]) -> None:
+        """The fire map beside the images shows only what had been detected by that day."""
+        fires_map = getattr(self, "fires_map", None)
+        if fires_map is not None and self._mode == "satellite":
+            fires_map.until = date
+            fires_map.update()
+
+    def _lapse_next(self) -> None:
+        frames = self.dataset.timelapse
+        self.lapse_index += 1
+        date, note = frames[self.lapse_index]
+        self._lapse_image.show_day(date, self._lapse_caption(date, note), self.LAPSE_FADE_MS)
+        last = self.lapse_index >= len(frames) - 1
+        self._fires_until(None if last else date)
+        if last:
+            self._lapse_timer.stop()
+
     def show_satellite(self) -> None:
-        """June 28 NASA MODIS view with the EMU and Detroit markers."""
+        """The days from June 24 to June 28, ending on the smoke, with the EMU and Detroit markers."""
         self._show("satellite")
+        self._start_timelapse()
 
     def compare_air_quality(self) -> None:
-        """June 26 and June 28 imagery plus the county AQI comparison."""
+        """The days from June 24 to June 28 flowing in one image, plus the county AQI comparison."""
         self._show("compare")
+        self._start_timelapse()
 
     def reset(self) -> None:
         """Blank panel for cancel, disconnect, or the next question."""
         self._show("blank")
 
     def _show(self, mode: str) -> None:
+        changed = mode != self._mode
         self._mode = mode
         self._stack.setCurrentWidget(self._pages[mode])
+        if changed:
+            from signal2speech.ui.fade import fade_in
+            fade_in(self, BACKGROUND, 320)             # the reveal fades in (#182)
 
     @staticmethod
     def _page() -> Tuple[QWidget, QVBoxLayout]:
@@ -394,10 +520,25 @@ class OpenOrbitView(QWidget):
         return page, layout
 
     def _build_blank(self) -> QWidget:
+        """Before any confirm: a dimmed look at the region, so the panel isn't an empty box (#182).
+        It is plainly not the reveal: it is faint, has no data on it, and says what it's waiting for."""
         page, layout = self._page()
-        layout.addStretch(1)
-        layout.addWidget(_label(BLANK_HINT, SMALL_PX + 2, MUTED, align=Qt.AlignCenter))
-        layout.addStretch(1)
+        ds = self.dataset
+        if ds is None or self.data_error is not None:
+            layout.addStretch(1)
+            layout.addWidget(_label(BLANK_HINT, SMALL_PX + 2, MUTED, align=Qt.AlignCenter))
+            layout.addStretch(1)
+            return page
+        layout.addWidget(_label("Wildfire smoke over southeast Michigan", TITLE_PX, MUTED, bold=True))
+        layout.addWidget(_label(f"{_long_date(BEFORE)} and {_long_date(AFTER)}  ·  NASA satellite imagery "
+                                "and EPA air quality", SMALL_PX + 2, MUTED))
+        self.idle_image = MapImage(ds, AFTER)
+        # Drawn faintly by the painter itself. A graphics effect on this custom-painted widget
+        # crashed the test run on macOS (bus error).
+        self.idle_image.opacity = IDLE_OPACITY
+        layout.addWidget(self.idle_image, 1)
+        layout.addWidget(_label(BLANK_HINT, BODY_PX, MUTED, align=Qt.AlignCenter))
+        layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
         return page
 
     def _build_missing(self, error: str) -> QWidget:
@@ -414,9 +555,10 @@ class OpenOrbitView(QWidget):
     def _build_satellite(self) -> QWidget:
         ds = self.dataset
         page, layout = self._page()
-        layout.addWidget(_label("Southeast Michigan under wildfire smoke", TITLE_PX, bold=True))
+        layout.addWidget(_label("Southeast Michigan, June 24 to 28, 2023", TITLE_PX, bold=True))
         if self.fires is None:
-            layout.addWidget(MapImage(ds, AFTER, caption=_long_date(AFTER)), 1)
+            self.sat_image = MapImage(ds, AFTER, caption=_long_date(AFTER))
+            layout.addWidget(self.sat_image, 1)
             layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
             return page
 
@@ -426,10 +568,12 @@ class OpenOrbitView(QWidget):
         grid = QGridLayout()
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(4)
-        grid.addWidget(_label("Smoke over the demo counties", BODY_PX, bold=True), 0, 0)
+        grid.addWidget(_label("Day by day: clear, cloud, then smoke", BODY_PX, bold=True), 0, 0)
         grid.addWidget(_label("Where the smoke came from", BODY_PX, bold=True), 0, 1)
-        grid.addWidget(MapImage(ds, AFTER, caption=_long_date(AFTER)), 1, 0)
-        grid.addWidget(FiresMap(self.fires, home), 1, 1)
+        self.sat_image = MapImage(ds, AFTER, caption=_long_date(AFTER))
+        grid.addWidget(self.sat_image, 1, 0)
+        self.fires_map = FiresMap(self.fires, home)
+        grid.addWidget(self.fires_map, 1, 1)
         swatches = "&nbsp;&nbsp;".join(
             f"<span style='color:{FIRE_COLORS[min(i, len(FIRE_COLORS) - 1)]}'>&#9679;</span> {_long_date(d)}"
             for i, d in enumerate(self.fires.dates))
@@ -450,18 +594,18 @@ class OpenOrbitView(QWidget):
     def _build_compare(self) -> QWidget:
         ds = self.dataset
         page, layout = self._page()
-        layout.addWidget(_label("Wildfire smoke: before and after", TITLE_PX, bold=True))
+        layout.addWidget(_label("Wildfire smoke arrives: June 24 to 28, 2023", TITLE_PX, bold=True))
 
-        images = QHBoxLayout()
-        images.setSpacing(10)
-        for date in (BEFORE, AFTER):
-            # June 26 was overcast for both MODIS satellites: the white is cloud, not clear air (#153).
-            caption = _long_date(date) + (" · mostly cloud" if date == BEFORE else "")
-            images.addWidget(MapImage(ds, date, caption=caption,
-                                      caption_short=_long_date(date)), 1)
-        layout.addLayout(images, 1)
+        # One large image that flows through the days, in place of two stills. June 25 to 27 were
+        # overcast for every NASA satellite we checked: the white is cloud, not clear air (#153),
+        # and each frame's caption says so.
+        self.cmp_image = MapImage(ds, AFTER, caption=_long_date(AFTER))
+        layout.addWidget(self.cmp_image, 1)
         layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
 
+        # The pictures run from June 24; the EPA numbers we hold are for June 26 and June 28
+        # only. Say so on screen, so nobody reads the table as covering all five days.
+        layout.addWidget(_label(COMPARE_SCOPE_NOTE, SMALL_PX + 1, MUTED))
         layout.addWidget(self._aqi_table())
         for line in self._summary_lines():
             layout.addWidget(_label(line, BODY_PX))
