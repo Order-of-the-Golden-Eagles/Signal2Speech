@@ -501,7 +501,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
 - With the AI provider unreachable, saved phrases appear right away, labelled offline. A real Wi-Fi-off run is still part of the judging-laptop session
 
-## 11/15/26 - 12:11 AM - Vasanth Anbukumar - #150 The program detects the EEG device and picks the right channels (PR pending)
+## 11/15/26 - 12:11 AM - Vasanth Anbukumar - #150 The program detects the EEG device and picks the right channels ([PR #186](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/186))
 - One eyes-closed check now works on different amplifiers without anyone setting channel numbers: `python -m signal2speech.eeg.lsl_source --input live --demo`
     - g.tec devices have a fixed electrode layout, so it uses the three back-of-head electrodes (PO7, Oz, PO8)
     - The PiEEG Octopus 16 is a coin-sized puck with 16 pins on one spot. The check drops pins that aren't touching and averages every pin that responds when the wearer closes their eyes
