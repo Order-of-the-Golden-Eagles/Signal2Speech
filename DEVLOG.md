@@ -584,3 +584,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The library run isn't affected either way: on the judging laptop the session uses Windows' own voice, which always spoke every cue
 - If no voice works at all, the cue is still printed and the session carries on
 - Verified on the judging laptop by switching the Windows voice off: three cues in a row spoke for 2.3 s, 2.1 s and 2.2 s. Two new tests. Not tried on a real Mac or Linux machine
+
+## 11/15/26 - 2:27 AM - Vasanth Anbukumar - #204 The app window now fits the judging laptop's screen ([PR #205](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/205))
+- The app used to open at a fixed 1700 × 900 and hang off the right and bottom of the judging laptop's screen. It now opens inside whatever screen it's on
+    - The laptop is 1920 × 1080 at 125 % scaling, which leaves only 1536 × 864 for windows
+    - Screens with more room still get the usual 1700 × 900
+- Found while rehearsing the PiEEG board in the real app (`python -m signal2speech.app --input pieeg --pieeg-self-test --keys 2`): the simulated board's eye closure confirmed and the map changed, but the window didn't fit
+- Verified on the judging laptop's real display: the window with its title bar is 1520 × 846, fully on screen. One new test. `--fullscreen` and F11 are unchanged
