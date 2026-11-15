@@ -8,7 +8,7 @@ Rehearse on the **judging laptop** with the **frozen judging commit**. Write the
 | --- | --- | --- |
 | Keyboard | `python -m signal2speech.app --input keyboard` | `Input: Keyboard` (blue) |
 | Simulated (g.Pype Generator) | `python -m signal2speech.app --input simulated --sim 2,1` | `Input: Simulated` (amber). Ctrl+1 and Ctrl+2 pick for the simulated brain. |
-| Live EEG | `python -m signal2speech.app --input live` | **Blocked on `main` until #23.** Today it prints "Live EEG is blocked" and exits. |
+| Live EEG | `python -m signal2speech.app --input live` | Runs since #124 (#103): it calibrates on the app's tiles (10 P300 sequences, then 10 s eyes open and 10 s eyes closed), then the P300 chooser picks and key 1 confirms. Eye-closure confirm stays off until #23. Rehearse the same path with `--input simulated --p300`. No headset: it exits 3 with the pairing checklist. |
 | Evidence, Simulated | `python -m signal2speech.evidence --source generator` | Banner `INPUT: SIMULATED` |
 | Evidence, Live | `python -m signal2speech.evidence --source hybridblack` | Banner `INPUT: LIVE EEG` |
 | Evidence, Recorded | `python -m signal2speech.evidence --source replay recordings/evidence_<timestamp>` | Banner `INPUT: RECORDED` |
