@@ -643,6 +643,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
 
+## 11/15/26 - 4:10 AM - MagicJester2764 - #165 Soak test for the judging hour ([PR #211](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/211))
+- Anyone can leave the demo running for an hour by itself and get a pass/fail report: no double outputs, no crashes, steady memory, same speed at the end as at the start
+    - `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` writes `logs/soak-<time>.md`
+- It goes through the same crash-safe launcher we'll use at the table, and kills the app once on purpose to prove it comes back
+- First full run (simulated input, dev machine, muted) passed: 169 confirms and 169 spoken lines with 0 doubles, 0 crashes, back within 1.1 s after the kill, selection time 3.1 s at the start and 3.2 s at the end
+- Still needed: the same hour on the judging laptop with Wi-Fi off and sound on (Part D of the judging laptop session). This was not live EEG
 ## 11/15/26 - 4:25 AM - MagicJester2764 - #164 OSCAR shown and measured on g.tec's recorded EEG ([PR #212](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/212))
 - Judges can now see g.tec's OSCAR artifact removal working on real human EEG, before and after side by side, even without our headset
     - `python -m signal2speech.evidence --source dataset path/to/p300-speller/S1.mat`, and the numbers with `python -m signal2speech.evidence.oscar_report path/to/p300-speller --jobs 5`
