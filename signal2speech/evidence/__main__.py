@@ -1,4 +1,4 @@
-"""``python -m signal2speech.evidence --source generator|hybridblack|replay [--p300]``."""
+"""``python -m signal2speech.evidence --source generator|hybridblack|replay|dataset [--p300]``."""
 
 from __future__ import annotations
 
@@ -47,9 +47,16 @@ def parse_args(argv=None) -> argparse.Namespace:
                         help="Save a PNG of the window just before closing")
     args = parser.parse_args(argv)
     kind = args.source[0]
-    if kind not in ("generator", "hybridblack", "replay"):
-        parser.error("--source must be generator, hybridblack or replay")
-    if kind == "replay":
+    if kind not in ("generator", "hybridblack", "replay", "dataset"):
+        parser.error("--source must be generator, hybridblack, replay or dataset")
+    if kind == "dataset":
+        if len(args.source) != 2:
+            parser.error("--source dataset needs a g.tec P300 Speller .mat file or its folder")
+        if args.record is not None:
+            parser.error("cannot record the g.tec dataset")
+        if args.p300:
+            parser.error("--p300 needs a generator or hybridblack source")
+    elif kind == "replay":
         if len(args.source) != 2:
             parser.error("--source replay needs a run directory")
         if args.record is not None:

@@ -404,3 +404,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - When the app closes, it writes a short report to `logs/session-<time>.md`: commit, input, counts of previews, confirms, and cancels, the response times, and a timeline. It never contains EEG or keys. `--no-report` turns it off
 - The report is ready to paste into the rehearsal log, so every practice run leaves evidence behind
 - Found and fixed two bugs while testing: the map time got overwritten in the strip, and closing the app could raise an error from the sound player. Tests use a fake clock. Not yet measured on the judging laptop
+
+## 11/14/26 - 9:36 PM - Vasanth Anbukumar - #142 Real recorded brain data in the evidence view (PR pending)
+- Judges can now see a real human P300 even though our headset was lost in transit: `python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat`
+    - It plays g.tec's own hackathon recording (five people, 8 channels at 250 Hz like the Unicorn, but with different electrode positions: P3 and P4 where the Unicorn has C3 and C4) through our filters and averaging. The red target line pulls away from the blue non-target line around 300–500 ms within a minute
+    - The banner always says "RECORDED… recorded by g.tec, not our headset or wearer". It's never shown as live or as ours
+- `python -m signal2speech.evidence.dataset path/to/p300-speller` prints the numbers: a 7–11 µV target vs non-target difference in all five people, and our chooser's method classifies single flashes at 0.59–0.85 balanced accuracy (chance is 0.50)
+- The dataset stays out of git. The docs say where to download it; cite g.tec and don't redistribute it
+- Verified: the window on the judging laptop with subject S4, and tests that build a small fake file in the same format and check the flashes line up to the sample. Still not a result for our wearer or our two-tile layout
