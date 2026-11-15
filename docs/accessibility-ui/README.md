@@ -75,6 +75,10 @@ Every text colour lives in `signal2speech/ui/theme.py` (`palette.py` is a back-c
 | conversation previewed | `#ffe066` on `#151a21` | 13.4:1 | 4.5:1 |
 | conversation said | `#22c55e` on `#151a21` | 7.7:1 | 4.5:1 |
 | conversation time / input | `#94a3b8` on `#151a21` | 6.8:1 | 4.5:1 |
+| text size toast | `#f5f7fa` on `#1e2630` | 14.2:1 | 3.0:1 |
+| help phrase banner | `#0b0d10` on `#ffe066` | 14.9:1 | 3.0:1 |
+| attract banner | `#0b0d10` on `#f59e0b` | 9.1:1 | 3.0:1 |
+| attract caption | `#f5f7fa` on `#0b0d10` | 18.1:1 | 4.5:1 |
 
 ## One visual design (#174)
 
@@ -149,3 +153,47 @@ A wearer with closed eyes can't see that a pick registered, so each event plays 
 - Each cue is 90–205 ms long at about a fifth of full volume, so it sits under the spoken reply.
 - The tones are generated in code with the standard library (sine waves with a 10 ms fade, so there's no click). Nothing is downloaded, and there's no third-party audio to license.
 - Turn them off with `--no-cues`. `--mute` also silences them. Tests use a fake player, so CI never plays sound.
+
+## Attract mode (#193)
+
+When nobody has touched the table for 60 s, the app loops a narrated walkthrough of one full pick: flashes, preview, confirm ring, map reveal, and the spoken reply. A large orange **SIMULATED DEMO · not a live headset** banner stays on screen for the whole loop. Captions above the screen explain each step, so the narration never talks over the reply.
+
+- The loop is a second, self-contained app driven by the simulated input (the scripted g.Pype decoder when g.Pype is installed). Its picks go through its own handler and output path, so nothing reaches the real session or the report's counts. The report lists how many loops ran.
+- Any key, click, or input on the real app stops it at once. That key doesn't also pick a tile. Speech still waiting in the loop is cancelled, and the real app is left on a clean first question.
+- It never starts over an open preview, a map reveal, or a practice round.
+- Turn it off with `--no-attract`. It is also off with `--keys` or `--screenshot`, and in the AI demo.
+
+![attract mode](media/193-attract.jpg)
+
+## Text size (#195)
+
+**Ctrl+=** and **Ctrl+-** step all app text through 80, 90, 100, 115, 130, 145, and 160%. **Ctrl+0** resets it. On macOS these are **Cmd+=**, **Cmd+-**, and **Cmd+0**. A toast shows the new size for 1.5 s. `--text-scale 1.3` starts at a given size.
+
+- One factor in `theme.py` (`px()`) scales the tiles, preview, conversation, strip, help overlay, toast, and the AI question panel. The confirm ring keeps its size so its label stays inside the circle.
+- At 160% everything still fits 1280×720. The preview reserves room for its fitted text and squeezes the tiles instead. During a preview the "Say this?" prompt hides, because the header already says what will happen. The round id in the strip may clip; the input label never does.
+- The keys never touch the selection handler, and changing size mid-flash doesn't change flash timing (tested).
+
+![160% text, preview at 1280x720](media/195-160-preview.jpg)
+
+## Practice round (#196)
+
+Press **P**, or start with `--practice`, for a 30 s warm-up before the first question. Tile 1 gets a yellow outline with "Look here · Count its flashes", and the screen runs real flash sequences at the demo's timing. Then it shows "Ready. Tile 1 flashed N times." and opens the first real question. **Esc** ends it early.
+
+- It never sends anything. No question is open during practice, so no key or decoder can preview or confirm. It flashes with its own scheduler, so no decoder is armed and the simulated script isn't used up.
+- It says **Practice** in the prompt, hint, and strip for the whole round, with any input.
+- It won't start over an open preview. The report counts practice rounds separately.
+- Not done yet: feeding live EEG calibration from it. That needs #23 and the calibration code's owner.
+
+![practice round](media/196-practice.jpg)
+
+## Help phrase (#197)
+
+**Hold H for 2 s** from any screen to say "I need help, please." once. A large yellow banner shows for 8 s, and the conversation and session report log it with its input.
+
+- A tap does nothing, and auto-repeat is ignored. Typing H in the AI question box is left alone.
+- It can't repeat within 10 s. It works from every state: waiting, choose, preview, reveal, help overlay, and practice. It never changes the current round, so an open preview still confirms or cancels normally.
+- It goes through the app's one output path (`AppSink.call_for_help`) with its own outcome, so it never counts as a choice.
+- `--help-by-eyes` adds a second trigger: eyes closed for 3 s past a full ring, outside a Confirm round only, so a normal confirm can't trigger it. This is off by default until it's tried on the headset.
+- A test runs 400 random key taps and a full simulated run and checks there are zero help calls.
+
+![help phrase banner](media/197-help.jpg)
