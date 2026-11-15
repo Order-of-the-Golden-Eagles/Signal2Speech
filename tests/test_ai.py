@@ -260,3 +260,53 @@ def test_ai_demo_uses_the_real_map_view_by_default(qapp):
     demo = AnsweringDemo(provider=FixedProvider(), provider_note="test", speaker=FakeSpeaker(),
                          echo=False)
     assert type(demo.app.view).__name__ in ("OpenOrbitView", "PendingMapView")
+
+
+# ── #134: editable saved phrases ─────────────────────────────
+import json as _json  # noqa: E402
+
+from signal2speech.ai import (PHRASES_FILE, SAVED_PHRASES, load_saved_phrases,  # noqa: E402
+                              saved_phrases_from_file)
+
+
+def _write(tmp_path, payload):
+    f = tmp_path / "phrases.json"
+    f.write_text(payload if isinstance(payload, str) else _json.dumps(payload), encoding="utf-8")
+    return f
+
+
+def test_repo_phrases_file_matches_the_built_in_list():
+    pairs, note = load_saved_phrases(PHRASES_FILE)
+    assert pairs == list(SAVED_PHRASES) and note == "phrases.json (6 pairs)"
+
+
+def test_valid_file_replaces_the_phrases(tmp_path):
+    f = _write(tmp_path, {"pairs": [["I'd like water.", "I'd like juice."], ["Yes, please.", "Not now."]]})
+    saved = saved_phrases_from_file(f)
+    assert saved.source == "phrases.json (2 pairs)"
+    assert saved.current().texts == ["I'd like water.", "I'd like juice."]
+    assert saved.next_page().texts == ["Yes, please.", "Not now."]
+
+
+@pytest.mark.parametrize("payload,why", [
+    ("{not json", "unreadable"),
+    ({"pairs": []}, 'no "pairs" list'),
+    ({"pairs": [["Only one"]]}, "isn't two strings"),
+    ({"pairs": [["Same.", "same."]]}, "same reply twice"),
+    ({"pairs": [["x" * 130, "Short."]]}, "too long"),
+    ([["Yes.", 5]], "isn't two strings"),
+])
+def test_bad_file_falls_back_to_built_in_with_reason(tmp_path, payload, why):
+    pairs, note = load_saved_phrases(_write(tmp_path, payload))
+    assert pairs == list(SAVED_PHRASES) and note.startswith("built-in") and why in note
+
+
+def test_missing_file_uses_built_in(tmp_path):
+    pairs, note = load_saved_phrases(tmp_path / "nope.json")
+    assert pairs == list(SAVED_PHRASES) and note == "built-in (no nope.json)"
+
+
+def test_ai_demo_logs_where_saved_phrases_came_from(qapp):
+    demo = AnsweringDemo(provider=FixedProvider(), provider_note="test", speaker=FakeSpeaker(),
+                         echo=False, view=FakeView())
+    assert any(l.endswith("saved phrases: phrases.json (6 pairs)") for l in demo.app.log.lines)
