@@ -25,6 +25,8 @@ REFRACTORY_S = 0.25            # one blink is one event, however long its swing 
 PAIR_MIN_S, PAIR_MAX_S = 0.15, 0.9
 AFTER_DOUBLE_S = 1.5           # after a double blink, ignore blinks for a moment
 MIN_RATIO = 2.5                # blinks must stand this far above the resting signal
+SMOOTH = 25                    # 0.1 s moving average: keeps the slow blink swing, drops the
+                               # faster brain activity and noise that hide it on a dry electrode
 
 
 class BlinkError(ValueError):
@@ -43,6 +45,7 @@ class BlinkSwitch:
         self.level: Optional[float] = None    # None until calibrated: nothing is detected
         self._lock = threading.Lock()
         self._samples = deque(maxlen=int(rate * 60))
+        self._tail = np.zeros(0)              # last raw samples, so smoothing joins blocks up
         self._count = 0                       # samples seen, for calibration windows
         self._last_blink = -1e9               # sample index of the last blink onset
         self._prev_blink = -1e9
@@ -54,7 +57,11 @@ class BlinkSwitch:
         block = np.asarray(rows, dtype=float)
         if block.ndim == 1:
             block = block[:, None]
-        x = np.abs(block[:, min(self.channel, block.shape[1] - 1)])
+        raw = block[:, min(self.channel, block.shape[1] - 1)]
+        joined = np.concatenate([self._tail, raw])
+        self._tail = joined[-(SMOOTH - 1):]
+        smooth = np.convolve(joined, np.ones(SMOOTH) / SMOOTH, mode="full")[SMOOTH - 1:len(joined)]
+        x = np.abs(smooth[-len(raw):])
         fired = False
         with self._lock:
             start = self._count

@@ -511,9 +511,9 @@ class LiveEegInput:
                 windows = []
                 for i in range(3):
                     w.prompt.setText(f"Blink check {i + 1}/3: blink twice, quickly and firmly (low beep)")
+                    start = b.count()               # from before the words: people blink as they hear them
                     self._guide("Blink twice now." if i else "When you hear the low beep, blink twice, quickly and firmly.")
                     self._eye_cue("close")
-                    start = b.count()
                     wait(2.5)
                     windows.append(b.since(start))
                     wait(0.8)
