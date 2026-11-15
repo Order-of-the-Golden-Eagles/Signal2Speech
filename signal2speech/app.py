@@ -980,6 +980,9 @@ def main(argv=None) -> int:
         return 2
 
     qapp = QApplication.instance() or QApplication(sys.argv[:1])
+    if args.screenshot:
+        from signal2speech.ui import fade
+        fade.ENABLED = False                       # a picture taken mid-fade would be wrong
     script = [int(s) for s in args.sim.split(",") if s.strip()]
     if any(s not in (1, 2) for s in script):
         print(f"--sim takes 1s and 2s, e.g. 2,1; got {args.sim!r}", file=sys.stderr)

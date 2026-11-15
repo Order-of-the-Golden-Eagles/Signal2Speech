@@ -273,7 +273,9 @@ def test_flash_still_looks_the_same(app):
     t.set_label("Compare counties", ActionIds.COMPARE_AIR_QUALITY)
     t.set_lit(True)
     img = t.grab().toImage()
-    corner = img.pixelColor(40, img.height() // 2)      # inside the border, away from text
+    # In the padding between the border and the content, where nothing is ever drawn. (A point
+    # further in can land on the title's edge now that tiles are smaller.)
+    corner = img.pixelColor(int(Tile.INSET) - 6, img.height() // 2)
     assert corner == QColor(theme.TILE_LIT_BG)
     assert (theme.TILE_LIT_BG, theme.TILE_LIT_TEXT) == ("#ffffff", "#000000")
 
