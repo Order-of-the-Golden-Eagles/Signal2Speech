@@ -538,3 +538,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - It said live input was switched off, which stopped being true when #103's code merged. A judge reading it would undersell the demo
 - Eye-closure confirm is still off on a real headset and key 1 confirms instead. That still needs one wearer run (#23, #103)
 - Docs only. Nothing new was run
+
+## 11/15/26 - 1:15 AM - Long Le - #176 #177 Readable conversation and sound cues (PR pending)
+- The panel under the map now reads like a conversation: Options (and where they came from), Previewed, Said aloud or Showed the map and said, or Nothing was said, each with the input that caused it
+    - Press `F2` to swap to the developer log; the session report in `logs/` keeps both
+- Preview, confirm, and cancel each play a short, quiet tone, so a wearer with closed eyes knows the pick registered. The confirm tone ends before speech starts, so they never overlap.
+    - `--no-cues` turns them off; `--mute` silences them too
+- The tones are generated in code, so there's no audio file to download or license
+- Verified with the keyboard and in headless tests with a fake sound player (11 new tests: wording for cancel, timeout, and disconnect; one cue per event; confirm cue before speech; exactly one speech). I haven't listened to the tones' volume on the judging laptop's speakers yet.
