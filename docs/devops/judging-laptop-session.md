@@ -23,7 +23,7 @@ Turn Wi-Fi **off** (and unplug Ethernet). Activate the main folder's `.venv`. Se
 | # | Do | Expect | Closes |
 | --- | --- | --- | --- |
 | B1 | `python tools/demo_launcher.py --input keyboard` (fullscreen, and it restarts the app if it crashes; F1 shows the keys, F11 leaves fullscreen). Press **2**, then hold **1** for 2 s. | The county comparison fills most of the window for 8 s, and **one** line is spoken: "Washtenaw's AQI rose 186 points. Wayne's rose 168 points." | #39 |
-| B2 | When the next question appears, press **1**, then hold **1** for 2 s. | The June 28 satellite view appears, and **one** line is spoken | #39 |
+| B2 | When the next question appears, press **1**, then hold **1** for 2 s. | The satellite view plays June 24 to June 28 day by day and rests on June 28, and **one** line is spoken: "NASA satellite images from June 24 to June 28, 2023: clear ground, then cloud, then wildfire smoke over southeast Michigan." |
 | B3 | Press **2** (preview), then **2** (cancel). Then press **2**, then **D** (disconnect during preview). | Nothing appears and nothing is spoken, both times. The transcript shows `cleared (cancel)` and `cleared (disconnect)`. | #39, #26 |
 | B4 | Close the app. Run `python -m signal2speech.app --input simulated --sim 2,1`. | The bottom strip says **Input: Simulated** and **Connection: g.Pype Generator stream**. If it says "scripted", g.Pype didn't load: stop and note it. The tiles flash, then the preview shows, then the comparison appears with **one** spoken line. | **#4** |
 | B5 | Close it. Run `python -m signal2speech.app --input simulated --sim 2,2`. | Preview, then cancel. Nothing appears and nothing is spoken. | #4 |
@@ -67,6 +67,15 @@ Follow [CLAUDE.md](../../CLAUDE.md#project-board-after-every-merge):
 - **#39 passes:** close it as completed, and set Done.
 - **#4 passes:** close it as completed, and set Done. Its sub-issues are already closed.
 - **#42:** stays In Progress until `judging-draft` and `judging-final` are tagged, as described in [judging-build.md](judging-build.md#freeze-and-rollback-42).
+
+## Part D (optional): the judging-hour soak (#165)
+
+About 65 minutes, with Wi-Fi off and the laptop on its charger. Nobody needs to watch it. Leave the volume on if you can: speech is part of what's tested.
+
+| # | Do | Expect |
+| --- | --- | --- |
+| D1 | `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` | The app opens fullscreen, calibrates on simulated input, then answers by itself, round after round. At 30 minutes it's killed on purpose and comes back within a few seconds. A progress line prints every minute. |
+| D2 | When it finishes, open the `logs/soak-<time>.md` it names | **Verdict: PASS.** 0 double outputs, 0 crashes, memory stable, and the kill test restarted the app. Paste the whole report into #165. |
 
 ## If a step fails
 

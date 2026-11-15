@@ -76,47 +76,60 @@ class QuestionPanel(QWidget):
     ask_requested = Signal(str)
     alternatives_requested = Signal()
     saved_requested = Signal()
+    nasa_requested = Signal()
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         col = QVBoxLayout(self)
         col.setContentsMargins(0, 0, 0, 0)
-        self.title = QLabel("Question from the conversation partner")
+        self.title = QLabel("Ask a question")
         col.addWidget(self.title)
+        self.title.setVisible(False)           # the box says it; the height goes to the replies
         self.restyle()
-        self.question = QLineEdit(placeholderText="Type a question, then press Enter")
-        col.addWidget(self.question)
-        row = QHBoxLayout()
+        self.question = QLineEdit(placeholderText="Ask a question: type it here, then press Enter")
+        row = QHBoxLayout()                    # the question and its buttons share one row
+        row.addWidget(self.question, 1)
         self.ask_btn = QPushButton("Suggest replies")
         self.alt_btn = QPushButton("Other replies")
         self.saved_btn = QPushButton("Saved phrases")
-        for b in (self.ask_btn, self.alt_btn, self.saved_btn):
+        self.nasa_btn = QPushButton("Example: NASA air quality")
+        self.nasa_btn.setToolTip("Ask the built-in question about wildfire smoke, answered with "
+                                 "NASA satellite images and EPA data")
+        for b in (self.ask_btn, self.alt_btn, self.saved_btn, self.nasa_btn):
             b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             row.addWidget(b)
         col.addLayout(row)
+        notes = QHBoxLayout()                  # one line: where the replies come from, and the language
         self.origin = QLabel()
         self.origin.setWordWrap(True)
-        col.addWidget(self.origin)
+        notes.addWidget(self.origin, 3)
         self.language = QLabel("Reply language: English")   # #194
         self.language.setWordWrap(True)
-        col.addWidget(self.language)
+        self.language.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        notes.addWidget(self.language, 2)
+        from signal2speech.ui.brain_trace import BrainTrace
+        self.trace = BrainTrace()              # fixed size, fixed place, on every screen
+        notes.addWidget(self.trace, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.language.setVisible(False)
+        col.addLayout(notes)
         self.alt_btn.setEnabled(False)
 
         self.question.returnPressed.connect(self._ask)
         self.ask_btn.clicked.connect(self._ask)
         self.alt_btn.clicked.connect(self.alternatives_requested)
         self.saved_btn.clicked.connect(self.saved_requested)
+        self.nasa_btn.clicked.connect(self.nasa_requested)
 
     def restyle(self) -> None:
         """Apply the current text scale (#195)."""
         self.setStyleSheet(
             f"QLabel{{color:{T.STRIP_TEXT};font-size:{T.px(T.CAPTION + 2)}px;}}"
-            f"QLineEdit{{background:{T.SURFACE};color:{T.TEXT};font-size:{T.px(T.BODY)}px;padding:{T.S}px;"
-            f"border:2px solid {T.BORDER};border-radius:{T.RADIUS_S}px;}}"
+            f"QLineEdit{{background:{T.SURFACE};color:{T.TEXT};font-size:{T.px(T.HEADING + 2)}px;"
+            f"padding:{T.S + 4}px {T.M}px;border:2px solid {T.ACCENT};border-radius:{T.RADIUS_M}px;}}"
             f"QPushButton{{background:{T.RAISED};color:{T.TEXT};font-size:{T.px(T.CAPTION)}px;"
             f"padding:{T.S}px {T.M}px;border:2px solid {T.BORDER};border-radius:{T.RADIUS_S}px;}}"
             f"QPushButton:disabled{{color:{T.QUIET};}}")
-        self.title.setStyleSheet(f"color:{T.MUTED};font-size:{T.px(T.BODY)}px;font-weight:600;")
+        self.title.setStyleSheet(f"color:{T.TEXT};font-size:{T.px(T.HEADING)}px;font-weight:700;")
 
     def _ask(self) -> None:
         text = self.question.text().strip()
@@ -138,3 +151,5 @@ class QuestionPanel(QWidget):
 
     def set_language(self, text: str) -> None:
         self.language.setText(text)
+        # Shown only when replies are not in English, so the screen stays simple by default.
+        self.language.setVisible(not text.startswith("Reply language: English"))

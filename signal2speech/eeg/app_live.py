@@ -213,12 +213,21 @@ class LiveEegInput:
         self._reflashing = False
         self._last_attended: Optional[str] = None
         self._start_hung = False
+        #: Called with "close" and "open" during the eye check, so a wearer with their eyes shut
+        #: hears when to open them. The app sets it to a low and a high beep.
+        self.eye_cue: Optional[Callable[[str], None]] = None
+        #: Shown under the tiles when a round opens and the script has nothing for it.
+        self.idle_hint = "Simulated script finished: press 1 or 2"
         self.p300_calibration: dict = {}
         self.alpha_calibration: Optional[am.Calibration] = None
 
         self.nodes, self.alpha, self.bursts = build_live_graph(
             handler, source, self.input_source, placeholder=placeholder, enable_oscar=enable_oscar,
             recorded=recorded)
+        # A display-only tap on the filtered EEG, for the app's small "Brain Activity" graph. It
+        # reads the same 1-30 Hz signal the chooser cuts its epochs from and changes nothing.
+        self.trace_tap = am._Tap(name="brain_activity_display")
+        self.nodes.pipeline.connect(self.nodes.eeg, self.trace_tap)
         self.adapter = InputAdapter(handler, self.input_source)
         self.chooser = p300.P300Chooser(self.nodes, self.adapter, flashes_per_tile=flashes)
         self.chooser.bridge.listeners.append(self._on_p300_decision)
@@ -422,14 +431,18 @@ class LiveEegInput:
                 self.bursts.open_eyes()
             collect(1.0)
             open_vals = collect(s)
-            w.prompt.setText(f"Now CLOSE your eyes for {s:g} s. We'll say when to open them.")
+            heard = self.eye_cue is not None
+            w.prompt.setText(f"Now CLOSE your eyes for {s:g} s (low beep). A high beep says when to open them."
+                             if heard else f"Now CLOSE your eyes for {s:g} s. We'll say when to open them.")
+            self._eye_cue("close")
             if self.bursts:
                 self.bursts.close_eyes()
             collect(1.0)
             closed_vals = collect(s)
             if self.bursts:
                 self.bursts.open_eyes()
-            w.prompt.setText("Open your eyes.")
+            w.prompt.setText("Open your eyes  (high beep)" if heard else "Open your eyes.")
+            self._eye_cue("open")
             self.alpha_calibration = self.alpha.calibrate(open_vals, closed_vals)
             collect(1.5)                                     # alpha decays below release
         except CalibrationAborted:
@@ -441,6 +454,15 @@ class LiveEegInput:
         self.log(f"Alpha switch calibrated: ratio {self.alpha_calibration.ratio:.1f}")
         return True
 
+    def _eye_cue(self, kind: str) -> None:
+        if self.eye_cue is None:
+            return
+        self.log(f"eye check cue: {kind}")
+        try:
+            self.eye_cue(kind)
+        except Exception as err:                         # a missing sound device must not stop calibration
+            self.log(f"eye check cue failed: {type(err).__name__}: {err}")
+
     # ── Flash hooks ──────────────────────────────────────────
     def _sequence_started(self) -> None:
         if self._calibrating:
@@ -451,7 +473,7 @@ class LiveEegInput:
                 attended = self._last_attended
             elif not self.script:                        # script spent: keys take over
                 self.window.flasher.stop()
-                self.window.hint.setText("Simulated script finished: press 1 or 2")
+                self.window.hint.setText(self.idle_hint)
                 return
             else:
                 attended = TILES[self.script.popleft() - 1]   # tile the synthetic brain attends

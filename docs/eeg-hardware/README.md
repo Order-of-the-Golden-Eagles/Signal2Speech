@@ -86,7 +86,7 @@ python -m signal2speech.evidence --source replay recordings/evidence_<timestamp>
 - **Generator** has no brain, so the view adds a synthetic deflection about 300 ms after each target marker. That is why the average separates. It is labelled Simulated, and OSCAR is shown as unavailable.
 - **Record and replay** use g.Pype's launch recorder (`LaunchConfig` `save_as` / `load_from`). It saves the EEG and the flash markers as HDF5 files, taken before OSCAR, under `recordings/`, which is gitignored. Never commit a recording. A replay rebuilds the same graph and is labelled Recorded.
 - **Driven by the P300 chooser (`--p300`):** `python -m signal2speech.evidence --source generator --p300` (or `--source hybridblack --p300`) builds the graph with `build_evidence_graph(front_end=p300_front_end)` and puts the chooser's online scorers and calibration collectors in the same pipeline (`signal2speech/evidence/p300_mode.py`). A `P300Chooser` emits every flash on the graph's `marker`, from `make_sequence` flash schedules, and two test tiles flash in the window header. The run calibrates first (`--calibration N` sequences, default 6), fits the LDA, then selects until the window closes. Each decision goes through `InputAdapter.select_captured` to the `SelectionHandler`, and the header shows the decision, the outcome, and the attended tile (simulated on the Generator, cued on the headset).
-  - The target vs non-target average uses the calibration codes (101 / 100). Those averages and the classifier's training epochs come from the same Trigger nodes on the same filtered stream (the OSCAR branch when there is one), so the plot shows what the LDA learns from. Online flashes use the tile codes (1 / 2, yellow markers) and are not averaged, because on live EEG the attended tile is only what the cue asked for.
+  - The target vs non-target average uses the calibration codes (101 / 100). Those averages and the classifier's training epochs come from the same Trigger nodes on the same filtered stream, so the plot shows what the LDA learns from. That stream is the OSCAR-off one: the separate OSCAR branch delays the EEG ~324 ms and g.Pype doesn't delay the flash markers to match, so it's shown but never epoched ([#164](#oscar-on-gtecs-recording-164)). Online flashes use the tile codes (1 / 2, yellow markers) and are not averaged, because on live EEG the attended tile is only what the cue asked for.
   - On the Generator the chooser's own synthetic P300 is used, labelled Simulated. With `--p300` the filter is the chooser's 1–30 Hz bandpass only (no 50 / 60 Hz notches).
   - Verified on simulated input only: headless tests in `tests/test_evidence_p300.py`, and a 22 s offscreen run (`--calibration 2`) that made 2 of 2 correct simulated selections. With so few calibration epochs the average separates only weakly on screen. Not yet run with a headset.
 - **Seam for #46:** `build_evidence_graph(front_end=...)` accepts the P300 chooser's filter chain, and the graph's `marker` is the node the flashing tiles emit on. Without `--p300`, pass `--no-flasher` when other tiles send the markers.
@@ -133,7 +133,7 @@ The synthetic P300 is a 5 µV Gaussian at 300 ms over 10 µV white noise plus 10
 
 **Not verified yet**
 
-- **Live headset:** `--source hybridblack` hasn't been run. Accuracy, trials needed per wearer, and OSCAR's effect on P300 epochs are all unmeasured. Report them here after the first live calibration.
+- **Live headset:** `--source hybridblack` hasn't been run. Accuracy, trials needed per wearer, and OSCAR's effect on P300 epochs are all unmeasured. OSCAR delays the signal ~324 ms and g.Pype doesn't move flash markers to match on a separate OSCAR node; whether the in-source OSCAR does is a headset-slot check ([#164](#oscar-on-gtecs-recording-164)). Report them here after the first live calibration.
 - **Two-tile oddball:** each tile is the target half the time, which isn't rare. Real P300s are larger for rare targets. If live accuracy is weak, add null flashes or more tiles, or fall back to the alpha step-through (#47).
 - **Flash-to-marker timing:** the P300 is locked to the real flash. The marker is emitted right after Qt repaints the tile, not at the monitor's vsync (`FlashScheduler` and the CLI tiles both work this way). Expect 0–17 ms of jitter at 60 Hz plus compositor delay. A constant offset is harmless because calibration learns it, but jitter smears the epoch. OSCAR adds processing delay, and we haven't checked whether g.Pype aligns Marker events to OSCAR-delayed samples.
 
@@ -398,6 +398,43 @@ Each subject has 150 target and 1,050 non-target flashes over about 4 minutes. T
 - **Why this is higher than the 0.59–0.85 above.** That figure asks "is this one flash a target?" against a fixed threshold, with seven non-targets for every target. This one asks "which of two is the target?", which is the easier question and the one a two-tile chooser faces.
 - **Decision: keep 5 flashes per tile** (`p300.FLASHES_PER_TILE`). Three would do on these clean, separate epochs. But in the app the responses overlap, and the weakest subject needs five to reach 99 %. Run the app's own way, with overlapping recorded responses, five flashes give 80–95 % at the normal 0.25 s spacing and 90–100 % at 0.5 s ([table](../integration/README.md#recorded-human-eeg-chooses-the-tile-104)). No parameter in `signal2speech/eeg/p300.py` changes.
 - **Label.** Recorded (g.tec P300 Speller dataset), offline. Five people who are not our wearer, on a different electrode layout from the Unicorn's. It shows the method works on real human P300. It does not predict a live wearer's accuracy.
+
+### OSCAR on g.tec's recording (#164)
+
+g.tec's judging notes name OSCAR, its real-time artifact removal. Until now we could only show it on a headset we don't have. It does run on replayed data. The evidence view puts g.tec's recording through the same OSCAR branch as the headset, side by side, labelled **Recorded (g.tec dataset)**:
+
+```
+python -m signal2speech.evidence --source dataset path/to/p300-speller/S1.mat      # OSCAR off (top right) vs on (middle left)
+python -m signal2speech.evidence.oscar_report path/to/p300-speller --jobs 5          # the numbers below, about 4 min
+```
+
+**How it's measured:** each subject plays in real time through the evidence view's own g.Pype graph (the recording plus its OSCAR branch), with a "before" tap on the recording and an "after" tap on the `Oscar` node. Offline, with the first 10 s left out while OSCAR adapts:
+- **OSCAR's delay:** the lag that best lines "after" up with "before".
+- **Artifact amplitude:** the median peak-to-peak in 1 s windows at Fz, 1–30 Hz. Fz is the frontal channel, where blinks are largest. "Artifact stretches" are the 5% of windows with the biggest swings before OSCAR; "the rest" is everything else.
+- **Single-flash accuracy:** the same shrinkage LDA as the P300 chooser (`dataset.analyse`), cross-validated, before vs after OSCAR with its delay removed. The extra column epochs OSCAR's output on the flashes **as-is**, the way a pipeline would without correcting the delay.
+
+Results on 2026-11-15 (Recorded, g.tec's subjects, not our wearer, not live):
+
+| Subject | OSCAR delay | Fz, artifact stretches | Fz, the rest | Single-flash accuracy | Same, without the delay fix | P300 peak (target − non-target) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| S1 | 324 ms | 122 → 43 µV | 39 → 36 µV | 0.72 → 0.81 | 0.71 | −9.5 → −9.0 µV |
+| S2 | 328 ms | 38 → 32 µV | 27 → 25 µV | 0.76 → 0.75 | 0.62 | +7.5 → +7.2 µV |
+| S3 | 324 ms | 102 → 36 µV | 33 → 32 µV | 0.60 → 0.62 | 0.56 | +6.8 → +6.2 µV |
+| S4 | 324 ms | 75 → 36 µV | 33 → 31 µV | 0.86 → 0.86 | 0.80 | +8.0 → +7.0 µV |
+| S5 | 324 ms | 86 → 53 µV | 29 → 28 µV | 0.75 → 0.75 | 0.71 | −11.6 → −6.7 µV |
+
+**What it shows:**
+- **OSCAR removes artifacts:** the biggest swings at Fz are 14–65% smaller, while the rest of the signal changes by only 3–8%.
+- **Classification:** once the delay is corrected, it's unchanged within ±0.02 for four subjects. S1 improves (0.72 → 0.81); S1 has the largest artifacts. That's no improvement for most subjects, and no harm.
+- **The P300 survives**, a little smaller (S5's peak at PO7 drops most). The "before" accuracies differ slightly from the #142 table because the first 10 s are left out here.
+- **OSCAR delays the signal by about 324 ms**, steadily, close to the 70 samples (280 ms) g.Pype's own code mentions. **g.Pype doesn't move the flash markers to match** when OSCAR runs as a separate node. Epoched as-is, the P300 lands ~320 ms late (S4's average peaks at 796 ms instead of 488 ms), and accuracy drops by 0.04–0.14. This held with both the recording's flash channel and live-style `Marker` events: a synthetic P300 peaked at 740 ms instead of 504 ms.
+
+**What this means for us:**
+- **Evidence view:** the averages, and in `--p300` mode the classifier, are cut from the OSCAR-off stream, so they're aligned. Before this finding, `--p300` mode epoched the OSCAR branch; that's fixed in `build_evidence_graph`, which now never epochs a separate OSCAR node. The flash lines drawn over the **OSCAR on** scope are ~0.3 s early relative to that trace. Read them as approximate there.
+- **Headset (#23), unverified:** the P300 chooser and `--input live` use OSCAR *inside* the Unicorn source (`HybridBlack(enable_oscar=True)`). If that path delays the EEG the same way, the P300 sits near 600 ms in our 100–700 ms epochs. Calibration runs on the same stream, so it would still classify, but with less of the response in view. **Check at the headset slot:** compare the averaged P300 latency with OSCAR on and with `--no-oscar`. If on is ~300 ms later, lengthen the epoch or move it later when OSCAR is on.
+- **Can't do offline without g.Pype:** the standalone `gtec_oscar` package needs a licence key (`gtec_oscar.authenticate(key)`), so the numbers come from replaying through g.Pype in real time.
+- **Tests:** `tests/test_oscar_report.py` checks the measures on constructed data, plus one slow run of a synthetic recording through the real OSCAR branch.
+
 ## PiEEG Octopus 16 on real people: no usable EEG (2026-11-15)
 
 **Result: the board connects, streams and records well, but we could not measure a brain signal with it.** It is not part of the demo. g.tec's recorded data ([above](#recorded-human-p300-from-gtecs-dataset-142)) is the real EEG we show. Everything below this section about the board describes tools that work on simulated streams only.

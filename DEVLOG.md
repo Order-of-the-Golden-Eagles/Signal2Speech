@@ -648,6 +648,18 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - It uses the same rules as a normal cancel, so a brain decision still in flight from before the restart is thrown away instead of picking something on the new question
 - Each restart is counted in the session report, separately from cancels
 - Checked with keyboard and simulated input in tests. The welcome screen half of #180 is still open: Long's attract loop already uses the idle time, and we're agreeing on how the two fit
+## 11/15/26 - 4:10 AM - MagicJester2764 - #165 Soak test for the judging hour ([PR #211](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/211))
+- Anyone can leave the demo running for an hour by itself and get a pass/fail report: no double outputs, no crashes, steady memory, same speed at the end as at the start
+    - `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` writes `logs/soak-<time>.md`
+- It goes through the same crash-safe launcher we'll use at the table, and kills the app once on purpose to prove it comes back
+- First full run (simulated input, dev machine, muted) passed: 169 confirms and 169 spoken lines with 0 doubles, 0 crashes, back within 1.1 s after the kill, selection time 3.1 s at the start and 3.2 s at the end
+- Still needed: the same hour on the judging laptop with Wi-Fi off and sound on (Part D of the judging laptop session). This was not live EEG
+## 11/15/26 - 4:25 AM - MagicJester2764 - #164 OSCAR shown and measured on g.tec's recorded EEG ([PR #212](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/212))
+- Judges can now see g.tec's OSCAR artifact removal working on real human EEG, before and after side by side, even without our headset
+    - `python -m signal2speech.evidence --source dataset path/to/p300-speller/S1.mat`, and the numbers with `python -m signal2speech.evidence.oscar_report path/to/p300-speller --jobs 5`
+- On all five of g.tec's recorded subjects, the biggest blink and movement swings got 14–65% smaller, while the rest of the signal barely changed. Classification stayed the same or improved (one subject went from 0.72 to 0.81)
+- We found that OSCAR delays the signal by about a third of a second and g.Pype doesn't shift the flash markers to match. Ignoring that costs up to 0.14 accuracy, so the docs say how to handle it, and the headset session should check it on the live path
+- Measured on g.tec's recordings replayed through g.Pype (Recorded, not our wearer, not live). The g.tec data stays out of git
 
 ## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
 - With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
@@ -714,3 +726,19 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The satellite and fire images have rounded corners and a thin border
 - Each launch of recorded mode now draws the recorded brain responses in a fresh order, so two runs can differ. Before, every launch replayed the same ones
 - Verified by screenshots of every screen on the judging laptop and by the interface tests. The opening animation ran without errors; Vasanth watched it once and it looked right
+
+## 11/15/26 - 9:43 AM - Vasanth Anbukumar - #228 Docs refresh, team briefing, recorded EEG in the phrase demo ([PR #229](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/229))
+- Everyone on the team can now read one page before judging: [docs/TEAM-BRIEFING.md](docs/TEAM-BRIEFING.md). It covers what we built, what is real and what is scripted, the numbers to know, the questions judges will ask, and where each topic lives in the repo
+- The phrase selection demo can now be driven by g.tec's recorded brain data, like the NASA demo
+    - `python -m signal2speech.ai --input recorded`, wait about 90 seconds, then type a question and press Enter
+    - It only picks after a question is asked or the Saved phrases button is clicked. Ctrl+1 or Ctrl+2 sets which reply the scripted wearer looks at next
+- The README and the area docs now describe the judging-day build: the recorded walkthrough, the fixed layout and status pills, the June 24 to 28 image sequence, the natural voice, and a new video cut in `docs/demo-submission/shot-list.md`
+- Verified: the recorded phrase demo picked and spoke a reply on the judging laptop with stand-in replies, and calibrated with Claude as the reply source. A full run with Claude's replies being picked hasn't been watched yet
+
+## 11/15/26 - 10:08 AM - Vasanth Anbukumar - #232 One app with replies as the main screen ([PR #233](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/233))
+- Signal2Speech is now one app. The main screen is a question box and two replies, and the top of the window says what the app is and the three steps to use it
+    - `python -m signal2speech.ai`, with `--input recorded` for g.tec's recorded brain data or `--input live` for the Unicorn headset
+- The NASA air-quality question is an example inside it: click `Example: NASA air quality`. The map takes the side panel only for that question, and the conversation is shown the rest of the time
+- Nothing about choosing, previewing, confirming or speaking changed. Only the screen layout and the way in
+- The launcher (`python -m signal2speech`) lists the main app first. The stand-alone NASA run still works
+- Verified by screenshots at the judging laptop's window size and by the tests. The headset path was rehearsed on simulated signals and picked a reply; it has not run on a real headset. With a headset the Yes / No cards flash before any question is asked, which still needs a decision

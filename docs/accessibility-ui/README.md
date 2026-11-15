@@ -12,10 +12,10 @@ Keep choices stable during a round. Show the preview, confirm and cancel control
 
 | Screen region | Content | Driven by |
 | --- | --- | --- |
-| **Choice tiles** | Two large flashing tiles, `target-1` and `target-2`, relabelled per round. Keys 1 and 2 select the same tiles. | `on_round_opened` |
-| **Preview** | The exact reply or action text in large type, with **Confirm** (close your eyes for 2 s, or key 1) and **Cancel** (key 2 or Esc). | `on_preview` |
-| **Judge strip** | Input label (Keyboard / Simulated / Recorded / Live EEG), connection state, current round ID, last outcome | `on_handled`, `on_cleared` |
-| **OpenOrbit panel** | June 26 and June 28 imagery with county AQI and separate attribution. Revealed only after a confirm. | sink `execute` ([#30](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/30), [#25](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/25)) |
+| **Choice tiles** | Two flashing tiles, `target-1` and `target-2`, relabelled per round. They sit in a fixed band in the middle of the left column and never move. Keys 1 and 2 select the same tiles. | `on_round_opened` |
+| **Preview** | The exact reply or action text, with **Confirm** (close your eyes for 2 s, or hold key 1) and **Cancel** (hold key 2, or Esc). It appears above the tiles, which stay where they are. | `on_preview` |
+| **Status pills** | A row of pills along the bottom of the whole window: the input label (Keyboard / Simulated / Recorded / Live EEG), the round, the connection, and the last outcome. A long input label takes a row to itself. | `on_handled`, `on_cleared` |
+| **OpenOrbit panel** | Before a confirm: a faint view of the region and "The map appears after a confirmed choice." After a confirm: NASA's daily images from June 24 to June 28 flowing day by day, with the county AQI table or the fire map, and separate attribution. | sink `execute` ([#30](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/30), [#25](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/25)) |
 | **Question input** | A typed question from the conversation partner, on the judge side | [#27](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/27) |
 
 **Rules**
@@ -45,8 +45,8 @@ The standalone sink only prints the `ConfirmedAction`. It plays no audio and cha
 - **Fits 1280×720 and up.** That's a 1080p laptop at 150% scaling. 1366×768 and 1536×864 (125%) are also checked. The app's smallest size is about 1190×521, and tests assert it stays within 1280×720 in the choose, preview, and reveal states. Tiles can shrink to 300 px wide.
 - **Fullscreen:** `python -m signal2speech.app --fullscreen`. **F11** toggles it at any time.
 - **F1** shows a key-help overlay for the operator: 1/2, Esc, D, F11, F1, and Ctrl+1/Ctrl+2 when the g.Pype simulator is active. It never touches the selection handler. Close it with F1 or a click.
-- **Bottom strip on small screens:** the input label always shows in full. Connection and last-outcome text can clip, and their full text is in the tooltip and the transcript. With keyboard input the connection field is hidden, because there's nothing to report.
-- **Long text shrinks to fit (#95).** Tile text starts at 56 px, and preview text at 44 px. If a long reply doesn't fit, the font steps down to a 32 px floor (`signal2speech/ui/fit.py`). Tiles recompute on relabel and resize, never on a flash, so flash timing stays steady. The preview is capped at about 28% of the window height so it doesn't squeeze the tiles. A 12-word AI reply fits at 1280×720 at 54 px.
+- **Status pills on small screens:** the input pill always shows in full. The others hug their text and clip only if the row runs out of room; the full text is in the tooltip and the developer log. With keyboard input the connection pill is hidden, because there's nothing to report.
+- **Long text shrinks to fit (#95).** Tile titles start at 40 px and step down to a 32 px floor. Preview text starts at 24 px, so a reply reads at about five words a line, and steps down to 20 px (`signal2speech/ui/fit.py`). Tiles recompute on relabel and resize, never on a flash, so flash timing stays steady. The preview is capped at about 28% of the window height.
 - **Confirm countdown (#96).** During a Confirm round, a muted line under the preview reads "No answer cancels in N s". It reads the same timer as #26's timeout, so it can't disagree with when the cancel happens. It hides on confirm, cancel, disconnect, or a new question. With `--confirm-timeout 0` it never appears.
 
 ## Colour contrast (#135)
@@ -80,11 +80,23 @@ Every text colour lives in `signal2speech/ui/theme.py` (`palette.py` is a back-c
 | attract banner | `#0b0d10` on `#f59e0b` | 9.1:1 | 3.0:1 |
 | attract caption | `#f5f7fa` on `#0b0d10` | 18.1:1 | 4.5:1 |
 
+## Layout and motion (updated 2026-11-15)
+
+Changed after trying the app on the judging laptop (1920 × 1080 at 125 % scaling, so 1536 × 864 for windows).
+
+- **Nothing shifts.** The left column has three bands: the prompt and the preview at the top, the tiles in the middle, the countdown and the hint below. The outer bands share the spare height equally, so the tiles stay centred and in the same place on the choose, preview and result screens. Tiles and hint keep their space when hidden. The left and right columns keep one width (2:3) in every state.
+- **The window fits its screen.** It opens no larger than the screen it is on, and long lines wrap instead of widening it.
+- **The map gets the room.** The box under the map shows only the latest thing chosen or said (`ConversationView.latest_only`), including the words of a reply that was cancelled. F2 still shows the full developer log, and the session report keeps everything.
+- **The opening.** The two cards appear alone, then settle into their places on the left while the map panel, the latest-line box and the status pills fade in (`ui/intro.py`, `--no-intro` to skip). The moving cards are stand-ins drawn over the window: the real tiles underneath never move.
+- **Fades.** The preview and the revealed map fade in over about a quarter of a second (`ui/fade.py`). Fades are off in tests and for `--screenshot`.
+- **Never animated: the tile flashes.** They stay instant. Repaint was measured at 0.3 ms for a flash and 0.7 ms for an idle tile on the judging laptop.
+- **One font family** across the app (`theme.FONT_FAMILIES`, Segoe UI Variable on Windows 11, falling back to what the system has).
+
 ## One visual design (#174)
 
 `signal2speech/ui/theme.py` is the single source for the look: colour roles (background, surface, raised, border, text, muted, quiet, accent, success), a type scale (56 / 44 / 36 / 28 / 22 / 18 px, with a 32 px floor for fitted text), spacing (4 / 8 / 16 / 24 / 32), and corner radii (8 / 14 / 20). The selection window, tiles, judge strip, help overlay, app shell and transcript, AI question panel, and launcher all take their styling from it. `tests/test_contrast.py` fails if any of them uses a raw colour code. The OpenOrbit map view keeps its own data-display styling (#30).
 
-**Tiles** are drawn by hand: a small drawn icon (satellite, chart, speech bubble, check, cross), the fitted title, a one-line description of what happens, and the key as a corner badge instead of "[1]" in the title.
+**Tiles** are drawn by hand: an emoji for what the tile does (satellite, chart, speech bubble, check, cross), the fitted title, a one-line description, and the key as a corner badge. Each kind of tile has its own tint (`theme.ACTION_TINT`): blue and violet for the two map choices, amber for a spoken reply, green for Confirm, rose for Cancel. **A flashing tile ignores all of that:** it is plain white with a black drawn icon, exactly as before, because the brain response is timed against that stimulus.
 
 | State | Look |
 | --- | --- |

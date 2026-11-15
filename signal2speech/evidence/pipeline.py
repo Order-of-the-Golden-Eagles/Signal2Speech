@@ -81,6 +81,8 @@ class EvidenceGraph:
     nontarget_average: object
     oscar: Optional[object] = None
     oscar_note: str = ""
+    #: The standalone ``Oscar`` node itself (unfiltered output), when the graph has one (#164).
+    oscar_node: Optional[object] = None
     detail: str = ""
     #: The filtered stream the Triggers cut epochs from (the OSCAR branch
     #: when ``average_oscar`` asked for it and it exists).
@@ -146,10 +148,12 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
         kind: The source to build (for a replay, the source that was recorded).
         label: How to label the input. Defaults to Simulated for the
             Generator and Live EEG for the headset; pass RECORDED for a replay.
-        oscar: Show OSCAR. For the headset, the main stream stays OSCAR
-            off and a branch runs OSCAR on, so both are visible. If the
-            standalone OSCAR node is unavailable, the headset is built
-            with ``enable_oscar=True`` instead. Never run on the Generator.
+        oscar: Show OSCAR. For the headset and for g.tec's recording
+            (``dataset``), the main stream stays OSCAR off and a branch runs
+            OSCAR on, so both are visible. If the standalone OSCAR node is
+            unavailable, the headset is built with ``enable_oscar=True``
+            instead; the recording then shows OSCAR off. Never run on the
+            Generator's own simulated samples.
         front_end: Seam for #46. See the module docstring.
         synthetic_p300: Add the simulated P300 after target markers.
             Defaults to True for the Generator and False otherwise.
@@ -160,7 +164,8 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
         target_code, nontarget_code: Marker codes the two averages
             trigger on.
         time_pre, time_post: Epoch window around each flash, in seconds.
-        average_oscar: Cut epochs from the OSCAR branch when there is one.
+        average_oscar: Kept for callers; ignored. Epochs never come from the standalone
+            OSCAR branch, because its delay misaligns them with the flash markers (#164).
         dataset: A ``dataset.Session`` (g.tec's recorded P300 data, #142). The
             Generator then only clocks the pipeline: the recorded EEG and its
             flash codes replace its samples. Labelled Recorded.
@@ -182,9 +187,16 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
     oscar_branch = None
     in_source_oscar = False
     if dataset is not None:
+        # #164: the same OSCAR branch as the headset, on g.tec's recording (8 channels, uV).
         from .dataset import LABEL_DETAIL
-        oscar_note = (f"{LABEL_DETAIL}, subject {dataset.name}: recorded by g.tec, "
-                      "not our headset or wearer. OSCAR not applied")
+        oscar_branch = oscar_node() if oscar else None
+        who = f"{LABEL_DETAIL}, subject {dataset.name}: recorded by g.tec, not our headset or wearer"
+        if not oscar:
+            oscar_note = f"{who}. OSCAR off"
+        elif oscar_branch is not None:
+            oscar_note = f"{who}. OSCAR off (top right) vs OSCAR on (middle left)"
+        else:
+            oscar_note = f"{who}. OSCAR unavailable in this g.Pype, so not applied"
     elif kind is SourceKind.GENERATOR:
         oscar_note = "OSCAR unavailable: Generator input, no headset"
     elif not oscar:
@@ -233,8 +245,14 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
                  window_function="hamming", name="fft")
     p.connect(raw, fft)
 
-    epoch_input = oscar_filtered if (average_oscar and oscar_filtered
-                                     is not None) else filtered
+    # #164: a standalone OSCAR node delays the EEG ~324 ms, and g.Pype doesn't delay the flash
+    # markers to match, so epochs cut from it hold the P300 ~320 ms late (measured on g.tec's
+    # recordings: accuracy drops 0.04-0.14). Never epoch it; the averages and the classifier use
+    # the OSCAR-off stream, and the OSCAR branch stays for viewing.
+    epoch_input = filtered
+    if average_oscar and oscar_filtered is not None:
+        oscar_note += ("; epochs use the OSCAR-off stream (OSCAR's ~324 ms delay isn't applied "
+                       "to the flash markers, #164)")
     epochs, averages, triggers = {}, {}, {}
     for name, code in (("target", target_code),
                        ("nontarget", nontarget_code)):
@@ -256,7 +274,7 @@ def build_evidence_graph(kind: SourceKind | str = SourceKind.GENERATOR, *,
         nontarget_epochs=epochs["nontarget"],
         target_average=averages["target"],
         nontarget_average=averages["nontarget"],
-        oscar=oscar_filtered, oscar_note=oscar_note,
+        oscar=oscar_filtered, oscar_note=oscar_note, oscar_node=oscar_branch,
         epoch_input=epoch_input, target_trigger=triggers["target"],
         nontarget_trigger=triggers["nontarget"], target_code=target_code,
         nontarget_code=nontarget_code)

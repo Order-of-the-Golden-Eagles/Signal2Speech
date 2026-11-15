@@ -83,7 +83,7 @@ Assign the roles at the first rehearsal and write the names here.
 - S: question card in hand, stopwatch at 0:00.
 - W: seated, headset on, eyes on the screen, impedance or signal quality checked in the evidence view.
 - If the headset isn't ready in 30 seconds, switch to Track K before the judge sits down. Don't debug in front of the judge.
-- O: the build is the frozen `judging-final` (or `judging-draft`), `python -m signal2speech.app --smoke=judging` passed, Wi-Fi is off, and the fallback folder from [judging-build.md](../devops/judging-build.md#offline-safe-fallback-copy) is ready.
+- O: the build is the frozen `judging-final` (or `judging-draft`), `python -m signal2speech.app --smoke=judging` passed, Wi-Fi is on (Claude's reply suggestions need it; without it the app offers saved phrases), and the fallback folder from [judging-build.md](../devops/judging-build.md#offline-safe-fallback-copy) is ready.
 
 ## Second by second
 

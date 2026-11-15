@@ -37,12 +37,13 @@ class Tool:
 
 
 TOOLS: List[Tool] = [
-    Tool("demo-keyboard", "Demo · Keyboard", "Choose, preview, and confirm with keys 1 and 2. The map and voice answer.",
-         ["-m", "signal2speech.app", "--input", "keyboard"], fullscreen_ok=True),
-    Tool("demo-simulated", "Demo · Simulated", "The same flow driven by simulated brain signals (g.Pype if installed, otherwise scripted).",
-         ["-m", "signal2speech.app", "--input", "simulated", "--sim", "2,1"], fullscreen_ok=True),
-    Tool("ai", "AI Answering · Keyboard", "Type a question, pick a suggested reply, preview it, and confirm it.",
+    Tool("ai", "Signal2Speech · Keyboard", "The main app. Ask any question, pick a suggested reply, preview it, "
+         "confirm it, and it is spoken. The NASA example is one click inside.",
          ["-m", "signal2speech.ai"]),
+    Tool("demo-keyboard", "NASA example · Keyboard", "Choose, preview, and confirm with keys 1 and 2. The map and voice answer.",
+         ["-m", "signal2speech.app", "--input", "keyboard"], fullscreen_ok=True),
+    Tool("demo-simulated", "NASA example · Simulated", "The same flow driven by simulated brain signals (g.Pype if installed, otherwise scripted).",
+         ["-m", "signal2speech.app", "--input", "simulated", "--sim", "2,1"], fullscreen_ok=True),
     Tool("evidence", "Evidence view · Simulated", "g.Pype scopes: raw and filtered EEG, OSCAR, and the averaged P300.",
          ["-m", "signal2speech.evidence", "--source", "generator"], needs="gpype"),
     Tool("smoke", "Smoke check", "A hardware-free check of the whole demo. Shows PASS or FAIL here.",
