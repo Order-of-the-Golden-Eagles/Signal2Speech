@@ -26,7 +26,8 @@ REDRAW_MS = 80                 # about 12 pictures a second: steady, and cheap n
 class BrainTrace(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.caption = "No EEG: keyboard input"
+        self.caption = "No EEG: keyboard"
+        self.idle_note = "no signal right now"
         self.active = False
         self._lock = threading.Lock()
         self._samples: deque = deque(maxlen=int(RATE_HZ * SECONDS))
@@ -69,7 +70,7 @@ class BrainTrace(QWidget):
         title.setBold(True)
         p.setFont(title)
         p.setPen(QColor(T.TEXT))
-        label_w = T.px(118)
+        label_w = T.px(136)
         left = QRectF(box.left() + 10, box.top(), label_w, box.height())
         p.drawText(left.adjusted(0, 6, 0, -box.height() / 2), int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom),
                    "Brain Activity")
@@ -87,6 +88,12 @@ class BrainTrace(QWidget):
         with self._lock:
             data = np.fromiter(self._samples, dtype=float, count=len(self._samples))
         if not self.active or data.size < 2:
+            return
+        if float(np.ptp(data)) < 1e-9:
+            # Nothing is arriving: with recorded data the EEG plays only while the cards flash.
+            # Say so, and never draw a made-up signal in the gap.
+            p.setPen(QColor(T.MUTED))
+            p.drawText(plot, int(Qt.AlignmentFlag.AlignCenter), self.idle_note)
             return
         data = data - np.median(data)
         spread = float(np.percentile(np.abs(data), 98)) or 1.0

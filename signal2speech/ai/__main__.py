@@ -91,10 +91,12 @@ class AnsweringDemo:
         tap = getattr(self.app.sim, "trace_tap", None)
         if tap is not None:                    # an EEG input: show what the pipeline receives
             tap.on_rows = self.panel.trace.feed
+            if input_source == InputSources.RECORDED:
+                self.panel.trace.idle_note = "plays when the cards flash"
             self.panel.trace.set_source({
-                InputSources.LIVE_EEG: "Live EEG from the headset",
-                InputSources.RECORDED: "Recorded g.tec EEG, played at each flash",
-            }.get(input_source, "Simulated signal, not a brain"))
+                InputSources.LIVE_EEG: "Live EEG, headset",
+                InputSources.RECORDED: "Recorded g.tec EEG",
+            }.get(input_source, "Simulated, not a brain"))
         self.app.on_text_scale.append(self._style_banner)
         self._map_on = True
         self._show_map(False)
