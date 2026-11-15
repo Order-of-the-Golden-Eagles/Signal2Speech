@@ -592,4 +592,5 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - No wait after confirming: the app starts making the audio while the reply is still a preview. Measured on the judging laptop, speech starts 0.15 s after the confirm
 - Abbreviations are said properly: "AQI" is spoken as "air quality index", and ones we don't know are spelled out letter by letter. The screen still shows the original text
 - Licences to know about: Piper is GPL-3.0, so we run it as a separate program. The voice we chose is for non-commercial use with credit. The 63 MB voice file is not in the repo
+- Lines with numbers in them are spoken 25 % slower, so the figures are easy to catch
 - Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux

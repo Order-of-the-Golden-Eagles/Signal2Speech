@@ -41,6 +41,13 @@ EXPANSIONS: Dict[str, str] = {
 #: Abbreviations people say as a word, and short words written in capitals: leave them alone.
 SAID_AS_WORDS = frozenset({"NASA", "FIRMS", "MODIS", "GIBS", "LED", "OK", "NO", "YES", "AM", "PM"})
 _ABBREVIATION = re.compile(r"\b[A-Z]{2,5}\b")
+#: A line with numbers in it is spoken this much slower, so the figures are easy to catch.
+NUMBER_SLOWDOWN = 1.25
+
+
+def pace(text: str) -> float:
+    """Piper's length scale for a line: 1.0 is the voice's normal speed, 1.25 is 25 % slower."""
+    return NUMBER_SLOWDOWN if re.search(r"\d", text) else 1.0
 
 
 def spoken_form(text: str) -> str:
@@ -124,7 +131,8 @@ class PiperVoice:
     def request(self, text: str) -> Clip:
         """Start making ``text`` (or return the clip already made or under way)."""
         spoken = spoken_form(text)
-        key = hashlib.sha1(f"{self.name}\n{spoken}".encode("utf-8")).hexdigest()[:20]
+        scale = pace(spoken)
+        key = hashlib.sha1(f"{self.name}\n{scale}\n{spoken}".encode("utf-8")).hexdigest()[:20]
         clip = self._clips.get(key)
         if clip is not None and clip.state() != "failed":
             return clip
@@ -134,7 +142,7 @@ class PiperVoice:
             try:
                 process = subprocess.Popen(
                     [sys.executable, "-m", "piper", "-m", str(self.model),
-                     "-f", str(wav.with_suffix(".part.wav"))],
+                     "--length-scale", str(scale), "-f", str(wav.with_suffix(".part.wav"))],
                     stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                 process.stdin.write((spoken.replace("\n", " ") + "\n").encode("utf-8"))

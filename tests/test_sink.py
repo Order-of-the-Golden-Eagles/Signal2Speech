@@ -217,6 +217,11 @@ def test_piper_voice_makes_each_line_once_and_only_names_finished_files(tmp_path
     assert clip.state() == "working" and not clip.wav.exists()
     assert voice.request("The AQI rose.") is clip and len(_FakePiper.made) == 1   # previewed, then said
     assert _FakePiper.made[0].text == "The air quality index rose.\n"
+    scale = lambda proc: proc.args[proc.args.index("--length-scale") + 1]
+    assert scale(_FakePiper.made[0]) == "1.0"                                     # no numbers: normal speed
+    voice.request("It rose 186 points.")
+    assert scale(_FakePiper.made[-1]) == "1.25"                                   # numbers: 25 % slower
+    _FakePiper.made.pop()
     _FakePiper.made[0].finish()
     assert clip.state() == "ready" and clip.wav.is_file()
     bad = voice.request("Another line.")

@@ -31,6 +31,7 @@ curl -L -o voices/en_US-hfc_female-medium.onnx.json https://huggingface.co/rhass
 - **Another voice, or none:** set `SIGNAL2SPEECH_VOICE` to an `.onnx` file, or to `off`.
 - **No delay on confirm:** making a sentence takes one to two seconds, so the app starts making a line when it's previewed. Measured on the judging laptop: audio starts 0.15 s after the confirm when the line was previewed, and 1.5 s when it wasn't. A line is made once and reused.
 - **Abbreviations:** the voice is given the full form when we know it ("AQI" is said as "air quality index") and letters otherwise ("PDF" as "P.D.F."). The screen keeps the original text. The lists are in `signal2speech/speech/neural.py`.
+- **Numbers are read slower:** a line with figures in it is spoken 25 % slower, so they're easy to catch (`NUMBER_SLOWDOWN` in `neural.py`).
 - **If a line can't be made,** that line falls back to the bundled clip or the operating system's voice.
 
 **Licences. Check these before reusing the project elsewhere.**
