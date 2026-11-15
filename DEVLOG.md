@@ -539,7 +539,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Eye-closure confirm is still off on a real headset and key 1 confirms instead. That still needs one wearer run (#23, #103)
 - Docs only. Nothing new was run
 
-## 11/15/26 - 1:05 AM - MagicJester2764 - #172 PiEEG eye closure confirms in the real app (PR pending)
+## 11/15/26 - 1:05 AM - MagicJester2764 - #172 PiEEG eye closure confirms in the real app ([PR #191](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/191))
 - A teammate can now run the real app with a PiEEG board's eye closure as the confirm: keys pick the answer, closing the eyes for two seconds says it, and the map changes once
     - `python -m signal2speech.app --input pieeg --pieeg live` (no board: `--pieeg-self-test`)
 - Eye confirm turns on only after the board check from #150 passes on screen in that same session. If it fails, key 1 confirms instead
