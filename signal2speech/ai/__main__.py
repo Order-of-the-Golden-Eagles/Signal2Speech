@@ -2,8 +2,10 @@
 
     python -m signal2speech.ai [--provider auto|claude|stub|slow-stub|saved] [--question "..."]
 
-Reuses the #4 App (same handler, adapters, sink, transcript). Confirmed replies go through
-AppSink as speak_reply: spoken once, no map change.
+Reuses the #4 App (same handler, adapters, sink, transcript, and the real OpenOrbit view).
+A confirmed speak_reply is spoken once with no map change. A confirmed map suggestion
+(show_satellite or compare_air_quality, #106) reveals the map and speaks its line once, the
+same as in `python -m signal2speech.app`.
 """
 from __future__ import annotations
 
@@ -22,28 +24,15 @@ from .qt import AsyncSuggester, QuestionPanel
 from .replies import TIMEOUT_S, ReplySet, ReplySuggester, make_provider
 
 
-class NoMap:
-    """AI replies never touch the map. Any call here is a bug and is logged loudly."""
-
-    def __init__(self, log):
-        self.log = log
-
-    def show_satellite(self) -> None:
-        self.log("BUG: map action during AI Answering")
-
-    def compare_air_quality(self) -> None:
-        self.log("BUG: map action during AI Answering")
-
-
 class AnsweringDemo:
     def __init__(self, input_source: str = InputSources.KEYBOARD, provider_kind: str = "auto", *,
-                 provider=None, provider_note: Optional[str] = None, speaker=None,
+                 provider=None, provider_note: Optional[str] = None, speaker=None, view=None,
                  mute: bool = False, echo: bool = True, deadline_s: float = TIMEOUT_S + 1):
         if provider is None and provider_note is None:
             provider, provider_note = make_provider(provider_kind)
         self.provider_note = provider_note or ""
-        self.app = App(input_source, view=NoMap(lambda m: self.app.log(m)), speaker=speaker,
-                       mute=mute, echo=echo)
+        # view=None gives the real OpenOrbit view, so map suggestions (#106) reveal the map.
+        self.app = App(input_source, view=view, speaker=speaker, mute=mute, echo=echo)
         self.suggester = ReplySuggester(provider)
         self.async_ = AsyncSuggester(self.suggester, deadline_s, parent=self.app.window)
         self.panel = QuestionPanel()

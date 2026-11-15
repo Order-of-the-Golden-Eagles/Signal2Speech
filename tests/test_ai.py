@@ -163,10 +163,22 @@ def test_newer_request_wins(qapp):
 
 
 # ── End to end through the #4 app ────────────────────────────
-def make_demo(qapp, provider=None, deadline_s=2):
+class FakeView:
+    def __init__(self):
+        self.calls = []
+
+    def show_satellite(self):
+        self.calls.append(ActionIds.SHOW_SATELLITE)
+
+    def compare_air_quality(self):
+        self.calls.append(ActionIds.COMPARE_AIR_QUALITY)
+
+
+def make_demo(qapp, provider=None, deadline_s=2, view=None):
     speaker = FakeSpeaker()
     demo = AnsweringDemo(provider=provider or FixedProvider(), provider_note="test",
-                         speaker=speaker, echo=False, deadline_s=deadline_s)
+                         speaker=speaker, echo=False, deadline_s=deadline_s,
+                         view=view if view is not None else FakeView())
     demo.start()
     return demo, speaker
 
@@ -226,3 +238,25 @@ def test_stub_is_labelled_on_screen(qapp):
     demo.ask("Tea?")
     pump(qapp, lambda: demo.current and demo.current.origin == STUB)
     assert "Replies: Stub" in demo.panel.origin.text()
+
+
+def test_map_suggestion_reveals_the_map_once(qapp):
+    """#106 lets Claude suggest a map action. The AI demo must reveal the map, not drop it."""
+    from signal2speech.core import Choice
+    from signal2speech.ai import ReplySet
+    view = FakeView()
+    demo, speaker = make_demo(qapp, view=view)
+    line = "Washtenaw's AQI rose 186 points. Wayne's rose 168 points."
+    demo._show(ReplySet((Choice(T1, ActionIds.COMPARE_AIR_QUALITY, "Compare counties (shows the map)", line),
+                         Choice(T2, ActionIds.SPEAK_REPLY, "No, thanks.", "No, thanks.")), CLAUDE))
+    demo.app.window.press_target(T1)
+    assert view.calls == [] and speaker.said == []             # preview: nothing yet
+    demo.app.window.press_target(T1)
+    assert view.calls == [ActionIds.COMPARE_AIR_QUALITY] and speaker.said == [line]
+    assert not any("BUG" in l for l in demo.app.log.lines)
+
+
+def test_ai_demo_uses_the_real_map_view_by_default(qapp):
+    demo = AnsweringDemo(provider=FixedProvider(), provider_note="test", speaker=FakeSpeaker(),
+                         echo=False)
+    assert type(demo.app.view).__name__ in ("OpenOrbitView", "PendingMapView")
