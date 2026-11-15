@@ -650,7 +650,11 @@ class PiEEGConfirm:
 
     def _show_label(self) -> None:
         text = self.strip_text()
-        self.window.set_input_text(text, self.input_source if self.armed else InputSources.KEYBOARD)
+        choose, confirm = text.split(" · ", 1)          # "Choose: Keyboard" · "Confirm: ..."
+        # Two badges (#179). The confirm badge takes the board's colour only once it's armed;
+        # until then holding key 1 confirms, so it's the keyboard's colour.
+        self.window.set_two_inputs(choose, InputSources.KEYBOARD, confirm,
+                                   self.input_source if self.armed else InputSources.KEYBOARD)
         self.window.set_connection(self.connection_label())
         if self.on_label is not None:
             self.on_label(text)

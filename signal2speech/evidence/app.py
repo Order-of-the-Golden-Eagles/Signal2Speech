@@ -81,8 +81,18 @@ def add_scopes(graph: EvidenceGraph) -> list:
     return placed
 
 
-BANNER_COLORS = {"Simulated": "#c98a00", "Recorded": "#2f6fb0",
-                 "Live EEG": "#2e8b57"}
+def _banner_palette():
+    """(background, text) per input label, from the app's badge colours (#179), so the evidence
+    view and the app always show the same colour for the same input."""
+    from signal2speech.core import InputSources
+    from signal2speech.ui.theme import BADGE_COLORS, BADGE_TEXT
+    names = {InputSources.SIMULATED: "Simulated", InputSources.RECORDED: "Recorded",
+             InputSources.LIVE_EEG: "Live EEG"}
+    return {label: (BADGE_COLORS[src], BADGE_TEXT[src]) for src, label in names.items()}
+
+
+BANNER_COLORS = {label: bg for label, (bg, _fg) in _banner_palette().items()}
+BANNER_TEXT = {label: fg for label, (_bg, fg) in _banner_palette().items()}
 
 
 def banner_text(graph: EvidenceGraph) -> str:
@@ -99,7 +109,8 @@ def _banner(graph: EvidenceGraph):
     label = QLabel(banner_text(graph))
     label.setWordWrap(True)
     color = BANNER_COLORS.get(graph.label.value, "#555555")
-    label.setStyleSheet(f"background:{color}; color:white; font-size:16px;"
+    text = BANNER_TEXT.get(graph.label.value, "white")
+    label.setStyleSheet(f"background:{color}; color:{text}; font-size:16px;"
                         " font-weight:bold; padding:6px 12px;")
     return label
 

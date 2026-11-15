@@ -39,6 +39,22 @@ INPUT_COLORS = {
     InputSources.LIVE_EEG: "#22c55e",
 }
 
+# Input badges (#179): one colour per input, shared with the evidence view's banner so both
+# windows match. Keyboard is slate so it can't be mistaken for Recorded's blue, and nothing
+# but Live EEG is ever green. Each badge's text colour is the one that passes WCAG AA on it.
+BADGE_COLORS = {
+    InputSources.KEYBOARD: "#475569",
+    InputSources.SIMULATED: "#c98a00",
+    InputSources.RECORDED: "#2f6fb0",
+    InputSources.LIVE_EEG: "#1f7a46",
+}
+BADGE_TEXT = {
+    InputSources.KEYBOARD: "#ffffff",
+    InputSources.SIMULATED: "#111111",
+    InputSources.RECORDED: "#ffffff",
+    InputSources.LIVE_EEG: "#ffffff",
+}
+
 # AI reply origin labels in the question panel
 ORIGIN_COLORS = {"Claude": "#22c55e", "Stub": "#f59e0b", "Saved phrases": "#60a5fa"}
 
@@ -134,6 +150,10 @@ TEXT_PAIRS = [
     ("strip text", STRIP_TEXT, STRIP_BG, CAPTION + 2, False),
     *[(f"input label {name}", colour, STRIP_BG, CAPTION + 2, True)
       for name, colour in INPUT_COLORS.items()],
+    *[(f"input badge {name}", BADGE_TEXT[name], colour, CAPTION + 2, True)
+      for name, colour in BADGE_COLORS.items()],
+    *[(f"evidence banner {name}", BADGE_TEXT[name], colour, 16, True)
+      for name, colour in BADGE_COLORS.items()],
     *[(f"reply origin {name}", colour, BG, CAPTION + 2, True) for name, colour in ORIGIN_COLORS.items()],
     ("transcript", STRIP_TEXT, SURFACE, 15, False),
     ("conversation text", TEXT, SURFACE, BODY - 2, False),

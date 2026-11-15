@@ -25,6 +25,45 @@ from . import theme as P
 INPUT_LABELS = {InputSources.KEYBOARD: "Keyboard", InputSources.SIMULATED: "Simulated",
                 InputSources.RECORDED: "Recorded", InputSources.LIVE_EEG: "Live EEG"}
 _INPUT_COLORS = P.INPUT_COLORS
+
+# What judges read in the strip (#179): one plain sentence per outcome. The exact outcome name,
+# event and round go to the developer log and the tooltip. tests/ check every Outcome is here.
+OUTCOME_SENTENCES = {
+    Outcome.Previewed: "Showing a preview. Nothing has been said yet.",
+    Outcome.Confirmed: "Confirmed: shown and said once.",
+    Outcome.Cancelled: "Nothing was said: the preview was cancelled.",
+    Outcome.RejectedNoOpenRound: "Ignored: no question was open yet.",
+    Outcome.RejectedStaleRound: "Ignored a late signal from an earlier question.",
+    Outcome.RejectedDuplicateEvent: "Ignored a repeated signal.",
+    Outcome.RejectedRoundConsumed: "Ignored: this question was already answered.",
+    Outcome.RejectedUnknownTarget: "Ignored: that choice isn't on screen.",
+    Outcome.RejectedUnknownSource: "Ignored a signal from an unknown input.",
+    Outcome.RejectedMalformed: "Ignored a broken signal.",
+    Outcome.RejectedLiveConfirmDisarmed: "Eye closure ignored: eye confirm is off. Hold 1 to confirm.",
+}
+CLEARED_SENTENCES = {
+    "cancel": "Nothing was said: the preview was cancelled.",
+    "timeout": "Nothing was said: the preview timed out.",
+    "disconnect": "Nothing was said: the headset disconnected.",
+    "restart": "Restarted for the next visitor.",
+    "practice": "Practice round: nothing is sent.",
+}
+
+
+def plain_outcome(outcome: Outcome) -> str:
+    return OUTCOME_SENTENCES.get(outcome, outcome.value)
+
+
+def plain_cleared(reason: str) -> str:
+    return CLEARED_SENTENCES.get(reason, f"Nothing was said: the question was cleared ({reason}).")
+
+
+def badge_style(source: str) -> str:
+    """A rounded pill in the input's colour (#179), the same colour as the evidence banner."""
+    bg = P.BADGE_COLORS.get(source, P.RAISED)
+    fg = P.BADGE_TEXT.get(source, P.TEXT)
+    return (f"background:{bg}; color:{fg}; font-weight:700; border-radius:{P.RADIUS_S}px; "
+            f"padding:2px {P.S}px;")
 _TILE_ORDER = (TargetIds.TARGET_1, TargetIds.TARGET_2)
 
 _STYLE = P.window_qss()
@@ -315,13 +354,20 @@ class SelectionWindow(QMainWindow):
         # so the window never has to grow past the screen to fit it.
         self.input_label = WrapWhenLong(limit=60)
         self.input_label.setProperty("class", "strip")
+        # #179: a second badge when choose and confirm use different inputs (PiEEG, #172).
+        self.confirm_badge = WrapWhenLong(limit=60)
+        self.confirm_badge.setProperty("class", "strip")
+        self.confirm_badge.setVisible(False)
         self.connection_label = self._strip_label()
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()
         srow.addWidget(self.input_label)
-        # At large text sizes (#195) the round id may clip; the input label never does.
+        srow.addWidget(self.confirm_badge)
+        # #179: round ids live in the developer log now. The label stays (practice and tests
+        # read it) but isn't shown to judges.
         self.round_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.round_label.setMinimumWidth(1)
+        self.round_label.setVisible(False)
         srow.addWidget(self.round_label, 1)
         # The last outcome can be long; let it clip instead of forcing the window wide.
         # The transcript and the tooltip keep the full text.
@@ -337,7 +383,7 @@ class SelectionWindow(QMainWindow):
         self.set_input_source(input_source)
         self.set_connection("n/a" if input_source == InputSources.KEYBOARD else "unknown")
         self._set_round_text(None)
-        self.outcome_label.setText("Last: —")
+        self.outcome_label.setText("")
 
         self.flasher = FlashScheduler(self._set_tile_lit, on_flash,
                                       on_sequence_started=on_sequence_started,
@@ -371,16 +417,28 @@ class SelectionWindow(QMainWindow):
         """Label the decoder actually feeding the handler, so Simulated never reads as Live."""
         self.input_source = source
         self.input_label.setText(f"Input: {INPUT_LABELS.get(source, source)}")
-        self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(source, P.STRIP_TEXT)};"
-                                       "font-weight:700;")
+        self.input_label.setToolTip(self.input_label.text())
+        self.input_label.setStyleSheet(badge_style(source))
+        self.confirm_badge.setVisible(False)
 
     def set_input_text(self, text: str, color_source: str) -> None:
-        """Name two inputs at once, e.g. 'Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)'
-        (#172). ``input_source`` stays the chooser's; the colour is the confirm's when it's on."""
+        """One badge with custom text, in ``color_source``'s colour."""
         self.input_label.setText(text)
         self.input_label.setToolTip(text)
-        self.input_label.setStyleSheet(f"color:{_INPUT_COLORS.get(color_source, P.STRIP_TEXT)};"
-                                       "font-weight:700;")
+        self.input_label.setStyleSheet(badge_style(color_source))
+        self.confirm_badge.setVisible(False)
+
+    def set_two_inputs(self, choose_text: str, choose_source: str,
+                       confirm_text: str, confirm_source: str) -> None:
+        """Both badges when choose and confirm use different inputs (#172, #179), e.g.
+        [Choose: Keyboard] [Confirm: Live EEG (PiEEG Octopus 16)]. Each in its own colour."""
+        self.input_label.setText(choose_text)
+        self.input_label.setToolTip(choose_text)
+        self.input_label.setStyleSheet(badge_style(choose_source))
+        self.confirm_badge.setText(confirm_text)
+        self.confirm_badge.setToolTip(confirm_text)
+        self.confirm_badge.setStyleSheet(badge_style(confirm_source))
+        self.confirm_badge.setVisible(True)
 
     def set_connection(self, state: str) -> None:
         self.connection_label.setText(f"Connection: {state}")
@@ -395,7 +453,8 @@ class SelectionWindow(QMainWindow):
     def press_target(self, target_id: str) -> Outcome:
         outcome = self.keyboard.select_now(target_id)
         if outcome is Outcome.RejectedNoOpenRound:   # select_now returns before handle()
-            self.outcome_label.setText(f"Last: {outcome.value} · keyboard {target_id}")
+            self.outcome_label.setText(plain_outcome(outcome))
+            self.outcome_label.setToolTip(f"{outcome.value} · keyboard {target_id}")
         return outcome
 
     def press_cancel(self) -> None:
@@ -500,12 +559,13 @@ class SelectionWindow(QMainWindow):
         self.prompt.setVisible(True)
         self._set_round_text(None)
         if reason:
-            self.outcome_label.setText(f"Last: Cleared ({reason})")
+            self.outcome_label.setText(plain_cleared(reason))
+            self.outcome_label.setToolTip(f"Cleared ({reason})")
 
     def show_outcome(self, e: Optional[SelectionEvent], outcome: Outcome) -> None:
         detail = f" · {e.source} {e.eventId} {e.roundId}→{e.targetId}" if e else ""
-        self.outcome_label.setText(f"Last: {outcome.value}{detail}")
-        self.outcome_label.setToolTip(self.outcome_label.text())
+        self.outcome_label.setText(plain_outcome(outcome))
+        self.outcome_label.setToolTip(f"{outcome.value}{detail}")   # exact, for developers
         if outcome is Outcome.Confirmed:   # handler closed the round without on_cleared
             last = getattr(self, "_last_round", None)
             spoken = self._preview
@@ -539,7 +599,6 @@ class SelectionWindow(QMainWindow):
         """Append e.g. "map 3 ms · speech 180 ms" to the last outcome in the strip (#130)."""
         base = self.outcome_label.text().split("  ⏱ ")[0]
         self.outcome_label.setText(f"{base}  ⏱ {note}")
-        self.outcome_label.setToolTip(self.outcome_label.text())
 
     def set_countdown(self, seconds) -> None:
         """Show "Cancels in N s" under the preview, or hide it with None."""
