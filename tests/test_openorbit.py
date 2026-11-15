@@ -202,3 +202,81 @@ def test_images_load_with_matching_sizes_and_render(qapp):
     for m in maps:
         rect = m.image_rect()
         assert all(rect.contains(point) for _, point in m.marker_points())
+
+
+# ── Optional FIRMS layer (#31, #32) ─────────────────────────────────────────
+DATA = Path(__file__).resolve().parents[1] / "data" / "openorbit"
+
+
+def core_only_copy(tmp_path):
+    """data/openorbit without the optional firms/ folder."""
+    import shutil
+    dst = tmp_path / "openorbit"
+    shutil.copytree(DATA, dst, ignore=shutil.ignore_patterns("firms", "raw"))
+    return dst
+
+
+def test_fires_sample_has_vegetation_fires_only_and_none_in_the_demo_area():
+    from signal2speech.openorbit.dataset import load_fires
+    fires = load_fires()
+    assert fires is not None and fires.dates == (BEFORE, AFTER)
+    summary = json.loads((DATA / "firms" / "summary.json").read_text(encoding="utf-8"))
+    for date in fires.dates:
+        assert sum(p.date == date for p in fires.points) == summary["counts"][date]["vegetation_fires"] > 0
+    b = fires.bbox
+    assert all(b["south"] <= p.lat <= b["north"] and b["west"] <= p.lon <= b["east"] for p in fires.points)
+    demo = load_dataset().bbox  # southeast Michigan: smoke there, but no wildfire detections
+    assert not any(demo["south"] <= p.lat <= demo["north"] and demo["west"] <= p.lon <= demo["east"]
+                   for p in fires.points)
+
+
+def test_satellite_shows_fires_beside_the_smoke_with_their_own_credit(qapp):
+    from signal2speech.openorbit import OpenOrbitView
+    from signal2speech.openorbit.view import FiresMap
+    view = OpenOrbitView()
+    view.show_satellite()
+    texts = visible_texts(view)
+    assert any("Where the smoke came from" in t for t in texts)
+    assert any("NASA FIRMS" in t for t in texts)
+    assert not any("FIRMS" in t and "MODIS" in t for t in texts)   # separate from the smoke image credit
+    assert not any("EPA" in t or "AQI" in t for t in texts)        # separate from air quality
+    assert len([m for m in view.findChildren(FiresMap) if m.isVisibleTo(view)]) == 1
+    view.compare_air_quality()
+    assert not any("FIRMS" in t for t in visible_texts(view))
+
+
+def test_core_view_works_without_the_fires_asset(qapp, tmp_path):
+    """#31 Done when: the core comparison still runs without the optional asset."""
+    from signal2speech.openorbit import OpenOrbitView
+    from signal2speech.openorbit.view import FiresMap
+    view = OpenOrbitView(data_root=core_only_copy(tmp_path))
+    assert view.data_error is None and view.fires is None
+    view.show_satellite()
+    assert view.findChildren(FiresMap) == [] and not any("FIRMS" in t for t in visible_texts(view))
+    view.compare_air_quality()
+    assert "+186" in visible_texts(view) and "+168" in visible_texts(view)
+
+
+def test_broken_fires_asset_is_ignored(qapp, tmp_path):
+    from signal2speech.openorbit import OpenOrbitView
+    root = core_only_copy(tmp_path)
+    (root / "firms").mkdir()
+    (root / "firms" / "summary.json").write_text("{not json", encoding="utf-8")
+    view = OpenOrbitView(data_root=root)
+    assert view.fires is None and view.data_error is None
+    assert view.perform(ActionIds.SHOW_SATELLITE) and view.mode == "satellite"
+
+
+def test_fire_dots_and_home_marker_land_on_the_image(qapp):
+    from signal2speech.openorbit import OpenOrbitView
+    from signal2speech.openorbit.view import FiresMap
+    view = OpenOrbitView()
+    view.resize(1150, 500)
+    view.show_satellite()
+    view.grab()
+    fires_map = [m for m in view.findChildren(FiresMap) if m.isVisibleTo(view)][0]
+    rect = fires_map.image_rect()
+    dots = fires_map.dot_points()
+    assert len(dots) == len(view.fires.points)
+    assert all(rect.contains(p) for _, p in dots)
+    assert rect.contains(fires_map.home_point())

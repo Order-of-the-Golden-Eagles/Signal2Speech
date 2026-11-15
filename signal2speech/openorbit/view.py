@@ -22,13 +22,15 @@ from PySide6.QtWidgets import (QGridLayout, QHBoxLayout, QLabel, QSizePolicy, QS
 
 from signal2speech.core import ActionIds
 
-from .dataset import AFTER, BEFORE, Dataset, Place, load_dataset
+from .dataset import AFTER, BEFORE, Dataset, Fires, Place, load_dataset, load_fires
 
 BACKGROUND = "#101418"
 TEXT = "#FFFFFF"
 MUTED = "#C9D1D9"
 MARKER = QColor("#FFD400")
 LABEL_BOX = QColor(0, 0, 0, 185)
+FIRE_COLORS = ("#FF453A", "#FFD60A")   # first and last FIRMS date
+HOME_COLOR = "#00E5FF"                  # southeast Michigan on the regional fire map
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August",
           "September", "October", "November", "December")
 
@@ -236,6 +238,75 @@ class MapImage(QWidget):
         painter.drawText(box, Qt.AlignCenter, text)
 
 
+class FiresMap(QWidget):
+    """Optional (#31): NASA FIRMS vegetation-fire detections drawn over the June 28 regional image,
+    with southeast Michigan marked so viewers can see how far the smoke travelled."""
+
+    def __init__(self, fires: Fires, home: Tuple[float, float], parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self._fires = fires
+        self._home = home
+        self._pixmap = QPixmap(str(fires.image))
+        self._colors = {date: QColor(FIRE_COLORS[min(i, len(FIRE_COLORS) - 1)])
+                        for i, date in enumerate(fires.dates)}
+        self.setMinimumSize(200, 107)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def image_rect(self) -> QRectF:
+        scale = min(self.width() / self._fires.width, self.height() / self._fires.height)
+        w, h = self._fires.width * scale, self._fires.height * scale
+        return QRectF((self.width() - w) / 2, (self.height() - h) / 2, w, h)
+
+    def _point(self, lat: float, lon: float) -> QPointF:
+        r = self.image_rect()
+        x, y = self._fires.to_pixel(lat, lon)
+        return QPointF(r.x() + x * r.width() / self._fires.width, r.y() + y * r.height() / self._fires.height)
+
+    def dot_points(self) -> List[Tuple[str, QPointF]]:
+        return [(p.date, self._point(p.lat, p.lon)) for p in self._fires.points]
+
+    def home_point(self) -> QPointF:
+        return self._point(*self._home)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        r = self.image_rect()
+        if self._pixmap.isNull():
+            painter.setPen(QColor(TEXT))
+            painter.drawText(r, Qt.AlignCenter, "Fire map image missing")
+            painter.end()
+            return
+        painter.drawPixmap(r, self._pixmap, QRectF(self._pixmap.rect()))
+        dot = max(1.2, r.width() / 450)
+        painter.setPen(Qt.NoPen)
+        for date, point in self.dot_points():
+            painter.setBrush(self._colors.get(date, QColor(FIRE_COLORS[0])))
+            painter.drawEllipse(point, dot, dot)
+
+        home, radius = self.home_point(), max(5.0, r.height() / 45)
+        painter.setBrush(Qt.NoBrush)
+        painter.setPen(QPen(QColor("black"), 5))
+        painter.drawEllipse(home, radius, radius)
+        painter.setPen(QPen(QColor(HOME_COLOR), 3))
+        painter.drawEllipse(home, radius, radius)
+        font = QFont(self.font())
+        font.setPixelSize(max(12, int(r.height() / 16)))
+        font.setBold(True)
+        painter.setFont(font)
+        metrics = QFontMetricsF(font)
+        text = "SE Michigan"
+        w, h = metrics.horizontalAdvance(text) + 12, metrics.height() + 4
+        box = _clamp(QRectF(home.x() - w / 2, home.y() - radius - 4 - h, w, h), r)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(LABEL_BOX)
+        painter.drawRoundedRect(box, 4, 4)
+        painter.setPen(QColor(TEXT))
+        painter.drawText(box, Qt.AlignCenter, text)
+        painter.end()
+
+
 class OpenOrbitView(QWidget):
     """Blank until a confirmed OpenOrbit action. Exposes both action IDs from the contract.
 
@@ -247,7 +318,7 @@ class OpenOrbitView(QWidget):
     MODES = ("blank", "satellite", "compare")
 
     def __init__(self, dataset: Optional[Dataset] = None, parent: Optional[QWidget] = None, *,
-                 data_root: Optional[Path] = None):
+                 data_root: Optional[Path] = None, with_fires: bool = True):
         super().__init__(parent)
         self.data_error: Optional[str] = None
         if dataset is None:
@@ -256,6 +327,9 @@ class OpenOrbitView(QWidget):
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 self.data_error = str(exc) or type(exc).__name__
         self.dataset = dataset
+        # Optional FIRMS layer (#31). Missing or broken files just mean no fire map.
+        self.fires: Optional[Fires] = (load_fires(dataset.root)
+                                       if dataset is not None and with_fires else None)
         self.setObjectName("OpenOrbitView")
         self.setAttribute(Qt.WA_StyledBackground, True)
         self.setStyleSheet(f"#OpenOrbitView {{ background-color: {BACKGROUND}; }}")
@@ -329,8 +403,36 @@ class OpenOrbitView(QWidget):
         ds = self.dataset
         page, layout = self._page()
         layout.addWidget(_label("Southeast Michigan under wildfire smoke", TITLE_PX, bold=True))
-        layout.addWidget(MapImage(ds, AFTER, caption=_long_date(AFTER)), 1)
+        if self.fires is None:
+            layout.addWidget(MapImage(ds, AFTER, caption=_long_date(AFTER)), 1)
+            layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
+            return page
+
+        # With the optional FIRMS sample: the fire map sits beside the smoke image, under its
+        # own heading, legend, and credit, so detections are never mixed up with smoke or AQI.
+        home = (sum(p.lat for p in ds.places) / len(ds.places), sum(p.lon for p in ds.places) / len(ds.places))
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(4)
+        grid.addWidget(_label("Smoke over the demo counties", BODY_PX, bold=True), 0, 0)
+        grid.addWidget(_label("Where the smoke came from", BODY_PX, bold=True), 0, 1)
+        grid.addWidget(MapImage(ds, AFTER, caption=_long_date(AFTER)), 1, 0)
+        grid.addWidget(FiresMap(self.fires, home), 1, 1)
+        swatches = "&nbsp;&nbsp;".join(
+            f"<span style='color:{FIRE_COLORS[min(i, len(FIRE_COLORS) - 1)]}'>&#9679;</span> {_long_date(d)}"
+            for i, d in enumerate(self.fires.dates))
+        legend = QLabel(f"Vegetation fires detected: {swatches}&nbsp;&nbsp;"
+                        f"<span style='color:{HOME_COLOR}'>&#9711;</span> Southeast Michigan")
+        legend.setTextFormat(Qt.RichText)
+        legend.setWordWrap(True)
+        legend.setStyleSheet(f"color: {MUTED}; font-size: {SMALL_PX}px;")
+        grid.addWidget(legend, 2, 1)
+        grid.setRowStretch(1, 1)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        layout.addLayout(grid, 1)
         layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
+        layout.addWidget(_label(self.fires.credit, SMALL_PX, MUTED))
         return page
 
     def _build_compare(self) -> QWidget:
@@ -386,4 +488,4 @@ class OpenOrbitView(QWidget):
         return [first, second]
 
 
-__all__ = ["MapImage", "OpenOrbitView"]
+__all__ = ["FiresMap", "MapImage", "OpenOrbitView"]
