@@ -490,3 +490,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Re-tested the AI demo window on the current code (Claude Sonnet 5.5 with grounded replies): a fresh question got two good replies in about 2 seconds, and the confirmed one was spoken once
 - The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
 - With the AI provider unreachable, saved phrases appear right away, labelled offline. A real Wi-Fi-off run is still part of the judging-laptop session
+
+## 11/14/26 - 11:56 PM - Vasanth Anbukumar - #37 Docs-only changes skip the slow tests (PR pending)
+- A PR that only touches docs, the devlog, or images now finishes its checks in under a minute instead of about five: the four test jobs still report (so the PR can merge) but skip install, pytest, and smoke
+- A new "quick checks" job runs on every PR in a few seconds with nothing installed: `python tools/quick_check.py`
+    - It fails on leftover merge-conflict markers and on a devlog entry duplicated by a merge, the two things that have actually broken doc-only PRs today
+- The pre-push hook does the same locally: quick checks always, and the full test suite only when the pushed commits change code, tests, data, or build files
+- Anything under `signal2speech/`, `tests/`, `contracts/`, `data/` (except its `.md` notes), `tools/`, `.github/`, `.githooks/`, or the dependency files still runs everything. Pushes to `main` always run the full suite on every OS

@@ -15,7 +15,38 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Runs on every PR in a few seconds, with nothing installed. It also decides whether the
+  # change touches code. Docs, the devlog and images skip the slow test steps below.
+  quick:
+    name: quick checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.scope.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: No conflict markers, no duplicated devlog entries
+        run: python3 tools/quick_check.py
+      - name: Does this change need the test suite?
+        id: scope
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            code=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" | python3 tools/quick_check.py --needs-tests)
+          else
+            code=true                 # pushes to main and manual runs always test everything
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = "true" ]; then msg="Code changed: running the full test jobs."
+          else msg="Docs-only change: the test jobs skip install, pytest and smoke."; fi
+          echo "### $msg" >> "$GITHUB_STEP_SUMMARY"
+
   ci:
+    needs: quick
+    # Always report, so the required checks resolve: these jobs pass fast on a docs-only change
+    # and fail if the quick checks failed.
+    if: ${{ !cancelled() }}
     name: ci (${{ matrix.os }}, py${{ matrix.python }})   # pytest + smoke
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -40,9 +71,22 @@ jobs:
       run:
         shell: bash                # same syntax on Windows; GitHub runs bash with -eo pipefail
     steps:
+      - name: Quick checks must pass
+        if: needs.quick.result != 'success'
+        run: |
+          echo "The quick checks job failed. See its log."
+          exit 1
+
+      - name: Docs-only change, tests skipped
+        if: needs.quick.outputs.code != 'true'
+        run: |
+          echo "### Docs-only change, so install, pytest and smoke were skipped" >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v4
+        if: needs.quick.outputs.code == 'true'
 
       - uses: actions/setup-python@v5
+        if: needs.quick.outputs.code == 'true'
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -51,7 +95,7 @@ jobs:
             requirements-lock.txt
 
       - name: Linux system libraries (Qt offscreen, Qt Multimedia, speech, Bluetooth runtime)
-        if: runner.os == 'Linux'
+        if: needs.quick.outputs.code == 'true' && runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -60,6 +104,7 @@ jobs:
 
       - name: Install (versions constrained to requirements-lock.txt)
         id: install
+        if: needs.quick.outputs.code == 'true'
         run: |
           python -m pip install --upgrade pip
           # -c applies the verified pins where a package is needed. Windows-only pins
@@ -67,6 +112,7 @@ jobs:
           pip install --resume-retries 30 --timeout 120 -c requirements-lock.txt -e ".[dev,mcp]"
 
       - name: Show versions
+        if: needs.quick.outputs.code == 'true'
         run: |
           python - <<'EOF'
           import sys
@@ -81,6 +127,7 @@ jobs:
 
       - name: pytest
         id: pytest
+        if: needs.quick.outputs.code == 'true'
         run: |
           set +e                        # write the summary even when tests fail
           # Slow real-time tests run on every OS for pushes to main, and on Windows (the
@@ -104,7 +151,7 @@ jobs:
           exit $rc
 
       - name: Smoke (#41)
-        if: always() && steps.install.outcome == 'success'
+        if: always() && needs.quick.outputs.code == 'true' && steps.install.outcome == 'success'
         run: |
           set +e
           # --help must work: a broken app import fails here instead of looking like a skip.
@@ -127,7 +174,7 @@ jobs:
           exit $rc
 
       - name: Manual checks (not run in CI)
-        if: always()
+        if: always() && needs.quick.outputs.code == 'true'
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
           ### Manual checks (not run in CI)
