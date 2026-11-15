@@ -179,6 +179,12 @@ class SequenceAggregator:
         self._scores: Dict[str, List[float]] = {}
         self._open = False
 
+    @property
+    def is_open(self) -> bool:
+        """True while a sequence is collecting scores (between start() and finish())."""
+        with self._lock:
+            return self._open
+
     def start(self) -> None:
         with self._lock:
             self._scores = {t: [] for t in self.tiles}

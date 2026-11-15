@@ -10,7 +10,8 @@ from typing import Callable, Dict, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QMainWindow, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QMainWindow, QSizePolicy,
+                               QVBoxLayout, QWidget)
 
 from signal2speech.core import (Choice, InputAdapter, InputSources, Outcome, Round, RoundKind,
                                 SelectionEvent, SelectionHandler, TargetIds)
@@ -45,7 +46,7 @@ class Tile(QLabel):
         self._label = ""
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setWordWrap(True)
-        self.setMinimumSize(420, 260)
+        self.setMinimumSize(300, 220)   # fits two tiles plus the map at 1280x720 (#94)
         self._apply()
 
     @property
@@ -124,8 +125,15 @@ class SelectionWindow(QMainWindow):
         self.connection_label = self._strip_label()
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()
-        for w in (self.input_label, self.connection_label, self.round_label):
-            srow.addWidget(w)
+        srow.addWidget(self.input_label)
+        srow.addWidget(self.round_label)
+        # The last outcome can be long; let it clip instead of forcing the window wide.
+        # The transcript and the tooltip keep the full text.
+        self.outcome_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        # The connection text can be long ("scripted, no g.Pype (...)"); let it clip too.
+        # The input label never clips: it's what keeps simulated input from looking live.
+        self.connection_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        srow.addWidget(self.connection_label, 1)
         srow.addWidget(self.outcome_label, 1)
         col.addWidget(strip)
         self.setCentralWidget(root)
@@ -168,6 +176,9 @@ class SelectionWindow(QMainWindow):
 
     def set_connection(self, state: str) -> None:
         self.connection_label.setText(f"Connection: {state}")
+        self.connection_label.setToolTip(self.connection_label.text())
+        # Keyboard has no connection to report; hide "n/a" so small screens keep room (#94).
+        self.connection_label.setVisible(state != "n/a")
 
     def _set_round_text(self, rnd: Optional[Round]) -> None:
         self.round_label.setText(f"Round: {rnd.id} ({rnd.kind.value})" if rnd else "Round: —")
@@ -224,6 +235,7 @@ class SelectionWindow(QMainWindow):
     def show_outcome(self, e: Optional[SelectionEvent], outcome: Outcome) -> None:
         detail = f" · {e.source} {e.eventId} {e.roundId}→{e.targetId}" if e else ""
         self.outcome_label.setText(f"Last: {outcome.value}{detail}")
+        self.outcome_label.setToolTip(self.outcome_label.text())
         if outcome is Outcome.Confirmed:   # handler closed the round without on_cleared
             self.reset()
             self.prompt.setText("Confirmed · sent to output")

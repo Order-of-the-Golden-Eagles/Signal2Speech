@@ -1,4 +1,4 @@
-"""``python -m signal2speech.evidence --source generator|hybridblack|replay``."""
+"""``python -m signal2speech.evidence --source generator|hybridblack|replay [--p300]``."""
 
 from __future__ import annotations
 
@@ -28,6 +28,19 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--no-flasher", action="store_true",
                         help="Do not emit simulated flash markers (use when "
                              "the P300 chooser's tiles send them)")
+    parser.add_argument("--p300", action="store_true",
+                        help="Drive the flashes from the P300 chooser (#46): "
+                             "calibrate, then select; averages use the "
+                             "chooser's calibration markers and decisions "
+                             "go to the SelectionHandler")
+    parser.add_argument("--calibration", type=int, default=6,
+                        help="P300 mode: calibration sequences before "
+                             "selecting (default 6)")
+    parser.add_argument("--flashes", type=int, default=5,
+                        help="P300 mode: flashes per tile per sequence")
+    parser.add_argument("--seed", type=int, default=0,
+                        help="P300 mode: seed for flash order and the "
+                             "simulated attended tile")
     parser.add_argument("--seconds", type=float, default=None,
                         help="Close the window after this many seconds")
     parser.add_argument("--screenshot", type=Path, default=None,
@@ -41,6 +54,8 @@ def parse_args(argv=None) -> argparse.Namespace:
             parser.error("--source replay needs a run directory")
         if args.record is not None:
             parser.error("cannot record a replay")
+        if args.p300:
+            parser.error("--p300 needs a generator or hybridblack source")
     elif len(args.source) != 1:
         parser.error(f"--source {kind} takes no path")
     return args

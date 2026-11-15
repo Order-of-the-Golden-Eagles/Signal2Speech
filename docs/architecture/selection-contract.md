@@ -59,7 +59,7 @@ All input sources produce the same shape:
 | --- | --- | --- |
 | `source` | `keyboard`, `simulated` (g.Pype `Generator` or injected), `recorded` (g.Pype replay), `live-eeg` | The adapter. Label input honestly in logs and the demo. |
 | `roundId` | `r1`, `r2`, … | The app issues it, and the adapter stamps it **when the flash sequence starts**, not when the decision arrives. |
-| `eventId` | `k1`, `s1`, `rec1`, `e1`, … | The adapter. Unique per run. |
+| `eventId` | `k1`, `s2`, `rec3`, `e4`, … | The adapter, from one process-wide counter, so it's unique per run even when two adapters share a source (the P300 chooser and the alpha switch both use `live-eeg`). |
 | `targetId` | `target-1`, `target-2` | The adapter maps keys or classifier classes onto it (`EegClassMap.default()`: 1 → `target-1`, 2 → `target-2`). |
 
 In Python, this is `SelectionEvent`. Its field names match the JSON so `SelectionEvent.from_dict()` maps 1:1.

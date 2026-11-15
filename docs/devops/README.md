@@ -6,6 +6,60 @@ Keep an offline judging build and rollback path. Add PR smoke checks after the l
 
 **Consolidated issues** · [#17](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/17), [#18](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/18)
 
+## Smoke check (#41)
+
+One hardware-free command. It needs no display, no network, and no headset.
+
+```
+python -m signal2speech.app --smoke            # dev: pieces not built yet are SKIP, exit 0 unless something FAILs
+python -m signal2speech.app --smoke=judging    # judging laptop: any SKIP or WARN counts as FAIL
+```
+
+| Check | What it proves | Input label |
+| --- | --- | --- |
+| environment | Python, g.Pype 4.2 or later, and PySide6 import. Python other than 3.12 is a **WARN**. | — |
+| demo numbers | In the spoken line (read with the app's own `load_demo_choices`), each county is followed in the same sentence by its exact rise: Washtenaw +186, Wayne +168. `1860` doesn't count. | — |
+| openorbit assets | `data/openorbit/` has `SOURCES.md` and at least 2 images. Each county's before and after values must be on that county's own rows: Washtenaw 32 and 218, Wayne 58 and 226. **SKIP until #29 lands.** | — |
+| openorbit view | `app.load_view()` returns the real view, not `PendingMapView`. **SKIP until #30 lands**; the app shows a labelled stand-in until then. | — |
+| confirm flow | The real `App` with a fake map and speaker. Preview gives no output. Confirm gives exactly one `compare_air_quality` and one spoken line. | keyboard |
+| cancel flow | Preview, then Cancel, gives no output. A late key gets `RejectedNoOpenRound`. | keyboard |
+| g.Pype stream | A `Generator` → `Collector` pipeline delivers samples (about 1 s) | simulated |
+
+The smoke prints these **MANUAL** checks and never runs them:
+- headset pairing and 8-channel signal
+- live P300 and alpha calibration (#23)
+- evidence scopes (#48)
+- audible speech
+- the Wi-Fi-off full reveal
+
+**Verified 2026-11-14 (Linux dev machine, Python 3.12.13):**
+- `--smoke` gave `SMOKE PASS: 5 pass, 2 skip, 0 fail` before #29 and #30 landed. On `bfce988` it gives `SMOKE PASS: 7 pass, 0 skip, 0 fail` (#40 checkpoint).
+- `--smoke=judging` gives `SMOKE FAIL` with exit 1, as expected until #29 and #30 land.
+- A deliberate double-output breakage makes `confirm flow` FAIL with exit 1. That's covered in `tests/test_diagnostics.py`.
+
+### Diagnostics log
+
+Each smoke run claims its own `logs/smoke-<timestamp>-<ms>-<pid>.jsonl`, so parallel runs never share a file. `logs/` is gitignored. Every row carries `input`, `gpype` (source), and `connection`, plus the event fields:
+
+- rounds, previews, outcomes with `since_round_ms`, clears
+- `output` rows with `sink_call_ms`: the time inside `AppSink.execute`, which covers the map update and *starting* speech. Qt plays speech asynchronously, so the audible duration isn't included.
+- Attaching several `Diagnostics` to one sink wraps it once. Each one logs a single output row per confirm.
+
+To log a real demo run, the #25 owner can add one line in `App.__init__`. It isn't wired in yet, because #41 may only touch `--smoke` in `app.py`:
+
+```python
+from signal2speech.diagnostics import Diagnostics
+self.diag = Diagnostics.to_file().attach(h, input_source=input_source,
+                                         gpype_source="Generator" if self.sim else "none",
+                                         connection="n/a", sink=self.sink)
+```
+
+**Raw EEG guard (#10):** `Diagnostics.record()` uses an allow-list. It accepts scalars, dicts up to 3 levels deep, and lists of up to 32 scalars. Anything else raises `TypeError`, including arrays, deques, bytes, nested sample lists, and long strings. Nothing gets stringified as a fallback. Call `set_connection()` or `set_gpype_source()` when the headset state changes.
+
+**Next:**
+- #37 runs `pytest` and `--smoke` in GitHub Actions.
+- #38 records one passing and one deliberately failing run.
+
 ## CI on every PR (#37)
 
 `.github/workflows/tests.yml` runs on every pull request and every push to `main`.
@@ -16,8 +70,19 @@ Keep an offline judging build and rollback path. Add PR smoke checks after the l
   - install
   - version report (`importlib.metadata`, so it can't crash the job)
   - `pytest -q -rs`
-  - `python -m signal2speech.app --smoke`. It's a visible "Smoke skipped" notice until #41 merges.
+  - `python -m signal2speech.app --smoke` (#41). It fails the job on any FAIL. Before #41, it was a visible "Smoke skipped" notice.
   - a **manual checks** list
 - **Job summary:** each `ci (...)` job's summary shows the pytest exit code and result line, every skip with its reason, any FAILED or ERROR lines, the full smoke report with its exit code, and the manual checklist. It's written even when a step fails, so skips and failures are never silent. If the app can't even start, the smoke step fails instead of reporting a skip.
 - **Cancelling runs:** a new push cancels the older run only on PRs. Each commit on `main` keeps its own result. Before this change, a quick second merge cancelled the first merge's run ([example](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43646992188)).
 - **Linux packages** are the same list as in [platform notes](../dev-setup-docs/README.md#platform-notes). Only `espeak-ng` is installed, because pyttsx3 2.99 loads `libespeak-ng` and the legacy `libespeak1` isn't needed.
+
+### Verified: the PR check passes and fails (#38)
+
+| Run | Change | Result |
+| --- | --- | --- |
+| [43648496045](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43648496045) | #68 final commit | ✅ all 4 jobs green |
+| [43649217606](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43649217606) | #38: a deliberately failing test (`tests/test_zz_ci_canary.py`) | ❌ all 4 jobs red with `1 failed, 104 passed`. The assertion message shows in the log and the `FAILED` line in the job summary. The smoke and manual-check steps still ran. |
+| [43650157549](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43650157549) | #38: canary removed | ✅ all 4 jobs green |
+
+- **Matrix:** Ubuntu appears twice on purpose. See the comment on `matrix:` in [`tests.yml`](../../.github/workflows/tests.yml), which is the single source for why.
+- **Known flake (open, #48 owner):** `tests/test_evidence.py::test_generator_average_separates_target_from_nontarget` failed once on macOS. It compares a synthetic P300 peak gap against `> 2.5`, and got 2.41 ([run](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43648196650)). The likely cause is a wall-clock capture that averages fewer epochs on a slow runner. The real fix is to wait for a fixed epoch count. Until then, re-run that job **once**. If it fails twice, or fails on any other OS, treat it as a real regression.
