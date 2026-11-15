@@ -565,7 +565,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The tones are generated in code, so there's no audio file to download or license
 - Verified with the keyboard and in headless tests with a fake sound player (11 new tests: wording for cancel, timeout, and disconnect; one cue per event; confirm cue before speech; exactly one speech). I haven't listened to the tones' volume on the judging laptop's speakers yet.
 
-## 11/15/26 - 1:53 AM - Vasanth Anbukumar - #199 The board session's spoken cues work off Windows too (PR pending)
+## 11/15/26 - 1:53 AM - Vasanth Anbukumar - #199 The board session's spoken cues work off Windows too ([PR #202](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/202))
 - On macOS or Linux, the voice-guided board session (`python -m signal2speech.eeg.board_session`) would have spoken its first instruction and gone silent for the rest. It now speaks every cue
     - Same cause and same fix as the app's backup voice: each cue is spoken from its own short-lived helper process
 - The library run isn't affected either way: on the judging laptop the session uses Windows' own voice, which always spoke every cue
