@@ -34,8 +34,8 @@ _MAP_ACTIONS = {ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY}
 
 
 class _KeyOne(QObject):
-    """App-wide filter for key 1, so a hold can be told apart from a tap (#175). Typing a 1 in a
-    text field (the AI question box) is left alone."""
+    """App-wide filter for keys 1 and 2, so a hold can be told apart from a tap (#175). Typing a
+    1 or 2 in a text field (the AI question box) is left alone."""
 
     def __init__(self, window):
         super().__init__(window)
@@ -45,13 +45,18 @@ class _KeyOne(QObject):
         t = event.type()
         if t not in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
             return False
-        if event.key() != Qt.Key.Key_1 or event.isAutoRepeat() or event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier:
+        if (event.key() not in (Qt.Key.Key_1, Qt.Key.Key_2) or event.isAutoRepeat()
+                or event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier):
             return False
         if isinstance(QApplication.focusWidget(), (QLineEdit, QTextEdit, QPlainTextEdit)):
             return False
         if not self.window.isVisible() and not getattr(self.window, "_test_keys", False):
             return False
-        self.window.key_one(t == QEvent.Type.KeyPress)
+        pressed = t == QEvent.Type.KeyPress
+        if event.key() == Qt.Key.Key_1:
+            self.window.key_one(pressed)
+        else:
+            self.window.key_two(pressed)
         return True
 
 
@@ -274,6 +279,10 @@ class SelectionWindow(QMainWindow):
         prow.addWidget(self.preview, 1)
         self.ring = ConfirmRing()
         self.ring.handlers["keyboard"] = lambda: self.press_target(TargetIds.TARGET_1)
+        # Cancelling takes the same deliberate hold as confirming: a stray tap on 2 must not
+        # throw away what the wearer just chose.
+        self.ring.handlers["cancel"] = lambda: self.press_target(TargetIds.TARGET_2)
+        self._held_key: Optional[int] = None       # which key is filling the ring: 1 or 2
         prow.addWidget(self.ring, 0, Qt.AlignmentFlag.AlignVCenter)
         pcol.addLayout(prow)
         self.preview_box.setVisible(False)
@@ -334,9 +343,9 @@ class SelectionWindow(QMainWindow):
                                       on_sequence_started=on_sequence_started,
                                       on_sequence_finished=on_sequence_finished, parent=self)
 
-        # Ambient keys; auto-repeat off so a held "2" can't preview and then cancel.
-        for seq, fn in (("2", lambda: self.press_target(TargetIds.TARGET_2)),
-                        ("Esc", self.press_cancel)):
+        # Esc is the operator's instant cancel. Keys 1 and 2 go through the key filter below,
+        # because in a Confirm round both must be held.
+        for seq, fn in (("Esc", self.press_cancel),):
             sc = QShortcut(QKeySequence(seq), self)
             sc.setAutoRepeat(False)
             sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
@@ -399,12 +408,12 @@ class SelectionWindow(QMainWindow):
         """The Confirm-round hint, matching what really confirms (#103)."""
         if self.eye_confirm is False:
             return (f"Confirm: hold 1  (eye-closure confirm is off: {self.eye_off_reason})   ·   "
-                    "Cancel: key 2 or Esc")
+                    "Cancel: hold 2, or Esc")
         if (self.input_source == InputSources.LIVE_EEG
                 and not self.handler.live_eeg_confirm_armed):
             return ("Confirm: hold 1  (eye-closure confirm is off until #23 says it's safe)   ·   "
-                    "Cancel: key 2 or Esc")
-        return "Confirm: close your eyes for 2 s, or hold 1   ·   Cancel: key 2 or Esc"
+                    "Cancel: hold 2, or Esc")
+        return "Confirm: close your eyes for 2 s, or hold 1   ·   Cancel: hold 2, or Esc"
 
     def eyes_can_confirm(self) -> bool:
         """Whether an eye closure can confirm right now (mirrors confirm_hint)."""
@@ -422,14 +431,25 @@ class SelectionWindow(QMainWindow):
 
     def key_one(self, pressed: bool) -> None:
         """Physical key 1. Choose round: a tap picks. Confirm round: hold to fill the ring."""
+        self._hold_or_tap(1, pressed, "keyboard", TargetIds.TARGET_1)
+
+    def key_two(self, pressed: bool) -> None:
+        """Physical key 2. Choose round: a tap picks. Confirm round: hold to cancel."""
+        self._hold_or_tap(2, pressed, "cancel", TargetIds.TARGET_2)
+
+    def _hold_or_tap(self, key: int, pressed: bool, ring_source: str, target: str) -> None:
+        if not pressed:
+            if self._held_key == key:               # letting go early empties the ring
+                self._held_key = None
+                self.ring.release()
+            return
         rnd = self.handler.current
         if rnd is not None and rnd.kind is RoundKind.CONFIRM:
-            if pressed:
-                self.ring.start_hold("keyboard", HOLD_S)
-            else:
-                self.ring.release()
-        elif pressed:
-            self.press_target(TargetIds.TARGET_1)
+            if self._held_key is None:              # the first key down owns the ring
+                self._held_key = key
+                self.ring.start_hold(ring_source, HOLD_S)
+        else:
+            self.press_target(target)
 
     def show_round(self, rnd: Round) -> None:
         self.flasher.stop()

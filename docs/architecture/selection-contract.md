@@ -72,7 +72,7 @@ In Python, this is `SelectionEvent`. Its field names match the JSON so `Selectio
 | --- | --- | --- |
 | Choose (OpenOrbit demo, [`demo-round.json`](../../contracts/demo-round.json)) | `show_satellite` | `compare_air_quality` |
 | Choose (AI Answering, #27) | `speak_reply` (reply A) | `speak_reply` (reply B) |
-| Confirm (always) | `confirm` (alpha switch or key 1) | `cancel` (key 2, Esc, or timeout) |
+| Confirm (always) | `confirm` (alpha switch or key 1) | `cancel` (hold key 2, Esc, or timeout) |
 
 **Actions** are stable strings in `ActionIds`. Only these three ever reach output:
 

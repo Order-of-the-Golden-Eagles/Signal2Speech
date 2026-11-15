@@ -629,3 +629,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - One rule everywhere, including the board session: low beep, close your eyes; high beep, open them
 - Fixed the app window growing past the screen during the eye check: a long status line forced it to 1841 wide on a 1536-wide screen. Long lines now wrap
 - Verified on the judging laptop: a full spoken dry run of the board session from a cold start with no cue falling back to the old voice, and the app in PiEEG mode on our simulated board staying 1520 wide. Seven new tests. Not yet run on a real board
+
+## 11/15/26 - 3:58 AM - Vasanth Anbukumar - #210 Cancelling on the preview screen now needs a hold, like confirming
+- On the preview screen, key 2 must now be held for two seconds to cancel, the same as holding key 1 to confirm. A stray tap no longer throws away what the wearer just chose
+    - The ring fills while you hold and shows "Cancel". Letting go early empties it
+    - When choosing between the two tiles, key 2 still picks at once. Esc is still an instant cancel for the operator
+- It works the same with a board connected: the eye closure confirms, and cancelling is a hold of key 2, Esc, or the timeout
+- The idle demo (#193) now stays off whenever a board is used, so it can't start over a wearer's 90-second eye check
+- Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
