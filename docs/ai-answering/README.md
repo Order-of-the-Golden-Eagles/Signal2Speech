@@ -22,3 +22,5 @@ Type the question and press Enter, then use keys 1/2 and Esc as usual. **Other r
   - **No late swaps:** a late answer can never replace the choices on screen, because only the newest request can deliver, and only once.
 - **Provider:** `claude-opus-5-5` through the Anthropic SDK, with JSON-schema structured output, low effort, server-side `fallbacks: "default"`, an 8 s timeout, and no retries. The key comes from `.env` (`ANTHROPIC_API_KEY=...`), which is git-ignored. `anthropic` isn't in `pyproject.toml` yet (#19 owns that file), so install it with `pip install anthropic`. Without it, or without a key, the app uses the Stub.
 - **Not verified yet:** a live Claude call. No key was available while this was built. The request shape is unit-tested with a fake client.
+
+**Map suggestions in the AI demo window.** When Claude suggests `show_satellite` or `compare_air_quality` (#106), `python -m signal2speech.ai` reveals the real OpenOrbit map and speaks its line once, the same as `python -m signal2speech.app`. The demo used to have no map on purpose, and that would have dropped the reveal.
