@@ -340,6 +340,14 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Only the tests that really need g.Pype are skipped. The rest of `test_diagnostics.py` and `test_recovery.py` still runs everywhere, and CI still runs all of them on Windows, macOS, and Linux
 - Checked on macOS 12 without g.Pype: 183 passed, 0 failed, and the push hook passes again
 
+## 11/14/26 - 8:01 PM - MagicJester2764 - #103 Live EEG inside the app ([PR #124](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/124))
+- The headset can now drive the real demo app: `python -m signal2speech.app --input live`
+    - It calibrates on the app's own tiles first (look at the named tile, then eyes open and eyes closed), then the brain's response picks a tile and closing your eyes confirms
+- The P300 chooser and the eye-closure switch share one headset connection, because the Unicorn can only be opened once
+- Eye-closure confirm stays off until the #23 live run says it's safe. Until then key 1 confirms, and the screen says so
+- With no headset, it now stops within about 15 seconds with pairing steps, instead of freezing forever (the headset library waits indefinitely when no device is there)
+- Rehearse the exact same path without the headset: `--input simulated --p300`. That run worked end to end (one preview, one eye-closure confirm, one spoken line). Nothing has been tried on a real wearer yet
+- After two code reviews: a failed calibration switches that part off and the on-screen hints say so (keys still work); closing the window, a busy headset, a missing driver, or a crash all exit cleanly and release the headset; if the brain gives no answer, the tiles flash again, then hand over to the keys
 ## 11/14/26 - 8:07 PM - Long Le - #5 AI demo shows the map for map suggestions ([PR #118](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/118))
 - When Claude suggests a map answer (from #106), the AI demo window now shows the map and speaks the line once, just like the main app
 - Why: the AI demo had no map on purpose, because replies used to be spoken words only. With #106, picking "Compare counties (shows the map)" would have spoken the line but shown nothing, and logged a BUG line
