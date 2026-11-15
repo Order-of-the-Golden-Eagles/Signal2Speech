@@ -712,3 +712,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - It only picks after a question is asked or the Saved phrases button is clicked. Ctrl+1 or Ctrl+2 sets which reply the scripted wearer looks at next
 - The README and the area docs now describe the judging-day build: the recorded walkthrough, the fixed layout and status pills, the June 24 to 28 image sequence, the natural voice, and a new video cut in `docs/demo-submission/shot-list.md`
 - Verified: the recorded phrase demo picked and spoke a reply on the judging laptop with stand-in replies, and calibrated with Claude as the reply source. A full run with Claude's replies being picked hasn't been watched yet
+
+## 11/15/26 - 10:08 AM - Vasanth Anbukumar - #232 One app with replies as the main screen (PR pending)
+- Signal2Speech is now one app. The main screen is a question box and two replies, and the top of the window says what the app is and the three steps to use it
+    - `python -m signal2speech.ai`, with `--input recorded` for g.tec's recorded brain data or `--input live` for the Unicorn headset
+- The NASA air-quality question is an example inside it: click `Example: NASA air quality`. The map takes the side panel only for that question, and the conversation is shown the rest of the time
+- Nothing about choosing, previewing, confirming or speaking changed. Only the screen layout and the way in
+- The launcher (`python -m signal2speech`) lists the main app first. The stand-alone NASA run still works
+- Verified by screenshots at the judging laptop's window size and by the tests. The headset path was rehearsed on simulated signals and picked a reply; it has not run on a real headset. With a headset the Yes / No cards flash before any question is asked, which still needs a decision
