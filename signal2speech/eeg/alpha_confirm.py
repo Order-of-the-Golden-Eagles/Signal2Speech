@@ -192,7 +192,8 @@ class Calibration:
             raise CalibrationError(
                 f"eyes-closed alpha median {closed_median:.3g} is not {min_ratio:g}x the "
                 f"eyes-open 95th percentile {open_p95:.3g}. Check the occipital electrodes, "
-                f"or close the eyes fully and relax.")
+                f"or close the eyes fully and relax. (Medians: eyes open {float(np.median(o)):.3g}, "
+                f"eyes closed {closed_median:.3g}, ratio {closed_median / max(float(np.median(o)), 1e-12):.2f}.)")
         level = float(np.sqrt(open_p95 * closed_median))
         release = float(np.sqrt(open_p95 * level))
         return cls(open_p95, closed_median, level, release)
