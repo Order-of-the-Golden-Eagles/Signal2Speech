@@ -17,7 +17,7 @@ from typing import Optional
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
-from signal2speech.app import App
+from signal2speech.app import CONFIRM_TIMEOUT_MS, App
 from signal2speech.ui import theme as T
 from signal2speech.core import InputSources, Outcome, TargetIds
 
@@ -28,7 +28,9 @@ from .replies import (HELP_PHRASES, TIMEOUT_S, ReplySet, ReplySuggester, languag
 
 #: The main screen: the reply cards get more of the width than the conversation beside them.
 CHAT_SPLIT = (3, 2)
-CHAT_TILE_HEIGHT = 270
+CHAT_TILE_HEIGHT = 300
+LIVE_TILE_HEIGHT = 250         # the headset's taller Brain Activity box takes the rest
+LIVE_CONFIRM_MS = 20_000       # the headset: 20 s to confirm (the demo keeps 15 s)
 CHAT_TILE_PX = (30, 20)        # title size on the reply cards: from, and down to for long replies
 CHAT_LOG_HEIGHT = 300          # the conversation box: room for one question and its answer
 SUITE_HELP = "\n".join([
@@ -51,7 +53,9 @@ class AnsweringDemo:
             provider, provider_note = make_provider(provider_kind)
         self.provider_note = provider_note or ""
         # view=None gives the real OpenOrbit view, so map suggestions (#106) reveal the map.
+        headset = input_source == InputSources.LIVE_EEG or p300
         self.app = App(input_source, view=view, speaker=speaker, mute=mute, echo=echo, cues=cues,
+                       confirm_timeout_ms=LIVE_CONFIRM_MS if headset else CONFIRM_TIMEOUT_MS,
                        recording=recording, p300=p300, arm_live_confirm=arm_live_confirm,
                        live_options=live_options)
         # The built-in NASA question (the app's own demo round), kept as an example to ask.
@@ -185,7 +189,8 @@ class AnsweringDemo:
         steps = " &nbsp;&nbsp;→&nbsp;&nbsp; ".join(step % pair for pair in (
             (1, "Someone asks a question"),
             (2, "Look at the reply you want"),
-            (3, "Close your eyes for 2 seconds to say it")))
+            (3, "Blink twice quickly to say it" if getattr(self.app.sim, "blink", None) is not None
+             else "Close your eyes for 2 seconds to say it")))
         self.banner.setText(
             f"<span style='color:{T.ACCENT};font-size:{T.px(T.TITLE - 4)}px;font-weight:800'>Signal2Speech</span>"
             f"&nbsp;&nbsp;<span style='color:{T.TEXT};font-size:{T.px(T.HEADING)}px'>"
@@ -208,7 +213,7 @@ class AnsweringDemo:
         app._row.setStretch(0, split[0])
         app._row.setStretch(1, split[1])
         for tile in app.window.tiles.values():
-            tile.HEIGHT = type(tile).HEIGHT if on else CHAT_TILE_HEIGHT
+            tile.HEIGHT = type(tile).HEIGHT if on else (LIVE_TILE_HEIGHT if self.live else CHAT_TILE_HEIGHT)
             tile.MAX_PX = type(tile).MAX_PX if on else CHAT_TILE_PX[0]
             tile.MIN_PX = type(tile).MIN_PX if on else CHAT_TILE_PX[1]
             tile.setMaximumHeight(tile.HEIGHT)

@@ -19,7 +19,8 @@ from . import theme as T
 
 RATE_HZ = 250
 SECONDS = 4.0
-WIDTH, HEIGHT = 540, 104       # before the text scale: small, and the same on every screen
+WIDTH, HEIGHT = 430, 56        # one line (demo and simulated): small, the same on every screen
+LIVE_WIDTH, LIVE_HEIGHT = 540, 104   # the headset: every channel, like Unicorn Recorder
 #: The Unicorn Hybrid Black's electrodes, in its channel order (as Unicorn Recorder lists them).
 UNICORN_CHANNELS = ("Fz", "C3", "Cz", "C4", "Pz", "PO7", "Oz", "PO8")
 REDRAW_MS = 80                 # about 12 pictures a second: steady, and cheap next to the flashes
@@ -54,6 +55,8 @@ class BrainTrace(QWidget):
     def set_source(self, caption: str, channel_names: tuple = ()) -> None:
         self.caption = caption
         self.channel_names = tuple(channel_names)
+        if self.channel_names:                             # the headset: one lane per electrode
+            self.setFixedSize(T.px(LIVE_WIDTH), T.px(LIVE_HEIGHT))
         self.active = True
         self._timer.start()
         self.update()
@@ -84,7 +87,7 @@ class BrainTrace(QWidget):
         p.drawText(left.adjusted(0, T.px(22), 0, 0),
                    int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap), self.caption)
 
-        names_w = T.px(30)
+        names_w = T.px(30) if self.channel_names else 0
         plot = QRectF(left.right() + 6 + names_w, box.top() + 5, box.right() - left.right() - 16 - names_w,
                       box.height() - 10)
         with self._lock:
@@ -99,6 +102,8 @@ class BrainTrace(QWidget):
             p.setPen(QColor(T.MUTED))
             p.drawText(plot, int(Qt.AlignmentFlag.AlignCenter), self.idle_note)
             return
+        if not self.channel_names:                         # one readable line: the middle channel
+            rows = rows[:, [rows.shape[1] // 2]]
         lanes = rows.shape[1]
         lane_h = plot.height() / lanes
         if len(self._scales) != lanes:
@@ -115,7 +120,7 @@ class BrainTrace(QWidget):
             mid = top + lane_h / 2
             p.setFont(tiny)
             p.setPen(QColor(T.QUIET))
-            name = self.channel_names[c] if c < len(self.channel_names) else str(c + 1)
+            name = self.channel_names[c] if c < len(self.channel_names) else ""
             p.drawText(QRectF(plot.left() - names_w - 2, top, names_w, lane_h),
                        int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter), name)
             data = rows[:, c] - np.median(rows[:, c])

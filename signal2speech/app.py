@@ -51,7 +51,7 @@ from signal2speech.ui.__main__ import load_demo_choices
 ROOT = Path(__file__).resolve().parents[1]
 
 MAP_ACTIONS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
-CONFIRM_TIMEOUT_MS = 20_000   # longer than alpha calibration's ~1.5 s closure plus reading time
+CONFIRM_TIMEOUT_MS = 15_000   # longer than alpha calibration's ~1.5 s closure plus reading time
 
 #: Width shared between the tiles (left) and the map with the latest line (right). The map and
 #: its NASA images are what a judge should see, so the right side gets most of it.
