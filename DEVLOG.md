@@ -544,3 +544,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Nothing is spoken until the ring is full. On the keyboard, hold 1 for 2 seconds (a tap no longer confirms). With EEG, the ring follows the eye-closure signal and empties if the eyes open early. After confirming, a "✓ Spoken" state shows until the next question
 - The alpha switch got a read-only progress signal for the ring, and its decision logic didn't change. Scripted simulated input fills the same ring
 - Checked with tests for each ring state (filling, emptying on early release, completing exactly once) and in screenshots. The live eye-closure ring needs g.Pype, so it hasn't been seen on this Mac
+
+## 11/15/26 - 1:46 AM - Vasanth Anbukumar - #28 The backup voice now speaks every reply, not just the first (PR pending)
+- If the main voice isn't available on a machine, the app's backup voice (`pyttsx3`) used to speak the first confirmed reply and silently skip every one after it. It now speaks all of them
+    - Each reply is spoken from its own short-lived helper process, which also means the window no longer freezes while it talks
+- Why it wasn't noticed: the judging laptop uses the main voice (Qt's Windows voice), which was never affected. Checked there: three replies in a row all spoke, each starting within a quarter of a second
+- How it was found: the voice-guided board session (#150) used the same library for its spoken cues, and the second and third cues were silent
+- Measured on the judging laptop: before the fix the backup spoke for 2.9 s, then 0.1 s and 0.1 s. After it: 2.7 s, 2.3 s, 2.2 s. A new test checks there is one helper per reply
