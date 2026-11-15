@@ -168,3 +168,68 @@ def test_main_screenshot(app, tmp_path):
     out = tmp_path / "ui.png"
     assert main(["--keys", "2", "--screenshot", str(out)]) == 0
     assert out.stat().st_size > 0
+
+
+# ── #95: long text shrinks to fit ────────────────────────────
+from PySide6.QtCore import QRect, Qt  # noqa: E402
+from PySide6.QtGui import QFont, QFontMetrics  # noqa: E402
+
+from signal2speech.ui.fit import MIN_PX, fit_pixel_size  # noqa: E402
+from signal2speech.ui.window import Tile  # noqa: E402
+
+LONG_REPLY = "I think so, but can we talk about it after lunch today?"
+
+
+def _fits(text, px, w, h):
+    f = QFont()
+    f.setBold(True)
+    f.setPixelSize(px)
+    r = QFontMetrics(f).boundingRect(QRect(0, 0, w, 100000),
+                                     int(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap), text)
+    return r.width() <= w and r.height() <= h
+
+
+def test_fit_pixel_size_bounds(app):
+    f = QFont()
+    f.setBold(True)
+    assert fit_pixel_size("Yes.", f, 400, 300, 56) == 56
+    assert fit_pixel_size("", f, 400, 300, 56) == 56
+    assert fit_pixel_size("word " * 200, f, 200, 100, 56) == MIN_PX
+
+
+def test_tile_shrinks_long_label_and_fits(app):
+    t = Tile("target-1", "1")
+    t.resize(300, 300)
+    t.set_label(LONG_REPLY + " " + LONG_REPLY)
+    assert MIN_PX <= t.font_px < Tile.MAX_PX
+    w, h = 300 - 2 * Tile.INSET, 300 - 2 * Tile.INSET
+    assert _fits(t.text(), t.font_px, w, h) or t.font_px == MIN_PX
+
+
+def test_tile_short_label_stays_56_and_flash_keeps_size(app):
+    t = Tile("target-2", "2")
+    t.resize(420, 400)
+    t.set_label("Compare counties")
+    assert t.font_px == 56
+    t.set_label(LONG_REPLY * 3)
+    px = t.font_px
+    t.set_lit(True)
+    t.set_lit(False)
+    assert t.font_px == px                     # flashing never changes the size
+
+
+def test_window_fits_twelve_word_reply_at_1280x720(ui):
+    from signal2speech.ai import to_choices
+    h, w, _, _ = ui
+    w.resize(760, 720)                          # the left column at 1280x720
+    w.show()
+    h.begin_choice_round(list(to_choices([LONG_REPLY, "No thanks, I would rather stay here and rest for now."])))
+    app = QApplication.instance()
+    app.processEvents()
+    for tile in w.tiles.values():
+        assert tile.font_px >= MIN_PX
+        assert _fits(tile.text(), tile.font_px, tile.width() - 2 * Tile.INSET,
+                     tile.height() - 2 * Tile.INSET) or tile.font_px == MIN_PX
+    w.press_target(T1)
+    app.processEvents()
+    assert MIN_PX <= w.preview_px <= w.PREVIEW_MAX_PX

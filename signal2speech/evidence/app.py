@@ -16,8 +16,6 @@ from __future__ import annotations
 import gpype as gp
 
 from .pipeline import EEG_CHANNELS, EvidenceGraph
-from .synthetic import NONTARGET_CODE, TARGET_CODE
-
 
 
 def _with_markers(graph: EvidenceGraph, node, name: str):
@@ -30,12 +28,15 @@ def _with_markers(graph: EvidenceGraph, node, name: str):
     return both
 
 
-def _time_scope(name: str, amplitude: float):
+def _time_scope(graph: EvidenceGraph, name: str, amplitude: float):
     mk = gp.TimeSeriesScope.Markers
     markers = [mk(color="r", label="T", channel=EEG_CHANNELS,
-                  value=TARGET_CODE),
+                  value=graph.target_code),
                mk(color="c", label="NT", channel=EEG_CHANNELS,
-                  value=NONTARGET_CODE)]
+                  value=graph.nontarget_code)]
+    markers += [mk(color=color, label=text, channel=EEG_CHANNELS,
+                   value=value)
+                for value, text, color in graph.extra_markers]
     return gp.TimeSeriesScope(name=name, amplitude_limit=amplitude,
                               time_window=10, markers=markers,
                               hidden_channels=[EEG_CHANNELS])
@@ -47,19 +48,19 @@ def add_scopes(graph: EvidenceGraph) -> list:
     label = graph.label.value
     placed = []
 
-    raw_scope = _time_scope(f"Raw EEG ({label})", 50)
+    raw_scope = _time_scope(graph, f"Raw EEG ({label})", 50)
     p.connect(_with_markers(graph, graph.raw, "raw"), raw_scope)
     placed.append((raw_scope, [1]))
 
     oscar_off = ", OSCAR off" if graph.oscar is not None else ""
-    filtered_scope = _time_scope(f"Filtered EEG 1-30 Hz{oscar_off} ({label})",
+    filtered_scope = _time_scope(graph, f"Filtered EEG 1-30 Hz{oscar_off} ({label})",
                                  30)
     p.connect(_with_markers(graph, graph.filtered, "filtered"),
               filtered_scope)
     placed.append((filtered_scope, [2]))
 
     if graph.oscar is not None:
-        oscar_scope = _time_scope(f"Filtered EEG, OSCAR on ({label})", 30)
+        oscar_scope = _time_scope(graph, f"Filtered EEG, OSCAR on ({label})", 30)
         p.connect(_with_markers(graph, graph.oscar, "oscar"), oscar_scope)
         placed.append((oscar_scope, [3]))
 
@@ -69,7 +70,8 @@ def add_scopes(graph: EvidenceGraph) -> list:
     placed.append((spectrum, [4]))
 
     average = gp.TriggerScope(
-        name=f"Averaged response, target vs non-target ({label})",
+        name=graph.average_title or
+        f"Averaged response, target vs non-target ({label})",
         amplitude_limit=8, plots=["T", "NT"],
         labels=["Target flashes", "Non-target flashes"], colors=["r", "c"])
     p.connect(graph.target_epochs, average["T"])
@@ -102,8 +104,12 @@ def _banner(graph: EvidenceGraph):
     return label
 
 
-def run_window(graph: EvidenceGraph, on_started=None) -> int:
-    """Open the window, run the pipeline, and block until it closes."""
+def run_window(graph: EvidenceGraph, on_started=None, header=None) -> int:
+    """Open the window, run the pipeline, and block until it closes.
+
+    ``header``, if given, is called with the banner QLabel and returns
+    the widget to put above the scopes instead (P300 mode adds tiles).
+    """
     grid = [3, 2] if graph.oscar is not None else [2, 2]
     app = gp.MainApp(caption=graph.caption, grid_size=grid,
                      position=[60, 60, 1400, 900])
@@ -111,7 +117,8 @@ def run_window(graph: EvidenceGraph, on_started=None) -> int:
         app.add_widget(widget, grid_positions=cells)
     window = app.window
     if window is not None:
-        window.setMenuWidget(_banner(graph))
+        banner = _banner(graph)
+        window.setMenuWidget(header(banner) if header else banner)
     try:
         graph.pipeline.start()
     except Exception as error:  # noqa: BLE001 - shown to the operator

@@ -84,7 +84,11 @@ python -m signal2speech.evidence --source replay recordings/evidence_<timestamp>
 - **OSCAR on and off:** `HybridBlack(enable_oscar=True)` gives only the cleaned stream. To show both, the view builds the headset with OSCAR off and runs g.Pype's `Oscar` node on a branch. That node comes from a private module (`gpype.backend.core._private.oscar`). If it is missing, the view falls back to `enable_oscar=True`, and you can compare by running a second time with `--oscar off`. OSCAR runs on our Generator data, but it hasn't been checked on real EEG.
 - **Generator** has no brain, so the view adds a synthetic deflection about 300 ms after each target marker. That is why the average separates. It is labelled Simulated, and OSCAR is shown as unavailable.
 - **Record and replay** use g.Pype's launch recorder (`LaunchConfig` `save_as` / `load_from`). It saves the EEG and the flash markers as HDF5 files, taken before OSCAR, under `recordings/`, which is gitignored. Never commit a recording. A replay rebuilds the same graph and is labelled Recorded.
-- **Seam for #46:** `build_evidence_graph(front_end=...)` accepts the P300 chooser's filter chain, and the graph's `marker` is the node the flashing tiles should emit on. Pass `--no-flasher` when the tiles send the markers.
+- **Driven by the P300 chooser (`--p300`):** `python -m signal2speech.evidence --source generator --p300` (or `--source hybridblack --p300`) builds the graph with `build_evidence_graph(front_end=p300_front_end)` and puts the chooser's online scorers and calibration collectors in the same pipeline (`signal2speech/evidence/p300_mode.py`). A `P300Chooser` emits every flash on the graph's `marker`, from `make_sequence` flash schedules, and two test tiles flash in the window header. The run calibrates first (`--calibration N` sequences, default 6), fits the LDA, then selects until the window closes. Each decision goes through `InputAdapter.select_captured` to the `SelectionHandler`, and the header shows the decision, the outcome, and the attended tile (simulated on the Generator, cued on the headset).
+  - The target vs non-target average uses the calibration codes (101 / 100). Those averages and the classifier's training epochs come from the same Trigger nodes on the same filtered stream (the OSCAR branch when there is one), so the plot shows what the LDA learns from. Online flashes use the tile codes (1 / 2, yellow markers) and are not averaged, because on live EEG the attended tile is only what the cue asked for.
+  - On the Generator the chooser's own synthetic P300 is used, labelled Simulated. With `--p300` the filter is the chooser's 1–30 Hz bandpass only (no 50 / 60 Hz notches).
+  - Verified on simulated input only: headless tests in `tests/test_evidence_p300.py`, and a 22 s offscreen run (`--calibration 2`) that made 2 of 2 correct simulated selections. With so few calibration epochs the average separates only weakly on screen. Not yet run with a headset.
+- **Seam for #46:** `build_evidence_graph(front_end=...)` accepts the P300 chooser's filter chain, and the graph's `marker` is the node the flashing tiles emit on. Without `--p300`, pass `--no-flasher` when other tiles send the markers.
 
 ## P300 chooser
 
@@ -132,12 +136,62 @@ The synthetic P300 is a 5 µV Gaussian at 300 ms over 10 µV white noise plus 10
 - **Two-tile oddball:** each tile is the target half the time, which isn't rare. Real P300s are larger for rare targets. If live accuracy is weak, add null flashes or more tiles, or fall back to the alpha step-through (#47).
 - **Flash-to-marker timing:** the P300 is locked to the real flash. The marker is emitted right after Qt repaints the tile, not at the monitor's vsync (`FlashScheduler` and the CLI tiles both work this way). Expect 0–17 ms of jitter at 60 Hz plus compositor delay. A constant offset is harmless because calibration learns it, but jitter smears the epoch. OSCAR adds processing delay, and we haven't checked whether g.Pype aligns Marker events to OSCAR-delayed samples.
 
-**TODO: measure flash jitter.**
+**Measure it:** see [Flash timing](#flash-timing) below.
 
-1. Tape a photodiode over a tile corner, wired into an aux input.
-2. Record a calibration run with the evidence view's `--record`.
-3. Offline, find each light onset in the photodiode channel and subtract the matching marker sample. The mean is the latency and the standard deviation is the jitter.
-4. If the standard deviation is above about 10 ms, pass the flip time to `on_flash(target_id, observed_at=...)`, for example `gp.stamp_clock()` taken in a `QWindow.frameSwapped` handler.
+## Flash timing
+
+The P300 is locked to the moment a tile really lights on the monitor. The chooser sends its Marker right after Qt repaints the tile. A constant gap between the two is fine, because calibration learns it. Jitter in the gap smears every epoch and lowers accuracy. `signal2speech/eeg/flash_timing.py` (#46) measures it.
+
+**Run it on the judging laptop, on the display the wearer will watch, before 8:15**
+
+```
+python -m signal2speech.eeg.flash_timing --seconds 30                   # real QLabel tiles + DWM vblank estimate
+python -m signal2speech.eeg.flash_timing --seconds 30 --tiles gl        # QOpenGLWidget tiles + Qt frameSwapped
+python -m signal2speech.eeg.flash_timing --seconds 60 --csv logs/flash_timing.csv   # keep per-flash times for the photodiode check
+```
+
+It flashes two tiles with the chooser's own `FlashScheduler` (100 ms flash, 75 ms gap). For every lit flash it records the time `on_flash` runs (where the chooser emits the Marker) and the best present time it can get:
+
+- **`--tiles widget` (default).** Same QLabel restyle plus `repaint()` path as the real tiles. The present time is the next display vblank after the repaint flushed, read from the Windows compositor clock (`DwmGetCompositionTimingInfo`, same QueryPerformanceCounter clock as the marker). This is an **estimate**, and a weak one. The offset is just "next vblank after the flush", so at 60 Hz it is spread evenly over 0–16.7 ms plus repaint time, and the jitter (about 15 ms) is built in and always under the 20 ms threshold. It can't see DWM composition latency, a late present for this window, or the panel's own scan-out delay. **A widget-mode PASS only rules out repaint stalls and missed frames.** The real test is `--tiles gl` or the light sensor / camera check below. Off Windows there is no source, and the tool says so.
+- **`--tiles gl`.** `QOpenGLWidget` tiles with vsync on. The present time is Qt's `frameSwapped` signal for the lit frame.
+
+It prints the offset (present minus marker) mean, p95, max, min, and standard deviation, then the jitter (the p95 − p5 spread of the offset), the refresh rate, repaint time, flash-onset interval, and frames the compositor missed. Then it prints:
+
+- **PASS:** the jitter is at most 20 ms (`--threshold-ms`), with at least 20 flashes, fewer than 10 % of flashes missing a present time, and no missed compositor frames. In widget mode the PASS line says plainly that it only rules out repaint stalls and missed frames.
+- **WARN:** anything else. It is always WARN under `QT_QPA_PLATFORM=offscreen`, which never draws to a screen. The exit code is 0 for PASS and 1 for WARN.
+
+At 60 Hz, a one-frame quantisation gives about 0–17 ms of offset and passes. If you get a WARN, close other apps, turn off Windows battery saver and variable refresh rate, keep the window on the laptop's own panel (not a projector mirror), and run it again.
+
+**Verified so far (2026-11-14, dev Windows laptop, offscreen only):** 18 headless tests cover the statistics, PASS/WARN logic, CSV, and ground-truth comparison. A 3 s offscreen run executes, reads a 60.00 Hz refresh from DWM, and reports WARN because it is offscreen. Offscreen numbers mean nothing. **Not verified:** a run on a real display, the `--tiles gl` swap timing (offscreen gives no swaps), and macOS or Linux.
+
+### Ground truth with a light sensor or a phone camera
+
+Software timestamps can't see the panel itself. To check what the screen really does, record when the light actually comes on and compare it to the markers. Both methods below compare **intervals** between consecutive flashes, so the sensor's clock never needs to match the laptop's. A constant delay cancels out. Only jitter remains.
+
+**Option A: phone slow-motion camera (no parts, about 10 minutes)**
+
+1. Set the laptop to the brightness and power plan you'll use for the demo, and plug in the charger.
+2. Run `python -m signal2speech.eeg.flash_timing --seconds 20 --csv logs/flash_timing.csv`.
+3. Film one tile with the phone at 240 fps (iPhone and most Android phones have this) from the moment the window opens. 240 fps gives 4.2 ms per frame. 120 fps (8.3 ms) is still usable. Fill the frame with the tile, and lock exposure if you can.
+4. Step through the video frame by frame, for example in VLC with `E`, or a free frame-stepping app. Write down the frame number where the tile first turns white, for every flash of that tile.
+5. Convert each frame number to seconds (frame ÷ fps) and write one per line in `logs/onsets.txt`. Start from the first flash of that tile the tool made.
+6. Run `python -m signal2speech.eeg.flash_timing --compare logs/flash_timing.csv logs/onsets.txt --tile target_1` (the left tile is `target_1`, the right is `target_2`). `--tile` keeps only that tile's markers.
+7. Read the "estimated per-flash jitter std". Anything under about 10 ms is fine for the P300 at 240 fps. The resolution floor is about one camera frame.
+
+**Option B: cheap light sensor (photodiode or photoresistor) on a microcontroller**
+
+1. Tape a photodiode (for example a BPW34) or a photoresistor over a tile corner with black tape so room light can't reach it. Wire it to an analog pin of an Arduino, ESP32, or similar, using a voltage divider (photoresistor plus a 10 kΩ resistor).
+2. Have the board print `micros()/1e6` over serial each time the reading crosses a threshold upward, with a few ms of debounce. Save the serial output as `logs/onsets.txt`, one time per line.
+3. Run the tool with `--csv`, then `--compare ... --tile <taped tile>` as in Option A. A photodiode resolves about 1 ms. A photoresistor is slower (10–50 ms rise), but its delay is mostly constant, so it still shows jitter.
+4. Reset the board's log before each run, and drop any onsets from before the tool's first flash so both lists start on the same flash. The tool warns when the counts differ.
+
+**Option C: through the EEG (best, needs the g.tec mentor).** A photodiode recorded by the amplifier puts the light onsets on the EEG clock, so you can measure the absolute marker-to-light latency, including OSCAR and g.Pype delays. The Unicorn has no dedicated photodiode input. Ask the mentor before connecting anything to an electrode input. If it's possible: record a calibration run with the evidence view's `--record`, find each onset in the sensor channel offline, and subtract the matching marker sample. The mean is the latency and the standard deviation is the jitter.
+
+**What to do with the result**
+
+- Jitter std under about 10 ms: do nothing. Calibration absorbs the constant part.
+- Above that: pass a measured present time to `P300Chooser.on_flash(target_id, observed_at=...)`. `on_flash` already accepts it, and `Marker.emit(..., observed_at=...)` timestamps the marker with it. Take it as `gp.stamp_clock()` in a `frameSwapped` handler (the `--tiles gl` path shows how). Note that `observed_at` must be on g.Pype's clock, not the QPC clock this tool uses.
+- Write the measured numbers (laptop, refresh rate, method, jitter) in this section and in docs/MEMORY.md. Don't commit `logs/` files. They're gitignored.
 
 ## Alpha-switch confirm (#47): works on simulated input
 
@@ -191,3 +245,58 @@ Then confirm with `AlphaConfirm` as usual. The `rising` signal and the calibrati
 - `ChannelMean` and `AlphaBursts` are custom `gp.IONode`s. For a 1-channel output, `setup()` sets `channel_count`, `channel_roles`, and `channel_labels` in the output context.
 - `Threshold.set_control({"level", "release", "dwell"})` works while the pipeline runs.
 - More than one `Pipeline` can run in a process. g.Pype refuses only a faster-than-real-time replay beside another pipeline.
+
+## Live run
+
+`signal2speech/eeg/live.py` ([#23](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/23)) walks the headset slot step by step, so the live run is one command.
+
+```
+python -m signal2speech.eeg.live --source hybridblack   # Live EEG: Unicorn Hybrid Black, OSCAR on
+python -m signal2speech.eeg.live --source generator     # dry run, no hardware, labelled Simulated
+```
+
+**Before you start:** turn the headset on and pair it in the OS Bluetooth settings. Close anything else that might have it open, such as the evidence view or another g.Pype run.
+
+| Step | What happens | Stops when |
+| --- | --- | --- |
+| 1. Device check | Opens the source through the #46 P300 pipeline. One headset can be opened once, so every branch shares that pipeline. | The headset isn't paired or sends no samples within 5 s. It prints the pairing checklist and exits with code 3. |
+| 2. Signal quality | About 10 s of stream with OSCAR on (`--quality-s`). For each channel it shows the 1–30 Hz RMS and the 50/60 Hz RMS, then GO or NO-GO. | NO-GO, unless the operator types `y`. Exits with code 4. |
+| 3. P300 calibration | `P300Chooser.begin_calibration` / `finish_calibration` from `p300.py`, over `--calibration` sequences (default 10). The test tiles show which tile to attend. It prints a cross-validated epoch accuracy (chance is 0.50). | No epochs collected. Exits with code 5. |
+| 4. Confirm calibration | The #47 alpha switch (`measure()`: eyes open, eyes closed, a rest period to count false triggers, and 2 closures), if `signal2speech/eeg/alpha_confirm.py` is on the checkout. Otherwise it uses keyboard confirm. | Alpha calibration fails. Exits with code 5. |
+| 5. Attempts | `--attempts` choose+confirm attempts (default 10) through `SelectionHandler` and `InputAdapter`. Confirm a correct preview. Let a wrong one time out (alpha) or cancel it (keyboard). | — |
+| 6. Summary | P300 accuracy, correct and confirmed, mean seconds per selection, false confirms, `RejectedStaleRound` count, late P300 decisions, every outcome, and the arming verdict. | — |
+
+**Arming rule.** It is safe to set `live_eeg_confirm_armed = True` only if all of these are true:
+
+- the input was Live EEG, never Simulated
+- at least 5 confirm rounds were decided by the alpha switch, not the keyboard
+- no `RejectedStaleRound` was seen
+- there were 0 false confirms (a Confirmed after a wrong preview)
+
+The harness uses its own handler with a logging sink, so nothing is spoken and the map doesn't change. On a live alpha run it arms that handler for step 5 only. The app's handler stays disarmed until someone changes it after reading the summary.
+
+**Logs.** Each run writes `logs/live_<YYYYmmdd-HHMMSS-mmm>_<pid>_<simulated|live-eeg>.jsonl`, opened with mode `x` so two runs started at the same moment never share a file. The `logs/` folder is gitignored. The log holds steps, the quality table, calibration counts, every handler outcome with its event, every P300 decision (and whether it was late), each attempt, and the summary. `RunLog` refuses arrays and long lists, so raw EEG can't end up in a log.
+
+**Event IDs.** Two `InputAdapter`s with the same source on one handler both count from 1. So the P300 branch's `s1` and the alpha branch's `s1` collide, and the alpha confirm is rejected as `RejectedDuplicateEvent`. The harness found this. `TaggedAdapter` adds a branch tag (`s1-p300`, `s1-alpha`). The app needs the same fix when it wires up both branches.
+
+**Verified (2026-11-14, Windows 11, Python 3.12.10, g.Pype 4.2.0)**
+
+| Check | Result |
+| --- | --- |
+| `--source generator` (defaults: `--confirm auto`, so the #47 alpha switch now on main), Simulated | Ran to completion in about 160 s. Quality GO on 8 channels. LDA on 50 target and 50 non-target epochs, CV epoch accuracy 0.89. Alpha ratio 7.0, 0 false triggers in the 20 s rest, 1 edge per closure. 10/10 correct previews, 10/10 confirmed by simulated eye closures, 0 false confirms, 0 `RejectedStaleRound`, 0 late decisions, 5.65 s per selection. Verdict: not safe (Simulated). |
+| `--source generator --confirm keyboard`, Simulated | Earlier run, before #47 merged: 83 s, 10/10 correct and Confirmed, 0 false confirms. An earlier alpha run with PR #58 loaded by hand found the event-ID collision above. |
+| `--source hybridblack` with no headset | `ConnectionError: No Unicorn device available`. Prints the pairing checklist and exits with code 3 in about 8 s. |
+| `pytest tests/test_live.py` (19 tests) | Pass. Covers quality rules, arming rules, scoring, the log refusing samples, separate log files for runs in the same second, tagged adapters, step order and exit codes, and three end-to-end Generator dry runs. Two of them inject wrong decodes: on keyboard, a wrong preview is cancelled and a wrongly confirmed one counts as 1 false confirm (verdict not safe); on alpha, a wrong preview with no eye closure times out. |
+
+**Not verified yet:** anything with the real headset. That includes the quality thresholds (`FLAT_RMS_UV` 0.5, `NOISY_RMS_UV` 50, `LINE_RMS_UV` 10 µV are starting guesses), whether the HybridBlack signal-role channels are the 8 EEG channels in Unicorn order, OSCAR's effect, real P300 and alpha accuracy, and whether a late decision ever crosses rounds. Fill in the table below after the run.
+
+| Live result (#23) | Value |
+| --- | --- |
+| Pairing steps that worked | |
+| Bad channels at first, and fix | |
+| Calibration time (P300 / alpha) | |
+| P300 accuracy (correct / attempts) | |
+| False confirms | |
+| `RejectedStaleRound` seen | |
+| Class → tile mapping | 1 → `target-1`, 2 → `target-2` (`EegClassMap.default()`) |
+| Arm `live_eeg_confirm_armed`? | |

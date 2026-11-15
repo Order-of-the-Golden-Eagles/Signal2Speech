@@ -1,0 +1,5 @@
+date,state,county,aqi,category,defining_parameter,defining_site,sites_reporting
+2023-06-26,Michigan,Washtenaw,32,Good,Ozone,26-161-9991,1
+2023-06-28,Michigan,Washtenaw,218,Very Unhealthy,PM2.5,26-161-0008,2
+2023-06-26,Michigan,Wayne,58,Moderate,PM2.5,26-163-0099,10
+2023-06-28,Michigan,Wayne,226,Very Unhealthy,PM2.5,26-163-0097,10

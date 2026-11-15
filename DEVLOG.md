@@ -124,6 +124,21 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Closing the simulator fully disconnects it, so a restarted app can't end up with two simulators
 - Verified on simulated input: 82 tests pass, and the integrated app gave one preview, then one reveal and one spoken line
 
+## 11/14/26 - 5:15 PM - In Young Song - #29 NASA and EPA dataset ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
+- The OpenOrbit demo now has its real data, bundled in the repo so it works with Wi-Fi off
+    - `data/openorbit/`: two NASA satellite images of southeast Michigan (June 26 and 28, 2023), the EPA air-quality rows, map marker places, and `SOURCES.md` with every link
+- The EPA numbers were checked against EPA's own file: Washtenaw 32 to 218 (+186), Wayne 58 to 226 (+168). `python data/openorbit/build_dataset.py --verify-only` re-checks the files offline
+- June 26 is mostly cloud on both NASA satellites, so the "before" picture shows little ground. The AQI numbers carry the before and after. The team can decide later whether to change it
+- Verified on Windows with no headset. NASA's coastline map lines up with the image, and the markers sit where EMU and Detroit really are
+
+## 11/14/26 - 5:15 PM - In Young Song - #30 Offline wildfire comparison view ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65))
+- After a confirm, the app now shows the real map instead of the "not built yet" placeholder
+    - "Show the satellite view" shows June 28 with EMU and Detroit marked. "Compare counties" shows both days side by side with the AQI table and which county rose most versus which ended highest
+- The numbers on screen come from the EPA file, and a test checks that they match the spoken line, so the screen and the voice can't disagree
+- Sized to fit next to the selection tiles on a 1920x1080 laptop at 125% scaling. Before this, the window ran off the screen
+- If the data folder is missing, the panel says so clearly instead of crashing the app
+- Verified on Windows with keyboard input and every network call blocked: one map change and one spoken line per confirm. Still needs a real Wi-Fi-off run on the judging laptop (#39)
+
 ## 11/14/26 - 5:20 PM - MagicJester2764 - #41 Code review fixes ([PR #61](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/61))
 - A code review found the asset check was too easy to fool: it would pass if the right numbers appeared anywhere in the data. Now Washtenaw's and Wayne's AQI values have to be on their own rows
 - The spoken-line check now needs the exact rise next to each county, so a typo like "1860" can't pass
@@ -149,7 +164,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The Linux setup steps in the docs now match what CI actually installs, and the docs only claim the Python versions CI really tests
 - Code review follow-up: the summary is now written even when tests or the smoke check fail, and an app that can't start fails CI instead of looking like a skipped smoke check. The check is renamed `ci (...)` because it runs more than pytest
 
-## 11/14/26 - 5:32 PM - Long Le (with Claude) - #34 Submission plan and checklist ([PR #73](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/73))
+## 11/14/26 - 5:32 PM - Long Le - #34 Submission plan and checklist ([PR #73](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/73))
 - The team has a plan for the demo and the submission in `docs/demo-submission/`
     - `run-of-show.md`: the two-minute table demo, with a fallback for every step
     - `video-shot-list.md`: nine shots under 2:45 for the video
@@ -165,3 +180,142 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Review fixes: marked the alpha confirm (#47) as merged with its real command (`--source hybrid-black`, plus `--demo`), and noted that the app's 175 ms, 10-flash tile timing has not been checked with the classifier, which was tested at 250 ms and 5 flashes
 - Merged with the #34 submission kit from PR #73: its `run-of-show.md` stays as the minute-by-minute plan, and this PR's second-by-second version with roles is now `stage-script.md`
 - Nothing here has been run with a real headset yet
+## 11/14/26 - 5:35 PM - Vasanth Anbukumar - #1 Sync the architecture docs with main ([PR #71](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/71))
+- Added a "Current status" table to the selection contract: what is merged and checked on simulated or synthetic data, what is still in an open PR (#29/#30 OpenOrbit), and what still needs the live headset (P300 accuracy, the alpha-switch threshold, live Unicorn input)
+- Fixed stale lines: the P300 pipeline now matches the code (Trigger per tile, LDA score, sequence vote), the folder table names the real files, and the tests section gives today's count (111 passed, 2 skipped after merging main, with a note that the number grows) and the 3-OS CI
+- Matched the dependency graph to GitHub's "Blocked by" links: added #22 to #30 and #21 to #23, and marked closed issues
+- `docs/MEMORY.md` no longer says simulated input still needs a one-line swap in `app.py`: it already uses the g.Pype stream
+- Docs only. No code changed, and pytest still passes
+
+## 11/14/26 - 5:38 PM - Vasanth Anbukumar - #48 Evidence view driven by the P300 chooser ([PR #76](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/76))
+- New flag: `python -m signal2speech.evidence --source generator --p300` (or `--source hybridblack --p300`) builds the judge window around the real P300 chooser instead of the stand-in flasher
+- The chooser's filter, scorers and calibration collectors now live in the same g.Pype pipeline as the scopes, and its flash markers go on the evidence view's marker
+- The target vs non-target average uses the calibration flashes, from the very Trigger nodes whose epochs train the classifier, so judges see what the classifier learns from
+- Two test tiles flash in the window header, and each decision (with the round's outcome from the SelectionHandler) shows next to them
+- The old mode without `--p300` works as before
+- Verified on simulated input only: new headless tests pass, and a 22 s offscreen run calibrated, trained, and made 2 of 2 correct simulated selections. Not tried with a headset
+
+## 11/14/26 - 5:41 PM - Vasanth Anbukumar - #46 Flash timing check ([PR #77](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/77))
+- Added a tool that checks whether the P300 flash markers line up with what the screen actually shows: `python -m signal2speech.eeg.flash_timing --seconds 30`
+    - It flashes the same kind of tiles the chooser uses and compares each marker with the moment the frame reaches the display. Then it prints the average and worst gap, the jitter, and the refresh rate, plus PASS or WARN (WARN above 20 ms of jitter)
+- Wrote a step-by-step check with a phone slow-motion camera or a cheap light sensor, so we can confirm the real screen timing on the judging laptop before 8:15. The tool compares those light times with its markers, so the two clocks don't need to match
+- Tested the maths and the PASS/WARN rules without a screen (18 tests), and ran the tool briefly in headless mode to show it works. Headless numbers mean nothing, so the tool always says WARN there
+- Not done yet: a run on the judging laptop's real display, and the camera or light-sensor check
+
+## 11/14/26 - 5:45 PM - Vasanth Anbukumar - #23 Guided live-run harness ([PR #78](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/78))
+- Added one command for the headset slot: `python -m signal2speech.eeg.live --source hybridblack`. It walks through the device check, signal quality, P300 calibration, confirm calibration, 10 live attempts, and a summary
+- If the headset isn't paired, it says how to pair it and exits cleanly. If signal quality is bad, it names the bad channels and stops unless you choose to continue
+- The summary says whether it's safe to arm live EEG confirm. It only says yes on a live run where the alpha switch did the confirming, with no late decisions crossing rounds and no false confirms. A dry run never says yes
+- Every outcome, accuracy, and time per selection goes to `logs/` (not committed). The log refuses raw EEG on purpose
+- A dry run with the alpha switch from #47 showed that the P300 and alpha inputs both start their event IDs at 1, so the second one was thrown away as a duplicate. The harness tags them apart, and the app will need the same fix
+- Verified on simulated input only: `--source generator` now uses the merged alpha switch and ran start to finish in about 160 s (10/10 confirmed by simulated eye closures, 0 false triggers, 0 false confirms). Tests also inject a wrong decode to check the cancel, timeout, and false-confirm paths, and 194 tests pass. Nothing has run on the real headset yet
+
+## 11/14/26 - 5:59 PM - Long Le (with Claude) - #4 Real map in the app, bigger reveal ([PR #81](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/81))
+
+## 11/14/26 - 5:59 PM - Long Le - #4 Real map in the app, bigger reveal ([PR #81](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/81))
+- The app now shows the real NASA/EPA map from #30 after a confirm. No code change was needed for that, and the stand-in panel is gone
+    - `python -m signal2speech.app --input keyboard`. Press 2, then 1, to see the county comparison
+- After a map reveal, the map takes most of the window and stays up for 8 seconds before the next question, so judges can read the AQI table. The input label stays visible the whole time
+- Checked with the real map: preview and cancel leave it blank, a confirm changes it once, and a repeated confirm changes nothing. One spoken line per confirm
+- Still to do for #4: the final run on the judging laptop with Wi-Fi off, and #26 (recovery checks)
+
+## 11/14/26 - 5:58 PM - MagicJester2764 - #26 Recovery checks ([PR #80](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/80))
+- Proved that nothing goes wrong when things go wrong: cancelling, a headset drop, repeated keys, and late or replayed brain decisions never cause an extra map change or spoken line
+    - Covers keyboard, the g.Pype simulator, and replayed recordings: `pytest tests/test_recovery.py`
+- Added the confirm timeout the rules always promised: if nobody confirms within 15 seconds, the preview cancels quietly (`--confirm-timeout`, 0 turns it off)
+- Found and fixed a hidden test problem: a leftover 30-second timer from one test could end a later test early. It only showed up once the test suite got long enough
+- Still open for the headset slot (#23): if the headset goes silent without disconnecting, nothing notices yet
+
+## 11/14/26 - 5:45 PM - MagicJester2764 - #38 Proved the PR check passes and fails ([PR #75](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/75))
+- Pushed a test that fails on purpose. CI went red on all four systems and pointed straight at the failing test. Then I removed it to get green again
+- That closes out #14: every PR now shows a clear pass or fail without needing the headset
+- Explained in the workflow why Ubuntu runs twice: Python 3.12 is what the judging laptop uses, and 3.13 is an early warning for newer Python. It caught a real bug on its first day
+- Recorded a flaky evidence test on macOS (#48) so nobody chases it as a real failure
+
+## 11/14/26 - 6:08 PM - MagicJester2764 - #38 Review follow-up ([PR #83](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/83))
+- Filled in the green CI run that proves the check passes again, instead of "expected green"
+- The flaky evidence test on macOS is now in living memory, with a firmer rule: re-run once, and if it fails twice it's a real problem
+- The CI matrix explanation lives in one place (the workflow file) and no longer claims Python versions CI doesn't test
+
+## 11/14/26 - 5:58 PM - In Young Song (with Claude) - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
+
+## 11/14/26 - 5:58 PM - In Young Song - #7 Wildfire comparison works offline ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
+- A teammate can now run the whole OpenOrbit reveal with Wi-Fi off and explain it
+    - `python -m signal2speech.app --input keyboard`: press 2 then 1 to compare counties, or 1 then 1 for the satellite view
+- The compare view shows the two numbers judges confuse: Washtenaw had the biggest jump (+186), but Wayne ended highest (226)
+- Verified with Wi-Fi actually disconnected on InYoung-Song's laptop, on `main` after PR #65: one map change and one full spoken line per confirm, and nothing on cancel. Keyboard input only, not live EEG
+
+## 11/14/26 - 5:58 PM - In Young Song - #35 Secret, AI key, and network checks ([PR #79](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/79))
+- Checked how the app handles keys and the network. Results are in `docs/security-privacy/README.md`
+- No local bridge exists (the app is one process), so the bridge checks don't apply
+- The AI key is read only from `.env` or the environment and never logged. Only the typed question goes to the AI, never EEG
+- `python tools/release_check.py` re-runs the checks, including secrets in every branch's history (none found)
+
+## 11/14/26 - 6:06 PM - Vasanth Anbukumar - #22 Fix duplicate event IDs between headset decoders ([PR #82](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/82))
+- The live flow (P300 picks, eyes-closed alpha switch confirms) can now actually confirm
+- Why: the P300 chooser (#46) and the alpha switch (#47) each make their own live-EEG adapter. Both numbered events `e1`, `e2`…, so the app rejected the alpha confirm as a repeat of the P300 preview. I found this while reviewing #47 after it merged
+- Event IDs now come from one counter shared by every adapter, so they're unique for the whole run
+- Verified with a new test where two live-EEG adapters preview and then confirm (`tests/test_contract.py`). `tests/test_app.py` and `tests/test_recovery.py` no longer assume IDs like `k1`. Full suite: 176 passed
+- Still needs the headset: the combined P300 + alpha flow on a real wearer (#23)
+
+## 11/14/26 - 6:20 PM - Long Le - #33 First security pass ([PR #85](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/85))
+- Did a first privacy and security check of the current code, ahead of making the repo and video public
+    - `python tools/release_check.py --quick --all-branches`, plus manual checks for trained models, network use, and image metadata
+- No keys, raw EEG, recordings, or trained models are in git on any branch. Nothing sends EEG over the network. The only outbound call is the optional AI request, which sends the typed question only
+- One warning: two teammates' personal email addresses appear in commit history. They'll be public if the repo goes public. Results and fix steps are in `docs/security-privacy/README.md`
+- Not final: the check has to be repeated on the frozen judging commit (#42) and the actual video and screenshots (#34). The checklist for that is in the same doc
+
+## 11/14/26 - 6:45 PM - Long Le - #42 Rollback that works with Wi-Fi off ([PR #86](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/86))
+- If the final build breaks at the table, the team can switch back to the draft build without Wi-Fi, even when the two builds need different packages
+    - Make a ready-to-run fallback copy when freezing: `git worktree add ../Signal2Speech-fallback judging-draft`, then set up its own `.venv` while still online. Steps are in `docs/devops/judging-build.md`
+- Why: the old switch-back step said to run `pip install` when the lock file changed, and that fails with Wi-Fi off
+- Switch-back rehearsal on a Mac: 3 seconds from `main` to the known-good build `eecc31a` and one map reveal (keyboard input; the lock file was the same)
+- Also updated the runbook for the smoke check (#41) and the 8-second map reveal (#81). Still needed: tag `judging-draft` and `judging-final` and rehearse the switch on the judging laptop
+
+## 11/14/26 - 7:01 PM - MagicJester2764 - #40 Pre-headset checkpoint ([PR #90](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/90))
+- Wrote down where the demo stands before the headset arrives: `docs/sprint-operations/pre-headset-checkpoint.md`
+- The reveal works with no headset: InYoung's Wi-Fi-off keyboard run on her laptop (a slightly older build), plus a fresh simulated run on today's build where the real NASA/EPA view appears and one line is sent to speech (muted, so not heard)
+- Not yet checked: the simulated run with Wi-Fi off, and hearing the line on the judging laptop. That's my next job, since the judging laptop is mine
+- The smoke check is now fully green (7 of 7), now that the map and data have landed
+- The one thing left for a live demo: the headset isn't connected to the app yet. The P300 chooser and the eyes-closed confirm both work on their own, but nothing wires them into the app (#23)
+- Each developer is asked to confirm their row in #40
+
+## 11/14/26 - 6:55 PM - In Young Song - #32 Verified June 2023 fire detections ([PR #89](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/89))
+- The team has a small, checked sample of NASA fire detections for the demo dates, bundled for offline use
+    - `data/openorbit/firms/`: about 10,000 VIIRS detections for June 26 and 28, 2023, from the Great Lakes to Quebec. `SOURCES.md` explains what a detection means
+- Southeast Michigan itself had no wildfire detections on either day, only a few industrial hot spots. The fires were in Quebec and Ontario
+- `python data/openorbit/firms/build_firms.py --verify-only` re-checks every date and coordinate offline
+
+## 11/14/26 - 6:55 PM - In Young Song - #31 Where the smoke came from ([PR #89](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/89))
+- "Show the satellite view" now also shows where the smoke came from: a NASA map with the Quebec and Ontario fires as dots and southeast Michigan circled
+- It has its own heading, legend, and credit, so fire detections are never confused with smoke or air quality, and it never appears on the AQI comparison
+- It's optional. Without the fire files, the view looks exactly as before. Tested with the files missing and with them broken
+- Verified in the real app on Windows with keyboard input. No headset needed
+
+## 11/14/26 - 6:55 PM - In Young Song - #8 NASA FIRMS fire view ([PR #89](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/89))
+- The FIRMS stretch goal is done: a verified sample (#32) and an optional map (#31). The core OpenOrbit comparison and the spoken lines didn't change
+
+## 11/14/26 - 6:56 PM - Long Le - #39 #4 #42 Judging laptop session script ([PR #88](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/88))
+- Whoever sits at the judging laptop now has one ordered 40-minute checklist: `docs/devops/judging-laptop-session.md`
+    - Wi-Fi on: install, release check, smoke check, and the fallback copy. Wi-Fi off: keyboard and simulated runs, the AI fallback, the evidence view, and a timed switch-back
+- One sitting produces the evidence to close #39 and #4 and rehearses #42's rollback. Each step has a ready-to-paste result comment for the right issue
+- Turned on GitHub's "delete branch after merge" setting, and cleaned up the merged branches
+- Not run yet: it needs the judging laptop
+
+## 11/14/26 - 7:12 PM - Long Le - #93 Judge-facing README ([PR #99](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/99))
+- A judge opening the repo now sees what Signal2Speech does, a screenshot, and a three-command offline quickstart at the top of `README.md`
+    - `pip install -r requirements-lock.txt`, then `python -m signal2speech.app --input keyboard`
+- A status table says honestly what works with keyboard, simulated, recorded, and live EEG input. The live headset tools are built but haven't run on a real wearer yet
+- Added team and data credits (NASA GIBS MODIS, EPA AirData) and a short AI-use note. The screenshot is 180 KB in `docs/demo-submission/media/`
+- Checked: every relative link resolves, and `tools/release_check.py --quick` passes apart from the known commit-email warning (#33)
+
+## 11/14/26 - 7:25 PM - Long Le - #94 Fits the judging laptop screen, plus fullscreen and key help ([PR #111](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/111))
+- The app now fits a 1080p laptop at 150% scaling (1280×720) without cutting anything off. Before, it needed 1400 px of width
+    - `python -m signal2speech.app --fullscreen`. F11 toggles fullscreen, and F1 shows the keys for whoever runs the demo
+- The input label in the bottom strip always shows in full, so simulated input can't look live on a small screen. Longer connection and outcome text clips instead, and the transcript keeps it
+- Checked with screenshots at 1280×720, 1366×768, and 1536×864 (preview, reveal, and help overlay), and tests assert the size limit in every state. Not yet seen on the judging laptop itself
+
+## 11/14/26 - 7:35 PM - Long Le - #95 Long replies fit their tiles ([PR #112](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/112))
+- Long AI replies now shrink to fit the tiles and the preview instead of getting cut off. The text never goes below 32 px, so it stays readable from the judge table
+- The size is only recalculated when the label or the window size changes, never during a flash, so the P300 flash timing isn't affected
+- Checked with screenshots at 1280×720 and 1536×864 using 12-word replies: they fit at 54–56 px. The demo labels stay at full size. Tests cover the 32 px floor, the flash, and the preview
