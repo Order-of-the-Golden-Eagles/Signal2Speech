@@ -214,11 +214,11 @@ def test_tile_shrinks_long_label_and_fits(app):
     assert _fits(t.text(), t.font_px, w, h) or t.font_px == MIN_PX
 
 
-def test_tile_short_label_stays_56_and_flash_keeps_size(app):
+def test_tile_short_label_stays_full_size_and_flash_keeps_size(app):
     t = Tile("target-2", "2")
     t.resize(420, 400)
     t.set_label("Compare counties")
-    assert t.font_px == 56
+    assert t.font_px == Tile.MAX_PX
     t.set_label(LONG_REPLY * 3)
     px = t.font_px
     t.set_lit(True)

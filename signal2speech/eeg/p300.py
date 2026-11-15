@@ -328,6 +328,8 @@ class RecordedResponses:
         if target.shape[2] != EEG_CHANNELS or nontarget.shape[2] != EEG_CHANNELS:
             raise ValueError(f"responses need {EEG_CHANNELS} channels")
         self.name = name
+        #: A short form for the status strip, which has little room.
+        self.short_name = name.replace("P300 Speller dataset, ", "dataset ")
         self.pools = {True: target, False: nontarget}
         self._rng = random.Random(seed)
         self._order = {True: [], False: []}

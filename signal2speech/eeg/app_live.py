@@ -250,7 +250,7 @@ class LiveEegInput:
 
     # ── Labels ───────────────────────────────────────────────
     def connection_label(self) -> str:
-        parts = [f"recorded responses from {self.nodes.synth.responses.name} · simulated eye closure"
+        parts = [f"{self.nodes.synth.responses.short_name} · simulated eye closure"
                  if self.recorded else
                  "g.Pype Generator + synthetic P300 · alpha bursts" if self.simulated else
                  f"Unicorn Hybrid Black · {'OSCAR on' if self.enable_oscar else 'OSCAR off'}"]

@@ -53,6 +53,13 @@ ROOT = Path(__file__).resolve().parents[1]
 MAP_ACTIONS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
 CONFIRM_TIMEOUT_MS = 15_000   # longer than alpha calibration's ~1.5 s closure plus reading time
 
+#: Width shared between the tiles (left) and the map with the latest line (right). The map and
+#: its NASA images are what a judge should see, so the right side gets most of it.
+CHOOSE_SPLIT = (2, 3)
+REVEAL_SPLIT = (2, 3)     # the same on a reveal: columns that change width make the screen jump
+#: Height of the one-line conversation box, before the text scale.
+CONVERSATION_HEIGHT = 104
+
 BLOCKED_INPUTS: dict = {}     # every input is wired in: recorded runs since #104
 
 #: Where --input recorded looks for g.tec's P300 Speller dataset when --recording isn't given.
@@ -450,15 +457,33 @@ class App:
         self.panel_title.setWordWrap(True)
         right.addWidget(self.panel_title)
         if isinstance(self.view, QWidget):
-            right.addWidget(self.view, 3)
-        right.addWidget(self.conversation, 2)
+            right.addWidget(self.view, 1)
+        # The map gets the height. The conversation shows only the latest line; the developer
+        # log (F2) and the session report keep everything.
+        self.conversation.latest_only = True
+        self.conversation.setFixedHeight(T.px(CONVERSATION_HEIGHT))
+        right.addWidget(self.conversation, 0)
         right.addWidget(self.transcript_view, 2)
         self.transcript_view.setVisible(False)
-        row = QHBoxLayout(self.root)
+        right.setContentsMargins(0, 12, 0, 12)        # the panels don't touch the window's edges
+        row = QHBoxLayout()
         row.setContentsMargins(0, 0, 16, 0)
-        row.addWidget(self.window, 3)
-        row.addLayout(right, 2)
+        row.addWidget(self.window, CHOOSE_SPLIT[0])
+        row.addLayout(right, CHOOSE_SPLIT[1])
         self._row = row
+        # The status strip spans the whole window. Inside the left column it was squeezed to a
+        # third of the width whenever the map was revealed, and its text was cut off ("Last: Co").
+        outer = QVBoxLayout(self.root)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        outer.addLayout(row, 1)
+        strip = self.window.strip
+        strip.setParent(self.root)
+        outer.addWidget(strip)
+        strip.setStyleSheet(self.window.styleSheet())  # it left the window that styled it
+        inner = self.window.centralWidget().layout()   # keep the hint line clear of the strip
+        m = inner.contentsMargins()
+        inner.setContentsMargins(m.left(), m.top(), m.right(), max(m.bottom(), 10))
         self.revealing = False
         fit_to_screen(self.root)
 
@@ -587,6 +612,7 @@ class App:
 
     def apply_text_scale(self) -> None:
         self.window.apply_text_scale()
+        self.window.strip.setStyleSheet(self.window.styleSheet())
         self.conversation.restyle()
         self.help.restyle()
         self._restyle_overlays()
@@ -713,8 +739,8 @@ class App:
         for tile in self.window.tiles.values():
             tile.setVisible(not on)
         self.window.hint.setVisible(not on)
-        self._row.setStretch(0, 1 if on else 3)
-        self._row.setStretch(1, 3 if on else 2)
+        self._row.setStretch(0, REVEAL_SPLIT[0] if on else CHOOSE_SPLIT[0])
+        self._row.setStretch(1, REVEAL_SPLIT[1] if on else CHOOSE_SPLIT[1])
 
     def _stop_confirm_timeout(self) -> None:
         self._confirm_timer.stop()

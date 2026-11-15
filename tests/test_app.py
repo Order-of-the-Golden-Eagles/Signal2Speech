@@ -179,7 +179,7 @@ def test_map_confirm_enlarges_reveal_until_next_question(qapp):
     app.window.press_target(T1)
     assert app.revealing and app._reopen.interval() == 60000
     assert not any(t.isVisibleTo(app.window) for t in app.window.tiles.values())
-    assert app.window.input_label.isVisibleTo(app.window)      # input label always visible
+    assert app.window.input_label.isVisibleTo(app.root)      # input label always visible
     app.ask()                                                  # next question
     assert not app.revealing
     assert all(t.isVisibleTo(app.window) for t in app.window.tiles.values())
@@ -213,7 +213,7 @@ def test_window_fits_1280x720_in_every_state(qapp, source):
     app.window.press_target(T1)
     sizes.append(app.root.minimumSizeHint())
     assert all(s.width() <= 1280 and s.height() <= 720 for s in sizes), [(s.width(), s.height()) for s in sizes]
-    assert app.window.input_label.isVisibleTo(app.window)
+    assert app.window.input_label.isVisibleTo(app.root)
     app.close()
     app.root.close()
 
@@ -250,9 +250,9 @@ def test_fullscreen_toggle(qapp):
 
 def test_connection_label_hides_for_keyboard_only(qapp):
     kb = App(view=FakeView(), speaker=FakeSpeaker(), echo=False)
-    assert not kb.window.connection_label.isVisibleTo(kb.window)
+    assert not kb.window.connection_label.isVisibleTo(kb.root)
     kb.window.set_connection("g.Pype Generator stream")
-    assert kb.window.connection_label.isVisibleTo(kb.window)
+    assert kb.window.connection_label.isVisibleTo(kb.root)
 
 
 def test_main_fullscreen_flag(qapp, tmp_path):
@@ -450,5 +450,27 @@ def test_cancel_in_a_confirm_round_needs_a_hold_and_a_tap_does_nothing(qapp):
     w.key_two(False)                                           # letting go afterwards is harmless
     assert w._held_key is None
     assert "hold 2" in w.confirm_hint()
+    app.close()
+    app.root.close()
+
+
+def test_status_strip_spans_the_window_so_its_text_is_not_cut_off(qapp):
+    """Inside the left column, the strip shrank to a third of the window on a reveal and showed
+    "Last: Co". It now sits under both columns at the window's full width."""
+    app = App(InputSources.KEYBOARD, view=WidgetView(), speaker=FakeSpeaker(), echo=False,
+              reveal_ms=60000)
+    app.root.show()
+    app.root.resize(1280, 720)
+    app.ask()
+    app.window.press_target(T2)
+    app.window.press_target(T1)
+    QApplication.processEvents()
+    assert app.revealing
+    strip = app.window.strip
+    assert strip.parent() is app.root and strip.width() == app.root.width()
+    assert strip.isVisibleTo(app.root) and app.window.outcome_label.isVisibleTo(app.root)
+    need = app.window.outcome_label.fontMetrics().horizontalAdvance(app.window.outcome_label.text())
+    assert app.window.outcome_label.width() >= need, (app.window.outcome_label.width(), need)
+    assert app.window.width() >= 0.35 * app.root.width()          # the left side keeps real room
     app.close()
     app.root.close()

@@ -45,7 +45,8 @@ ORIGIN_COLORS = {"Claude": "#22c55e", "Stub": "#f59e0b", "Saved phrases": "#60a5
 HELP_BG = BG              # the overlay is BG at 92% opacity over the window
 
 # ── Type scale (px) ──────────────────────────────────────────
-DISPLAY = 56              # tile titles at full size
+DISPLAY = 56              # the largest text on screen
+TILE_TITLE = 40           # tile titles at full size: readable, without filling the screen
 TITLE = 36                # screen titles
 PREVIEW = 44              # the words to be spoken
 HEADING = 28              # prompts, panel titles
@@ -89,8 +90,8 @@ BORDER_W = 4
 
 # ── What each tile does: (icon, one-line description) ────────
 ACTION_INFO = {
-    ActionIds.SHOW_SATELLITE: ("satellite", "Shows the June 28 satellite image"),
-    ActionIds.COMPARE_AIR_QUALITY: ("chart", "Compares county AQI, June 26 vs. 28"),
+    ActionIds.SHOW_SATELLITE: ("satellite", "June 28 satellite image"),
+    ActionIds.COMPARE_AIR_QUALITY: ("chart", "County AQI, June 26 vs. 28"),
     ActionIds.SPEAK_REPLY: ("speech", "Says these exact words"),
     ActionIds.CONFIRM: ("check", "Hold 1, or close your eyes"),
     ActionIds.CANCEL: ("cross", "Nothing is said"),
