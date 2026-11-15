@@ -72,12 +72,12 @@ Full detail in the [science note](../openorbit-data/science-note.md).
 No. The image is MODIS Terra true color (bands 1-4-3, 250 m), a late-morning snapshot of how the scene looked from orbit. The gray haze on June 28 matches the PM2.5 peak, but the image doesn't measure PM2.5. The AQI numbers come from EPA's ground monitors and cover the whole day. That's why the screen credits NASA and EPA separately.
 
 **"Is Washtenaw's +186 a fair comparison with Wayne's +168?"**
-On the AQI scale, yes. Those are EPA's daily county values. But Washtenaw's June 26 value of 32 came from one monitor and was set by ozone. PM2.5 set the other three values, and Wayne is PM2.5 on both days. Any PM2.5 in Washtenaw on June 26 was at or below 32, so the PM2.5-only rise there is at least as large. The app also shows the other answer: Wayne was worse on June 28 (226 vs 218).
+On the AQI scale, yes. Those are EPA's daily county values. But Washtenaw's June 26 value of 32 came from a single reporting site and was set by ozone, and the file doesn't give a June 26 PM2.5 value for Washtenaw. So its +186 isn't PM2.5 to PM2.5. Wayne is: PM2.5 on both days, 58 to 226. The app also shows the other answer: Wayne was worse on June 28 (226 vs 218).
 
 **"How do you know it was wildfire smoke, and not local pollution?"**
 Three independent sources agree:
 - Michigan's EGLE declared a PM2.5 Air Quality Action Day on June 28, and the National Weather Service attributed it to Canadian wildfire smoke held down by an inversion.
-- NASA FIRMS shows thousands of vegetation-fire detections in Quebec and Ontario, and none in southeast Michigan.
-- PM2.5 jumped region-wide (both counties, 10 Wayne monitors) from Good or Moderate to Very Unhealthy in a day.
+- NASA FIRMS shows 9,457 vegetation-fire detections on June 26 and 28, 86% of them in Quebec at a median of about 1,340 km, and none in the demo area.
+- PM2.5 set both counties' AQI on June 28 at Very Unhealthy. Wayne's PM2.5 went from Moderate (58) to Very Unhealthy (226), and Wayne had 10 sites reporting (all pollutants).
 
 We show a correlation during a documented smoke event. We don't claim to attribute each AQI point to smoke.

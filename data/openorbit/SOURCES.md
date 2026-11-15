@@ -57,7 +57,7 @@ Pixel position: `x = (lon - west) / (east - west) * width`, `y = (north - lat) /
 
 **What a detection means:** a 375 m satellite pixel with at least one hot spot in it at the time of the overpass (UTC). It is not a fire outline or a burned area. The view draws only type 0 ("presumed vegetation fire"). The Canada row count for June 26 (7,959) matches an independent count, which confirms the byte-range download.
 
-**Why a wider map:** southeast Michigan had smoke but no wildfire detections. The fires were in Quebec and Ontario, more than 1,000 km away.
+**Why a wider map:** the demo area had smoke but no vegetation-fire detections. 86% of the vegetation-fire detections were in Quebec, at a median of about 1,340 km. A few small ones were closer (7 within 200 km). The fires were mostly in Quebec, with some in Ontario.
 
 ## Audio (spoken lines, #97)
 

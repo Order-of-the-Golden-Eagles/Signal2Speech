@@ -486,3 +486,4 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Found a subtle point a scientist would catch: Washtenaw's "before" air quality (32) was set by ozone, not by smoke particles. The app now says which pollutant set each number, and the note explains why the comparison still holds
 - The June 26 satellite image is mostly cloud, and the screen now says so, so nobody reads white cloud as clean air
 - Checked against EPA and NASA documentation and news reports of the June 28 smoke alert. The judge Q&A has three science answers ready
+- After review, corrected the fire distances from FIRMS data (most fires about 1,340 km away in Quebec, a few small ones closer, nearest 84 km), made Wayne the like-for-like PM2.5 comparison, and kept the June 26 caption inside the image on small screens. Verified with `pytest tests/test_openorbit.py` (keyboard and offscreen only)
