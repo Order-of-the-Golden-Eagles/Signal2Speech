@@ -1,5 +1,7 @@
 # Submission video shot list (#34, #13)
 
+**The video we're recording: screen only, no headset ([#160](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/160)).** The team decided on a screen recording with simulated and keyboard input only, at 2:30 or less (2:25 target), so the same cut meets Devpost's 3:00 limit and g.tec's 2:30 cap. #160 has the shot list, the commands, the narration, and the export steps. The cut below is the original plan with a wearer on camera. Keep it for a later live version.
+
 **Hard limit: under 3:00. Target: 2:45.** That leaves 15 seconds of margin for titles and export rounding. Check the exported file's length, not the editor timeline.
 
 Every shot that shows EEG carries an on-screen caption naming its source: **Live EEG**, **Recorded**, **Simulated** or **Keyboard**. The app's judge strip and the evidence banner already show it, so the caption must agree with them. Never cut a Simulated or Keyboard shot under narration that says "live".
