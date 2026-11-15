@@ -31,6 +31,7 @@ CHAT_SPLIT = (3, 2)
 CHAT_TILE_HEIGHT = 300
 CHAT_TILE_PX = (30, 20)        # title size on the reply cards: from, and down to for long replies
 CHAT_LOG_HEIGHT = 300          # the conversation box: room for one question and its answer
+READ_S = 17                     # headset: seconds to read the replies before the cards flash
 NASA_QUESTION = "Which county's AQI rose more when wildfire smoke reached southeast Michigan?"
 
 
@@ -58,6 +59,11 @@ class AnsweringDemo:
         # asked. Flashing straight after calibration made a pick before anyone had asked anything.
         self.live = input_source == InputSources.LIVE_EEG or p300
         self._pending = False
+        #: Seconds the wearer gets to read both replies and choose one before the cards flash.
+        self.read_s = READ_S
+        self._read_left = 0
+        self._read_round = None
+        self._read_timer = QTimer(interval=1000)
         self.next_pick = 1
         self._asked = False
         if self.recorded:
@@ -92,6 +98,8 @@ class AnsweringDemo:
         self.panel.saved_requested.connect(self.saved)
         self.panel.nasa_requested.connect(lambda: self.back() if self._map_on else self.nasa())
         self.app.handler.on_round_opened.append(self._fit_side_panel)
+        self.app.handler.on_round_opened.append(self._read_then_flash)
+        self._read_timer.timeout.connect(self._read_tick)
         tap = getattr(self.app.sim, "trace_tap", None)
         if tap is not None:                    # an EEG input: show what the pipeline receives
             tap.on_rows = self.panel.trace.feed
@@ -235,6 +243,35 @@ class AnsweringDemo:
         if rnd.kind is RoundKind.CHOOSE:
             self._show_map(any(c.action_id in MAP_ACTIONS for c in rnd.choices))
 
+    def _read_then_flash(self, rnd) -> None:
+        """Headset: give the wearer time to read both replies, then flash. Every choose round of
+        an asked question gets it, including one reopened after a timeout."""
+        from signal2speech.core import RoundKind
+        self._read_timer.stop()
+        if not (self.live and self._pending and rnd.kind is RoundKind.CHOOSE
+                and getattr(self.app.sim, "p300_ok", True)):
+            return
+        self._read_round, self._read_left = rnd.id, int(self.read_s)
+        self._read_tick(first=True)
+        if self._read_left > 0:
+            self._read_timer.start()
+
+    def _read_tick(self, first: bool = False) -> None:
+        current = self.app.handler.current
+        if current is None or current.id != self._read_round:
+            self._read_timer.stop()             # the round changed: never flash an old one
+            return
+        if not first:
+            self._read_left -= 1
+        w = self.app.window
+        if self._read_left > 0:
+            w.hint.setText(f"Read both replies and choose one in your head. "
+                           f"Flashing starts in {self._read_left} s")
+            return
+        self._read_timer.stop()
+        w.hint.setText("Look at your reply and count its flashes")
+        w.flasher.start([c.target_id for c in current.choices])
+
     def _idle_hint(self) -> None:
         if self.live and not self._pending:
             self.app.window.hint.setText(
@@ -245,6 +282,9 @@ class AnsweringDemo:
         if self.live:
             if self._asked:
                 self._asked, self._pending = False, True
+            # The window doesn't start flashing on its own here (flash_hold): _read_then_flash
+            # does, after the wearer has had time to read the replies and pick one in their head.
+            self.app.window.flash_hold = True
             self.app.window.flash_enabled = bool(self._pending and getattr(self.app.sim, "p300_ok", True))
         if not self.recorded:
             return
@@ -341,6 +381,7 @@ class AnsweringDemo:
             if self.live:                                    # answered: no flashing until the next question
                 self._pending = False
                 self.app.window.flash_enabled = False
+                self._read_timer.stop()
             # The question is answered: empty the box for the next one.
             self.question = ""
             self.panel.question.clear()
@@ -430,6 +471,8 @@ def main(argv=None) -> int:
     p.add_argument("--question", default="", help="ask this question at start")
     p.add_argument("--keys", default="", help="keys after the replies arrive, e.g. '1,1'")
     p.add_argument("--mute", action="store_true")
+    p.add_argument("--read-seconds", type=int, default=READ_S,
+                   help="headset: seconds to read the two replies before the cards start flashing")
     p.add_argument("--no-start-button", action="store_true",
                    help="EEG inputs: begin calibration at once instead of waiting for the Start button")
     p.add_argument("--windows-voice", action="store_true",
@@ -479,6 +522,7 @@ def main(argv=None) -> int:
         print(f"Couldn't set up the EEG pipeline: {type(err).__name__}: {err}"
               + (f"\n{PAIRING_HELP}" if source == InputSources.LIVE_EEG else ""), file=sys.stderr)
         return 3
+    demo.read_s = max(0, args.read_seconds)
     demo.root.show()
     bring_to_front(demo.root)
     if hasattr(demo.app.sim, "calibrate") and not (args.no_start_button or args.question or args.screenshot

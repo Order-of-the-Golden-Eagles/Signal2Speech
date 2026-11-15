@@ -264,6 +264,9 @@ class SelectionWindow(QMainWindow):
         self.handler = handler
         self.keyboard = keyboard
         self.flash_enabled = flash
+        #: True: a round's cards don't start flashing by themselves; the app starts them later
+        #: (a headset wearer first reads the replies).
+        self.flash_hold = False
         self.eye_confirm: Optional[bool] = None   # False once eye-closure calibration failed (#103)
         self.eye_off_reason = "its calibration failed"   # shown when eye_confirm is False (#172)
         self._preview: Optional[Choice] = None
@@ -540,7 +543,7 @@ class SelectionWindow(QMainWindow):
             self.preview_box.setVisible(False)
             self.hint.setText("Look at a tile, or press 1 or 2   ·   Esc clears" if self.flash_enabled
                               else "Press 1 or 2   ·   Esc clears")
-            if self.flash_enabled:
+            if self.flash_enabled and not self.flash_hold:
                 self.flasher.start([t for t in _TILE_ORDER if rnd.find(t)])
 
     def show_preview(self, choice: Choice) -> None:

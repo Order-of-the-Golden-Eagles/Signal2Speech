@@ -216,6 +216,9 @@ class LiveEegInput:
         #: Called with "close" and "open" during the eye check, so a wearer with their eyes shut
         #: hears when to open them. The app sets it to a low and a high beep.
         self.eye_cue: Optional[Callable[[str], None]] = None
+        #: Speaks a calibration instruction and returns when it is finished (headset only).
+        self.guide: Optional[Callable[[str], None]] = None
+        self.alpha_attempts = 2
         #: Shown under the tiles when a round opens and the script has nothing for it.
         self.idle_hint = "Simulated script finished: press 1 or 2"
         self.p300_calibration: dict = {}
@@ -355,6 +358,8 @@ class LiveEegInput:
             w.tiles[t].set_label(labels[t])
         w.preview.setVisible(False)
         try:
+            self._guide("Calibration. Look only at the card the screen names, and silently count each "
+                        "time it flashes. Keep still and relaxed.")
             self.p300_ok = self._calibrate_p300(labels, wait)
             self.alpha_ok = self._calibrate_alpha(wait)
         except CalibrationAborted:
@@ -373,6 +378,8 @@ class LiveEegInput:
         w.set_connection(self.connection_label())
         self.log(f"calibration: {status}")
         self.calibrated = True
+        self._guide("Calibration is done. To say a reply, close your eyes for two seconds." if self.alpha_ok
+                    else "Calibration is done. The eye check didn't pass, so hold key one to confirm.")
         return bool(self.p300_ok and self.alpha_ok)
 
     def _calibrate_p300(self, labels: dict, wait) -> bool:
@@ -418,6 +425,16 @@ class LiveEegInput:
         return True
 
     def _calibrate_alpha(self, wait) -> bool:
+        """The eye check, spoken step by step. A failed try gets one more."""
+        for attempt in range(1, self.alpha_attempts + 1):
+            ok = self._alpha_attempt(wait, attempt)
+            if ok or attempt == self.alpha_attempts:
+                return ok
+            self._guide("That one didn't pass. Let's try the eye check once more. "
+                        "Relax your face and jaw, and keep your eyes closed for the whole time.")
+        return False
+
+    def _alpha_attempt(self, wait, attempt: int) -> bool:
         w, s = self.window, self.alpha_calib_s
 
         def collect(seconds: float):
@@ -425,8 +442,10 @@ class LiveEegInput:
             wait(seconds)
             return self.alpha.power_since(start)
         try:
-            w.prompt.setText(f"Eye-closure calibration: keep your eyes OPEN and relaxed for {s:g} s")
+            w.prompt.setText(f"Eye check: keep your eyes OPEN and relaxed for {s:g} s")
             w.hint.setText("")
+            if attempt == 1:
+                self._guide("Now the eye check. Keep your eyes open, look at the screen, and stay still.")
             if self.bursts:
                 self.bursts.open_eyes()
             collect(1.0)
@@ -434,25 +453,40 @@ class LiveEegInput:
             heard = self.eye_cue is not None
             w.prompt.setText(f"Now CLOSE your eyes for {s:g} s (low beep). A high beep says when to open them."
                              if heard else f"Now CLOSE your eyes for {s:g} s. We'll say when to open them.")
+            self._guide("Close your eyes now, and keep them closed until you hear the high beep.")
             self._eye_cue("close")
             if self.bursts:
                 self.bursts.close_eyes()
-            collect(1.0)
+            collect(1.5)                                     # alpha rises once the eyes are shut
             closed_vals = collect(s)
             if self.bursts:
                 self.bursts.open_eyes()
             w.prompt.setText("Open your eyes  (high beep)" if heard else "Open your eyes.")
             self._eye_cue("open")
+            self._guide("Open your eyes.")
             self.alpha_calibration = self.alpha.calibrate(open_vals, closed_vals)
             collect(1.5)                                     # alpha decays below release
         except CalibrationAborted:
             raise
         except Exception as err:                             # incl. CalibrationError
-            self.log(f"Eye-closure calibration failed: {type(err).__name__}: {err}. "
+            self.log(f"Eye-closure calibration failed (try {attempt}): {type(err).__name__}: {err}. "
                      "Key 1 still confirms.")
             return False                                     # threshold stays at "never fires"
         self.log(f"Alpha switch calibrated: ratio {self.alpha_calibration.ratio:.1f}")
         return True
+
+    def _guide(self, text: str) -> None:
+        """Speak one calibration instruction and wait until it is finished, so the wearer hears
+        what to do before the measurement starts. Headset only; recorded mode narrates itself."""
+        if self.guide is None:
+            return
+        self.log(f"guide: {text}")
+        from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()                     # the screen shows the step before it is spoken
+        try:
+            self.guide(text)
+        except Exception as err:                         # a voice problem must not stop calibration
+            self.log(f"guide voice failed: {type(err).__name__}: {err}")
 
     def _eye_cue(self, kind: str) -> None:
         if self.eye_cue is None:

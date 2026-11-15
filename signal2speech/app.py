@@ -51,7 +51,7 @@ from signal2speech.ui.__main__ import load_demo_choices
 ROOT = Path(__file__).resolve().parents[1]
 
 MAP_ACTIONS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
-CONFIRM_TIMEOUT_MS = 15_000   # longer than alpha calibration's ~1.5 s closure plus reading time
+CONFIRM_TIMEOUT_MS = 20_000   # longer than alpha calibration's ~1.5 s closure plus reading time
 
 #: Width shared between the tiles (left) and the map with the latest line (right). The map and
 #: its NASA images are what a judge should see, so the right side gets most of it.
@@ -403,8 +403,10 @@ class App:
                 # Someone with their eyes closed can't read "Open your eyes": a low beep to close,
                 # a high beep to open, the same sounds as the board session's eye check.
                 from signal2speech.eeg.board_session import Voice
-                cue_voice = Voice()
+                cue_voice = Voice(neural=PiperVoice.find())
                 self.sim.eye_cue = lambda kind: cue_voice.beep("go" if kind == "close" else "stop")
+                if not hasattr(self.sim, "narrator"):     # a headset: spoken calibration steps
+                    self.sim.guide = cue_voice.say
             alpha = getattr(self.sim, "alpha", None)
             if alpha is not None and hasattr(alpha, "progress"):
                 alpha.progress.connect(self.window.set_eye_progress, Qt.ConnectionType.QueuedConnection)
@@ -422,8 +424,10 @@ class App:
                 # Someone with their eyes closed can't read "Open your eyes": a low beep to close,
                 # a high beep to open, the same sounds as the board session's eye check.
                 from signal2speech.eeg.board_session import Voice
-                cue_voice = Voice()
+                cue_voice = Voice(neural=PiperVoice.find())
                 self.sim.eye_cue = lambda kind: cue_voice.beep("go" if kind == "close" else "stop")
+                if not hasattr(self.sim, "narrator"):     # a headset: spoken calibration steps
+                    self.sim.guide = cue_voice.say
             alpha = getattr(self.sim, "alpha", None)
             if alpha is not None and hasattr(alpha, "progress"):
                 # #175: the ring follows the alpha switch (queued: emitted on a g.Pype thread).
