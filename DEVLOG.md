@@ -565,7 +565,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The tones are generated in code, so there's no audio file to download or license
 - Verified with the keyboard and in headless tests with a fake sound player (11 new tests: wording for cancel, timeout, and disconnect; one cue per event; confirm cue before speech; exactly one speech). I haven't listened to the tones' volume on the judging laptop's speakers yet.
 
-## 11/15/26 - 1:48 AM - Long Le - #193 #194 #195 #196 #197 Attract mode, reply language, text size, practice round, help phrase (PR pending)
+## 11/15/26 - 1:48 AM - Long Le - #193 #194 #195 #196 #197 Attract mode, reply language, text size, practice round, help phrase ([PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203))
 - When the table sits idle for 60 s, a clearly labelled simulated demo now loops on its own. Any key stops it and returns to a clean first question.
     - `--no-attract` turns it off; the loop never reaches the real session or its report counts
 - The AI demo can suggest and speak replies in another language. If no voice for that language is installed, it says so and stays in English.
