@@ -44,7 +44,8 @@ class AnsweringDemo:
         self._asked = False
         if self.recorded:
             self.app.sim.script.clear()
-            self.app.sim.idle_hint = "Type a question above. The recorded brain data will answer it."
+            self.app.sim.idle_hint = ("Type a question above and press Enter (or click Saved phrases). "
+                                      "The recorded brain data will pick a reply.")
         self.suggester = ReplySuggester(provider, saved_phrases_from_file())   # #134
         self.async_ = AsyncSuggester(self.suggester, deadline_s, parent=self.app.window)
         self.panel = QuestionPanel()
@@ -146,6 +147,7 @@ class AnsweringDemo:
             self._request(avoid)
 
     def saved(self) -> None:
+        self._asked = True                     # a deliberate request: recorded data may answer it
         self.app.log("judge: saved phrases")
         self._show(self.suggester.saved.next_page("chosen by judge"))
 
