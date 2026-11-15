@@ -377,7 +377,7 @@ class App:
         h.on_cleared.append(self._talk_cleared)
         h.on_preview.append(self._cue_preview)               # #177
         h.on_round_opened.append(lambda r: self._event(f"round {r.id} ({r.kind.value}) opened"))
-        h.on_cleared.append(lambda r: None if r == "practice" else self._event(f"cleared ({r}), no output"))
+        h.on_cleared.append(lambda r: None if r in ("practice", "restart") else self._event(f"cleared ({r}), no output"))
         h.on_handled.append(lambda e, o: self._event(
             f"{o.value}" + (f" · {e.source} {e.eventId} {e.roundId}->{e.targetId}" if e else "")))
 
@@ -542,6 +542,13 @@ class App:
         self.on_text_scale: List[Callable[[], None]] = []
         self._restyle_overlays()
 
+        self.restarts = 0                               # #180: R presses, for the report
+        self._restarting = False
+        # #180: called on R; return True if you opened the first question yourself.
+        self.on_restart: List[Callable[[], bool]] = []
+        restart_key = QShortcut(QKeySequence("R"), self.root)
+        restart_key.setAutoRepeat(False)
+        restart_key.activated.connect(self.restart)
         sc = QShortcut(QKeySequence("D"), self.root)   # rehearse a headset drop (#26)
         sc.setAutoRepeat(False)
         sc.activated.connect(lambda: h.disconnect())
@@ -553,6 +560,7 @@ class App:
         # Operator keys (#94). Neither touches the handler.
         rows = [("1 / 2", "Pick a tile. At the preview, hold 1 for 2 s to confirm; 2 cancels."),
                 ("Esc", "Cancel and clear the screen"),
+                ("R", "Restart: a fresh first question for the next visitor, nothing is said"),
                 ("D", "Pretend the headset disconnected"),
                 ("F11", "Fullscreen on or off"),
                 ("F2", "Conversation or developer log"),
@@ -581,6 +589,57 @@ class App:
             self.attract = AttractMode(self, idle_ms=attract_idle_ms or IDLE_MS)
             self.attract.poke()
 
+    # ── #180 restart ─────────────────────────────────────────
+    @property
+    def calibrating(self) -> bool:
+        """True while a headset or board is calibrating (#103, #172): R must not interrupt it."""
+        return bool(getattr(self.sim, "calibrating_now", False))
+
+    def restart(self) -> bool:
+        """R: a clean first question from any state, for the next visitor (#180).
+
+        It goes through the contract, never around it: an open round is ended with
+        ``handler.cancel("restart")``, so a decision still in flight for it arrives stale and is
+        rejected, and a fresh Choose round opens with ``begin_choice_round``. Nothing new is
+        shown on the map or spoken. Each restart goes in the session report. It's refused during
+        a calibration. Returns True if it restarted.
+        """
+        h = self.handler
+        if self.calibrating:
+            self.log("restart (R) ignored: a calibration is running")
+            return False
+        attract_was_on = self.attract is not None and self.attract.active
+        if attract_was_on:
+            self.attract.stop("restart")             # it leaves a clean Choose round itself
+        self.sink.stop_output()                      # a reply still waiting for its cue stays unsaid
+        self.help_banner.hide()                      # the last visitor's help request
+        self._help_hide.stop()
+        if self.practice.active:
+            self._restarting = True                  # _practice_done logs the end, but doesn't ask
+            try:
+                self.practice.stop()
+            finally:
+                self._restarting = False
+        rnd = h.current
+        fresh = rnd is not None and rnd.kind is RoundKind.CHOOSE and h.pending is None
+        need_round = not (attract_was_on and fresh)  # attract already opened one: don't add another
+        if need_round and rnd is not None:
+            h.cancel("restart")
+        self._reopen.stop()                          # the cancel scheduled a reopen; we open now
+        self._stop_confirm_timeout()
+        self._set_reveal(False)
+        if hasattr(self.view, "reset"):
+            self.view.reset()                        # no map left over from the last visitor
+        self.restarts += 1
+        self.log("restart (R): a fresh first question, nothing was output")
+        self._event("restart (R)")
+        self.conversation.add("nothing", "Restarted for the next visitor.")
+        # Screens that own their own first question (the AI demo's saved phrases) open it here.
+        handled = any([fn() for fn in self.on_restart])
+        if need_round and not handled:
+            self.ask()
+        return True
+
     # ── #196 practice ────────────────────────────────────────
     @property
     def practicing(self) -> bool:
@@ -606,7 +665,8 @@ class App:
         p = self.practice
         self.log(f"practice: ended after {p.sequences} sequence(s), tile 1 flashed {p.target_flashes} times")
         self.window.reset()
-        self.ask()
+        if not self._restarting:                     # R opens the next question itself (#180)
+            self.ask()
 
     # ── #197 help phrase ─────────────────────────────────────
     def _call_for_help(self, how: str) -> None:
@@ -702,7 +762,7 @@ class App:
 
     def _talk_cleared(self, reason: str) -> None:
         had_preview, self._previewed = self._previewed is not None, None
-        if reason == "practice":                 # the practice round took over the screen (#196)
+        if reason in ("practice", "restart"):   # practice (#196) and R (#180) say it themselves
             return
         what = "preview" if had_preview else "question"
         text = {"cancel": f"The {what} was cancelled.",
@@ -839,7 +899,8 @@ class App:
         lines += ["", "## Help phrase", ""]
         lines += ([f"- {c['time']} · {c['source']}: “{c['text']}”" for c in self.sink.help_calls]
                   or ["Not used this session."])
-        extra = [f"- **Practice rounds:** {self.practice.runs}"]
+        extra = [f"- **Practice rounds:** {self.practice.runs}",
+                 f"- **Restarts (R):** {self.restarts}"]
         if hasattr(self.sim, "usage"):                 # #104: recorded responses, counted
             u = self.sim.usage()
             extra.append(f"- **Recorded responses played:** {u['target_responses']} attended and "

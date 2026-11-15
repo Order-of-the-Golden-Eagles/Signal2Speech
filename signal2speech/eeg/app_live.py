@@ -324,7 +324,17 @@ class LiveEegInput:
         self.running = False
 
     # ── Calibration, on the app's own tiles ──────────────────
+    calibrating_now = False      # R (#180) is refused while this is True
+
     def calibrate(self, labels: Optional[dict] = None) -> Optional[bool]:
+        """See ``_calibrate``. Marks the calibration as running, so R can't interrupt it."""
+        self.calibrating_now = True
+        try:
+            return self._calibrate(labels)
+        finally:
+            self.calibrating_now = False
+
+    def _calibrate(self, labels: Optional[dict] = None) -> Optional[bool]:
         """P300 calibration, then the alpha threshold. Blocks while keeping the UI live.
 
         Returns True if both worked, False if either failed (that path is turned off and the
@@ -828,7 +838,17 @@ class PiEEGConfirm:
         gc.collect()
 
     # ── The #150 check, on screen ────────────────────────────
+    calibrating_now = False      # R (#180) is refused while this is True
+
     def calibrate(self, labels: Optional[dict] = None) -> Optional[bool]:
+        """See ``_calibrate``. Marks the calibration as running, so R can't interrupt it."""
+        self.calibrating_now = True
+        try:
+            return self._calibrate(labels)
+        finally:
+            self.calibrating_now = False
+
+    def _calibrate(self, labels: Optional[dict] = None) -> Optional[bool]:
         """Channel check, alpha calibration, rest and closures; arm only if it's clean.
 
         Returns True if eye-closure confirm is on, False if the check failed (holding key 1 confirms),

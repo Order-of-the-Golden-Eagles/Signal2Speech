@@ -103,6 +103,7 @@ class AnsweringDemo:
         self.async_.ready.connect(self._show)
         # After a confirm the app reopens a round: offer saved phrases, not the spoken pair.
         self.app.handler.on_handled.append(self._after_handled)
+        self.app.on_restart.append(self._on_restart)            # #180: R starts a new visitor
         self.app.log(f"replies provider: {self.provider_note}")
         self.app.log(f"saved phrases: {self.suggester.saved.source}")
         # #194: F3 switches between English and the chosen reply language.
@@ -305,6 +306,15 @@ class AnsweringDemo:
         self.app.options_origin = rs.origin.lower() if rs.origin != "Claude" else "Claude"
         self._arm_recorded()
         self.app.ask()
+
+    def _on_restart(self) -> bool:
+        """R (#180): forget the last visitor's question and replies, drop a pending AI request,
+        and open the first question with saved phrases."""
+        self.async_.cancel()
+        self.question = ""
+        self.panel.question.clear()
+        self._show(self.suggester.saved.current("restarted"))      # opens the round itself
+        return True
 
     def _after_handled(self, _e, outcome: Outcome) -> None:
         if outcome is Outcome.Confirmed:

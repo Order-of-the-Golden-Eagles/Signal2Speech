@@ -656,6 +656,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - We found that OSCAR delays the signal by about a third of a second and g.Pype doesn't shift the flash markers to match. Ignoring that costs up to 0.14 accuracy, so the docs say how to handle it, and the headset session should check it on the live path
 - Measured on g.tec's recordings replayed through g.Pype (Recorded, not our wearer, not live). The g.tec data stays out of git
 
+## 11/15/26 - 5:24 AM - MagicJester2764 - #180 R restarts the demo for the next visitor ([PR #213](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/213))
+- Between judges, one key press (R) brings back a fresh first question from wherever the app is: mid-preview, mid-reveal, mid-practice, or during the idle demo. Nothing is said
+- It uses the same rules as a normal cancel, so a brain decision still in flight from before the restart is thrown away instead of picking something on the new question
+- Each restart is counted in the session report, separately from cancels
+- Checked with keyboard and simulated input in tests. The welcome screen half of #180 is still open: Long's attract loop already uses the idle time, and we're agreeing on how the two fit
+
 ## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
 - With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
     - Each tile flash is answered with one real recorded brain response. The same g.Pype pipeline and classifier as the live path calibrate on them and pick the tile
