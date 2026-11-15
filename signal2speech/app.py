@@ -35,8 +35,8 @@ from typing import Callable, List, Optional, Protocol
 
 from PySide6.QtCore import QObject, Qt, QTimer
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QPlainTextEdit, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QPlainTextEdit, QSizePolicy,
+                               QVBoxLayout, QWidget)
 
 from signal2speech.core import (ActionIds, Choice, ConfirmedAction, EegClassMap, InputAdapter,
                                 InputSources, Outcome, Round, RoundKind, SelectionEvent,
@@ -46,7 +46,7 @@ from signal2speech.speech.neural import PiperVoice
 from signal2speech.ui import INPUT_LABELS, KeyHelpOverlay, SelectionWindow
 from signal2speech.ui import theme as T
 from signal2speech.ui.conversation import KINDS, ConversationView
-from signal2speech.ui.__main__ import load_demo_choices
+from signal2speech.ui.__main__ import DEMO_QUESTION, load_demo_choices
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -323,7 +323,8 @@ class App:
                  recording=None,
                  clock: Callable[[], float] = time.monotonic, cues: bool = False,
                  attract: bool = False, attract_idle_ms: Optional[int] = None,
-                 help_by_eyes: bool = False, practice_s: Optional[float] = None):
+                 help_by_eyes: bool = False, practice_s: Optional[float] = None,
+                 question: Optional[str] = None):
         if pieeg is not None and input_source != InputSources.KEYBOARD:
             raise ValueError("--input pieeg chooses by keyboard: the board gives the eyes-closed "
                              "confirm only (#172)")
@@ -478,6 +479,20 @@ class App:
         right.addWidget(self.transcript_view, 2)
         self.transcript_view.setVisible(False)
         right.setContentsMargins(0, 12, 0, 12)        # the panels don't touch the window's edges
+        # #178: a header across the top: the name, the tagline, and where we are.
+        from signal2speech.ui.stepper import StepBar, StepTracker
+        self.window.question = DEMO_QUESTION if question is None else question
+        self.header_title = QLabel("Signal2Speech")
+        self.header_tagline = QLabel("Answer without speaking or typing.")
+        self.header_tagline.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.steps = StepBar()
+        self.step_tracker = StepTracker(h, self.steps, ring=self.window.ring)
+        header = QHBoxLayout()
+        header.setContentsMargins(T.XL, T.S, 16, 0)
+        header.setSpacing(T.M)
+        header.addWidget(self.header_title)
+        header.addWidget(self.header_tagline, 1)
+        header.addWidget(self.steps)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 16, 0)
         row.addWidget(self.window, CHOOSE_SPLIT[0])
@@ -488,6 +503,7 @@ class App:
         outer = QVBoxLayout(self.root)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
+        outer.addLayout(header)
         outer.addLayout(row, 1)
         strip = self.window.strip
         strip.setParent(self.root)
@@ -587,6 +603,7 @@ class App:
         if h.current is not None:
             h.cancel("practice")
             self._reopen.stop()
+        self.step_tracker.clear()                    # practice isn't a question (#178)
         self.log("practice: started (nothing is sent until it ends)")
         self.practice.start()
         return True
@@ -632,6 +649,9 @@ class App:
             fn()
 
     def _restyle_overlays(self) -> None:
+        self.header_title.setStyleSheet(f"color:{T.TEXT}; font-size:{T.px(T.HEADING)}px; font-weight:700;")
+        self.header_tagline.setStyleSheet(f"color:{T.MUTED}; font-size:{T.px(T.BODY)}px;")
+        self.steps.restyle()
         self.panel_title.setStyleSheet(f"color:{T.MUTED}; font-size:{T.px(T.BODY)}px; font-weight:600;")
         self.transcript_view.setStyleSheet(f"background:{T.SURFACE}; color:{T.STRIP_TEXT};"
                                            f"font-size:{T.px(15)}px; font-family: {T.MONO};")
@@ -667,8 +687,10 @@ class App:
         self.panel_title.setText("Developer log   ·   F2: back" if show_log else PANEL_TITLE)
 
     def add_question(self, text: str) -> None:
-        """The conversation partner's question, shown before the options it produced."""
+        """The conversation partner's question, shown before the options it produced, and in
+        large type above the tiles (#178)."""
         self.conversation.add("question", text)
+        self.window.question = text
 
     def _talk_round(self, rnd: Round) -> None:
         if rnd.kind is RoundKind.CHOOSE:
@@ -714,6 +736,8 @@ class App:
 
     def close(self) -> None:
         """Stop the g.Pype stream (#21) and this app's timers, so nothing fires after close."""
+        if hasattr(self, "step_tracker"):
+            self.step_tracker.stop()
         self._confirm_timer.stop()
         self._reopen.stop()
         self._countdown.stop()
@@ -1037,7 +1061,8 @@ def main(argv=None) -> int:
         from signal2speech.ui.intro import play_intro
         qapp.processEvents()                       # the tiles need their final places first
         play_intro(app.root, app.window, app.choices,
-                   reveal=[w for w in (app.view, app.conversation, app.window.strip)
+                   reveal=[w for w in (app.header_title, app.header_tagline, app.steps,   # #178
+                                       app.view, app.conversation, app.window.strip)
                            if isinstance(w, QWidget)])
 
     if hasattr(app.sim, "calibrate"):          # #103: open the stream and calibrate first

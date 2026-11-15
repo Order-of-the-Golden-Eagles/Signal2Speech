@@ -35,7 +35,14 @@ class RingModel:
                  clock: Callable[[], float] = time.monotonic):
         self.on_complete = on_complete
         self.clock = clock
+        # Called after a hold starts or ends, eye progress changes, a reset, or a confirm, so a
+        # view such as the step bar (#178) can follow the ring without polling it.
+        self.listeners: list = []
         self.reset()
+
+    def _changed(self) -> None:
+        for fn in list(self.listeners):
+            fn()
 
     def reset(self) -> None:
         self.progress = 0.0
@@ -43,6 +50,7 @@ class RingModel:
         self.completed = False
         self._hold_start: Optional[float] = None
         self._hold_s = HOLD_S
+        self._changed()
 
     @property
     def holding(self) -> bool:
@@ -55,6 +63,7 @@ class RingModel:
         self.source, self._hold_s = source, max(0.001, seconds)
         self._hold_start = self.clock()
         self.progress = 0.0
+        self._changed()
 
     def release(self) -> None:
         """Let go early: the ring empties, and nothing is confirmed."""
@@ -62,6 +71,7 @@ class RingModel:
             return
         self._hold_start = None
         self.progress = 0.0
+        self._changed()
 
     def tick(self) -> None:
         if self._hold_start is None or self.completed:
@@ -80,6 +90,7 @@ class RingModel:
             return
         self.source = source
         self.progress = max(0.0, min(1.0, float(progress)))
+        self._changed()
 
     def mark_confirmed(self, source: Optional[str] = None) -> None:
         """A confirm arrived (from any input): show the ring full, remembering what filled it."""
@@ -88,6 +99,7 @@ class RingModel:
         self._hold_start = None
         self.progress = 1.0
         self.completed = True
+        self._changed()
 
 
 def _qt_widget():

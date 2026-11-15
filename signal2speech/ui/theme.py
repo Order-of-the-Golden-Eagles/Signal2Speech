@@ -124,6 +124,7 @@ def window_qss() -> str:
 QMainWindow, QWidget#root {{ background: {BG}; }}
 QLabel {{ color: {TEXT}; }}
 QLabel#prompt {{ font-size: {px(HEADING)}px; font-weight: 600; color: {TEXT}; }}
+QLabel#question {{ font-size: {px(HEADING + 4)}px; font-weight: 700; color: {TEXT}; }}
 QLabel#preview {{ font-size: {px(PREVIEW)}px; font-weight: 700; color: {ACCENT}; padding: {M}px;
                   background: {SURFACE}; border-left: 6px solid {ACCENT}; border-radius: {RADIUS_M}px; }}
 QLabel#hint {{ font-size: {px(BODY)}px; color: {MUTED}; }}
@@ -169,6 +170,12 @@ TEXT_PAIRS = [
     ("help phrase banner", ON_ACCENT, ACCENT, TITLE, True),
     ("attract banner", ON_ACCENT, INPUT_COLORS[InputSources.SIMULATED], HEADING, True),
     ("attract caption", TEXT, BG, BODY, False),
+    ("header title", TEXT, BG, HEADING, True),
+    ("header tagline", MUTED, BG, BODY, False),
+    ("question", TEXT, BG, HEADING, True),
+    ("step current", ON_ACCENT, ACCENT, CAPTION + 2, True),
+    ("step done", MUTED, BG, CAPTION + 2, False),
+    ("step upcoming", QUIET, BG, CAPTION + 2, False),
     ("button", TILE_TEXT, RAISED, BODY, True),
     ("help text", TEXT, HELP_BG, 26, False),
     ("help keys", ACCENT, HELP_BG, 26, True),

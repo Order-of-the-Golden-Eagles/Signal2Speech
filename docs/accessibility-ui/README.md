@@ -165,6 +165,23 @@ When nobody has touched the table for 60 s, the app loops a narrated walkthrough
 
 ![attract mode](media/193-attract.jpg)
 
+## Header, the question, and where we are (#178)
+
+A judge who walks up mid-demo can now see what's being asked and which step is happening:
+
+- **A header across the top:** "Signal2Speech", the tagline "Answer without speaking or typing.", and on the right a four-step bar: **1 Choose › 2 Preview › 3 Confirm › 4 Spoken**. The current step is highlighted, earlier steps are dimmed, and later ones are quieter still.
+- **The partner's question in large type** above the tiles, in place of "Choose a reply". It's the demo question by default ("Which county's AQI rose more when wildfire smoke reached southeast Michigan?", `DEMO_QUESTION` in `signal2speech/ui/__main__.py`), or the typed question in AI Answering (`App.add_question`). The AI demo starts with no question, and after a confirm or the saved-phrases button it shows "Choose a reply" again. The question has its own label (`QLabel#question` in `theme.py`), so it scales with the text size and the prompt keeps its own style for "Say this?" and practice.
+- **The steps follow the selection handler, never a timer:**
+  - a Choose round opens → Choose;
+  - the preview shows → Preview;
+  - while the confirm ring fills to confirm (key 1 held, or eyes closing; not key 2 held to cancel) → Confirm. Simulated input starts filling at once, so it shows Confirm straight away. The ring's model tells the bar when it changes (`RingModel.listeners`), so nothing polls;
+  - confirmed → Spoken;
+  - a cancel, timeout or disconnect clears the bar until the next question, and so does a practice round.
+  - The rule is one function, `stepper.step_for`, with a test for each state.
+- **Fits 1280 × 720:** the selection column's spacing and top margin went from 16/24 px to 8 px to make room. The preview state is 693 px tall, and the minimum width is 1154 px. Colours and sizes come from `theme.py` and are in the contrast table.
+
+![header and steps](media/178-header.jpg)
+
 ## Text size (#195)
 
 **Ctrl+=** and **Ctrl+-** step all app text through 80, 90, 100, 115, 130, 145, and 160%. **Ctrl+0** resets it. On macOS these are **Cmd+=**, **Cmd+-**, and **Cmd+0**. A toast shows the new size for 1.5 s. `--text-scale 1.3` starts at a given size.

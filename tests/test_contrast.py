@@ -65,7 +65,8 @@ def test_ui_code_takes_colours_from_the_palette():
     """A raw #rrggbb in any screen's code would bypass this check (#135, #174)."""
     pkg = UI.parent
     screens = [UI / "window.py", UI / "help_overlay.py", UI / "conversation.py", pkg / "app.py",
-               pkg / "ai" / "qt.py", pkg / "__main__.py", pkg / "attract.py", pkg / "practice.py"]   # #174: every screen uses theme.py
+               pkg / "ai" / "qt.py", pkg / "__main__.py", pkg / "attract.py", pkg / "practice.py",
+               UI / "stepper.py"]   # #174: every screen uses theme.py
     for path in screens:
         code = [ln for ln in path.read_text(encoding="utf-8").splitlines() if not ln.lstrip().startswith("#")]
         assert not re.findall(r"#[0-9a-fA-F]{6}\b", "\n".join(code)), path.name

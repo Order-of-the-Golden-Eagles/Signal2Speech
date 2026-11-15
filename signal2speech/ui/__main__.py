@@ -29,6 +29,10 @@ class PrintSink:
         print(f"[sink stub] {action}", flush=True)
 
 
+#: The conversation partner's question for the OpenOrbit demo (#178). Shown above the tiles.
+DEMO_QUESTION = "Which county's AQI rose more when wildfire smoke reached southeast Michigan?"
+
+
 def load_demo_choices(path: Path = DEMO_ROUND):
     data = json.loads(path.read_text(encoding="utf-8"))
     return [Choice(c["targetId"], c["actionId"], c["label"], c.get("spokenText"))
