@@ -638,3 +638,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The idle demo (#193) now stays off whenever a board is used, so it can't start over a wearer's 90-second eye check
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
+
+## 11/15/26 - 6:08 AM - Vasanth Anbukumar - #104 Recorded human EEG from g.tec's dataset now chooses the tile in the app ([PR #214](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/214))
+- With no headset at the table, the app's choice can now come from real brain data recorded on a g.tec amplifier: `python -m signal2speech.app --input recorded --recording path/to/S4.mat`
+    - Each tile flash is answered with one real recorded brain response. The same g.Pype pipeline and classifier as the live path calibrate on them and pick the tile
+    - The dataset isn't in the repo. Without it, the app says where to get it
+- What's real and what isn't: the EEG and the classifier's pick are real. Which tile counts as "looked at" follows a script, because the recorded person was using g.tec's speller, not our app. The screen says "Recorded (g.tec dataset, re-mapped to our tiles)" and the confirm is labelled Simulated
+- Flashes are half a second apart in this mode. Faster than that, the recorded responses overlap and the classifier gets worse: measured offline, the right tile was picked 95 % of the time at the usual speed and 100 % at this one (best subject), and 90 to 100 % across all five subjects
+- Why now: the PiEEG board was tested on two people tonight and gave no usable EEG, so g.tec's data is the brain signal we can honestly show
+- Verified end to end on the judging laptop with subject S4: the recorded responses picked the scripted tile, then the map and the spoken line followed. Three new tests; the automated one uses a made-up recording because CI has no dataset. Not yet run for many choices in a row in the app
