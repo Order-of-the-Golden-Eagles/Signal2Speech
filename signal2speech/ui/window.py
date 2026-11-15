@@ -256,8 +256,9 @@ class SelectionWindow(QMainWindow):
 
         root = QWidget(objectName="root")
         col = QVBoxLayout(root)
-        col.setContentsMargins(P.XL, P.L, P.XL, 0)
-        col.setSpacing(P.M)
+        # #178: tighter than before, to make room for the header and step bar at 1280 x 720.
+        col.setContentsMargins(P.XL, P.S, P.XL, 0)
+        col.setSpacing(P.S)
 
         # A long prompt wraps, so it can never widen the window past the screen. Short ones
         # don't: a wrapping label asks for more height, and that pushed the preview screen over
@@ -470,7 +471,12 @@ class SelectionWindow(QMainWindow):
             self.hint.setText(self.confirm_hint())
         else:
             self._preview = None
-            self.prompt.setText("Choose a reply")
+            # #178: the partner's question, in large type, instead of "Choose a reply".
+            self.prompt.setText(self.question or "Choose a reply")
+            self.prompt.setProperty("question", bool(self.question))
+            self.prompt.setStyleSheet(
+                f"font-size:{P.px(P.HEADING)}px; font-weight:700; color:{P.TEXT};"
+                if self.question else "")
             self.set_countdown(None)
             self.ring.reset()
             self.preview_box.setVisible(False)
