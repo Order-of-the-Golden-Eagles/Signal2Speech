@@ -713,8 +713,10 @@ class App:
         for tile in self.window.tiles.values():
             tile.setVisible(not on)
         self.window.hint.setVisible(not on)
-        self._row.setStretch(0, 1 if on else 3)
+        # 2:3, not 1:3 (#225): at 1/4 width the confirmed quote wrapped one word per line.
+        self._row.setStretch(0, 2 if on else 3)
         self._row.setStretch(1, 3 if on else 2)
+        self.window.set_compact(on)
 
     def _stop_confirm_timeout(self) -> None:
         self._confirm_timer.stop()

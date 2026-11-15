@@ -673,3 +673,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - `docs/demo-submission/judge-qa.md` has straight answers to the questions we'll get: is this live, is the choice faked, how accurate is it, did you try real hardware, and why not a blink
 - Why: the old script assumed someone wearing a g.tec headset. Reading from it at the table would have meant saying things that aren't true today
 - Checked on the judging laptop: the four-exchange command ran and the recorded data picked the scripted tile all four times (2, 1, 2, 1). The older live-wearer plan is kept below the new section for reference
+
+## 11/15/26 - 9:39 AM - Long Le - #225 Reveal layout keeps the left column readable (PR pending)
+- During the map reveal, the confirmed words now read in full lines and the bottom strip no longer clips
+    - Before: the left column shrank to a quarter of the window, the quote wrapped one word per line, and the strip showed "Roun" and "Last"
+- The left column keeps 40% of the width. The green check ring hides during the reveal, since "✓ Shown and spoken" already says it. The last outcome wraps onto a second strip row.
+- The scripted demo's choices, the reveal-once rule, and the input label are unchanged
+- Verified with the keyboard at 1280×720 and 1600×900 (`tests/test_reveal_layout.py` and screenshots). Not yet looked at on the judging laptop's own screen.

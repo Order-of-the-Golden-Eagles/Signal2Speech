@@ -197,3 +197,17 @@ Press **P**, or start with `--practice`, for a 30 s warm-up before the first que
 - A test runs 400 random key taps and a full simulated run and checks there are zero help calls.
 
 ![help phrase banner](media/197-help.jpg)
+
+## Reveal layout (#225)
+
+During a map reveal the left column used to shrink to a quarter of the window. The confirmed quote wrapped one word per line, and the judge strip clipped to "Roun" and "Last". Now:
+
+- The left column keeps 40% of the width and the map gets 60%. Before a confirm the split is unchanged.
+- The green check ring hides during the reveal. The "✓ Shown and spoken" header already says it, and the quote gets the full column width.
+- The quote steps its font down until no line except the last holds a single word.
+- The strip moves the connection and the last outcome to a second row that wraps instead of clipping. The input label stays on the first row in full.
+- `tests/test_reveal_layout.py` checks the quote's lines and the strip at 1280×720 and 1600×900.
+
+| Before | After |
+| --- | --- |
+| ![before](media/225-before.jpg) | ![after, 1280x720](media/225-reveal-1280.jpg) |

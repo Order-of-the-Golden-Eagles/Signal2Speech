@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from typing import Callable, Dict, Optional
 
-from PySide6.QtCore import QEvent, QObject, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QKeySequence, QPainter, QPainterPath, QPen, QShortcut
+from PySide6.QtCore import QEvent, QObject, QRectF, QSize, Qt
+from PySide6.QtGui import (QColor, QFont, QFontMetrics, QKeySequence, QPainter, QPainterPath, QPen,
+                           QShortcut, QTextLayout)
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
                                QPlainTextEdit, QSizePolicy, QTextEdit, QVBoxLayout, QWidget)
 
@@ -233,6 +234,41 @@ class WrapWhenLong(QLabel):
         super().setText(text)
 
 
+def _has_orphan_line(text: str, font: QFont, px: int, width: int) -> bool:
+    """True if word-wrapping `text` at `width` leaves one word alone on a line (not the last)."""
+    f = QFont(font)
+    f.setPixelSize(px)
+    layout = QTextLayout(text, f)
+    layout.beginLayout()
+    lines = []
+    while True:
+        line = layout.createLine()
+        if not line.isValid():
+            break
+        line.setLineWidth(width)
+        lines.append(text[line.textStart():line.textStart() + line.textLength()].split())
+    layout.endLayout()
+    return any(len(words) < 2 for words in lines[:-1])
+
+
+class FitHeightLabel(QLabel):
+    """A strip label that, when wrapping, asks for exactly the height its text needs at its
+    current width. Qt's own hint for a wrapped label guesses a narrow width and asks for far
+    too much height (#225)."""
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        if not self.wordWrap():
+            return hint
+        width = self.width() if self.width() > 50 else 400
+        return QSize(min(hint.width(), width), self.heightForWidth(width))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self.wordWrap() and event.oldSize().width() != event.size().width():
+            self.updateGeometry()
+
+
 class SelectionWindow(QMainWindow):
     def __init__(self, handler: SelectionHandler, keyboard: InputAdapter, *,
                  input_source: str = InputSources.KEYBOARD, flash: bool = False,
@@ -308,9 +344,21 @@ class SelectionWindow(QMainWindow):
         col.addWidget(self.hint)
 
         strip = QFrame(objectName="strip")
-        srow = QHBoxLayout(strip)
-        srow.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
+        scol = QVBoxLayout(strip)
+        scol.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
+        scol.setSpacing(P.XS)
+        srow = QHBoxLayout()
         srow.setSpacing(P.L)
+        scol.addLayout(srow)
+        # A reveal narrows this column (#225): connection and last outcome move to a second,
+        # wrapping row instead of clipping.
+        self._strip_row2 = QHBoxLayout()
+        self._strip_row2.setSpacing(P.L)
+        scol.addLayout(self._strip_row2)
+        self._strip_row1 = srow
+        self.compact = False
+        strip.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        self.strip = strip
         # Two inputs, a device name and a status make a long line (PiEEG, #172). Then it wraps,
         # so the window never has to grow past the screen to fit it.
         self.input_label = WrapWhenLong(limit=60)
@@ -331,6 +379,7 @@ class SelectionWindow(QMainWindow):
         self.connection_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         srow.addWidget(self.connection_label, 1)
         srow.addWidget(self.outcome_label, 1)
+        col.addStretch(0)                 # takes the tiles' space during a reveal (#225)
         col.addWidget(strip)
         self.setCentralWidget(root)
 
@@ -361,9 +410,33 @@ class SelectionWindow(QMainWindow):
         handler.on_cleared.append(self.reset)
         handler.on_handled.append(self.show_outcome)
 
+    # ── Narrow column during a map reveal (#225) ─────────────
+    def set_compact(self, on: bool) -> None:
+        """The app narrows this window while the map is revealed. Hide the redundant check
+        ring (the header already says "✓ Shown and spoken"), let the quote use the full width,
+        and wrap the strip onto two rows so nothing clips."""
+        if on == self.compact:
+            return
+        self.compact = on
+        self.ring.setVisible(not on)
+        for lbl in (self.connection_label, self.outcome_label):
+            self._strip_row1.removeWidget(lbl)
+            self._strip_row2.removeWidget(lbl)
+            lbl.setWordWrap(on)
+            lbl.setSizePolicy(QSizePolicy.Policy.Preferred if on else QSizePolicy.Policy.Ignored,
+                              QSizePolicy.Policy.Maximum if on else QSizePolicy.Policy.Preferred)
+            lbl.setMinimumWidth(1)
+        if on:
+            self._strip_row2.addWidget(self.connection_label, 1)
+            self._strip_row2.addWidget(self.outcome_label, 3)
+        else:
+            self._strip_row1.addWidget(self.connection_label, 1)
+            self._strip_row1.addWidget(self.outcome_label, 1)
+        self._fit_preview()
+
     # ── Judge strip ──────────────────────────────────────────
     def _strip_label(self) -> QLabel:
-        lbl = QLabel()
+        lbl = FitHeightLabel()
         lbl.setProperty("class", "strip")
         return lbl
 
@@ -560,10 +633,20 @@ class SelectionWindow(QMainWindow):
             return
         font = QFont(self.preview.font())
         font.setBold(True)
-        width = max(self.width() - 2 * P.XL - 2 * P.M - 6 - 150 - P.L, 1)   # margins, accent bar, ring
-        height = max(int(self.height() * 0.28), 80)
+        ring = 0 if self.compact else 150 + P.L
+        width = max(self.width() - 2 * P.XL - 2 * P.M - 6 - ring, 1)   # margins, accent bar, ring
+        # The tiles are hidden during a reveal, so the quote may use more of the height.
+        height = max(int(self.height() * (0.5 if self.compact else 0.28)), 80)
         self.preview_px = fit_pixel_size(self.preview.text(), font, width, height,
                                          P.px(self.PREVIEW_MAX_PX), P.TILE_TITLE_MIN)
+        if self.compact and self.preview.text():
+            # Narrow column during a reveal (#225): a lone word on a line reads badly, so step
+            # down until only the last line may hold one word.
+            laid_out = self.preview.contentsRect().width()
+            line_w = laid_out if laid_out > 50 else width
+            while self.preview_px > P.TILE_TITLE_MIN and _has_orphan_line(
+                    self.preview.text(), font, self.preview_px, line_w):
+                self.preview_px -= 2
         self.preview.setStyleSheet(f"font-size: {self.preview_px}px;")
         # Reserve the fitted text's height, so the layout squeezes the tiles, never the words.
         font.setPixelSize(self.preview_px)
