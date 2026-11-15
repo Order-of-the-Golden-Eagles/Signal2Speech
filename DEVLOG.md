@@ -557,7 +557,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The alpha switch got a read-only progress signal for the ring, and its decision logic didn't change. Scripted simulated input fills the same ring
 - Checked with tests for each ring state (filling, emptying on early release, completing exactly once) and in screenshots. The live eye-closure ring needs g.Pype, so it hasn't been seen on this Mac
 
-## 11/15/26 - 1:46 AM - Vasanth Anbukumar - #28 The backup voice now speaks every reply, not just the first (PR pending)
+## 11/15/26 - 1:46 AM - Vasanth Anbukumar - #199 The backup voice now speaks every reply, not just the first (PR pending)
 - If the main voice isn't available on a machine, the app's backup voice (`pyttsx3`) used to speak the first confirmed reply and silently skip every one after it. It now speaks all of them
     - Each reply is spoken from its own short-lived helper process, which also means the window no longer freezes while it talks
 - Why it wasn't noticed: the judging laptop uses the main voice (Qt's Windows voice), which was never affected. Checked there: three replies in a row all spoke, each starting within a quarter of a second
