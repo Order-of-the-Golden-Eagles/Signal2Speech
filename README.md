@@ -134,6 +134,7 @@ No hardware is needed. With g.tec's P300 Speller dataset (`S1.mat`–`S5.mat`, f
 
 ```
 python -m signal2speech.evidence.dataset path/to/p300-speller            # the numbers
+python -m signal2speech.evidence.dataset path/to/p300-speller --curve    # accuracy by number of flashes
 python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat   # the live view
 python -m signal2speech.app --input recorded --recording path/to/p300-speller/S4.mat   # it drives the app
 ```
