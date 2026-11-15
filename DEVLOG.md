@@ -608,12 +608,6 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Lines with numbers in them are spoken 25 % slower, so the figures are easy to catch
 - Verified by ear and by timing on the judging laptop. Five new tests. Not tried on macOS or Linux
 
-## 11/15/26 - 4:10 AM - MagicJester2764 - #165 Soak test for the judging hour ([PR #211](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/211))
-- Anyone can leave the demo running for an hour by itself and get a pass/fail report: no double outputs, no crashes, steady memory, same speed at the end as at the start
-    - `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` writes `logs/soak-<time>.md`
-- It goes through the same crash-safe launcher we'll use at the table, and kills the app once on purpose to prove it comes back
-- First full run (simulated input, dev machine, muted) passed: 169 confirms and 169 spoken lines with 0 doubles, 0 crashes, back within 1.1 s after the kill, selection time 3.1 s at the start and 3.2 s at the end
-- Still needed: the same hour on the judging laptop with Wi-Fi off and sound on (Part D of the judging laptop session). This was not live EEG
 ## 11/15/26 - 2:57 AM - Vasanth Anbukumar - #150 The board session speaks with the natural voice, and repeats itself less ([PR #209](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/209))
 - The voice-guided board session (`python -m signal2speech.eeg.board_session`) now gives its instructions in the same natural voice as the app, when that voice is installed
     - `--standard-voice` goes back to the operating system's voice
@@ -626,3 +620,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - One rule everywhere, including the board session: low beep, close your eyes; high beep, open them
 - Fixed the app window growing past the screen during the eye check: a long status line forced it to 1841 wide on a 1536-wide screen. Long lines now wrap
 - Verified on the judging laptop: a full spoken dry run of the board session from a cold start with no cue falling back to the old voice, and the app in PiEEG mode on our simulated board staying 1520 wide. Seven new tests. Not yet run on a real board
+
+## 11/15/26 - 4:10 AM - MagicJester2764 - #165 Soak test for the judging hour ([PR #211](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/211))
+- Anyone can leave the demo running for an hour by itself and get a pass/fail report: no double outputs, no crashes, steady memory, same speed at the end as at the start
+    - `python tests/soak/soak.py --minutes 60 --p300 --kill-at 30` writes `logs/soak-<time>.md`
+- It goes through the same crash-safe launcher we'll use at the table, and kills the app once on purpose to prove it comes back
+- First full run (simulated input, dev machine, muted) passed: 169 confirms and 169 spoken lines with 0 doubles, 0 crashes, back within 1.1 s after the kill, selection time 3.1 s at the start and 3.2 s at the end
+- Still needed: the same hour on the judging laptop with Wi-Fi off and sound on (Part D of the judging laptop session). This was not live EEG

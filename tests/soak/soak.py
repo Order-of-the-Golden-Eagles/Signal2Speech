@@ -40,6 +40,9 @@ ROOT = Path(__file__).resolve().parents[2]
 # timeout clears the round, which is what really happens when a wearer doesn't confirm.
 ROUND_PATTERN = ((2, 1), (1, 1), (2, 2), (1, 1))      # 3 confirms and 1 cancel per 4 rounds
 LINE = re.compile(r"^(\d\d:\d\d:\d\d)  (.*)$")
+STARTUP_S = 90.0        # a new app process imports, calibrates and settles; don't judge memory then
+STALL_S = 180.0         # no round outcome for this long (outside a restart) means the app stalled
+SLOWER = 1.5            # the last 10 minutes may be at most this much slower than the first 10
 
 
 # ── Parsing (pure, unit-tested) ──────────────────────────────
@@ -58,6 +61,7 @@ class Tally:
     errors: List[str] = field(default_factory=list)
     app_starts: List[float] = field(default_factory=list)
     app_exits: List[Tuple[float, str]] = field(default_factory=list)
+    last_outcome: float = 0.0       # when the last preview, confirm, or cancel arrived
     _pending_maps: int = 0
     _pending_speaks: int = 0
 
@@ -82,6 +86,7 @@ class Tally:
             self.chooses[body.split()[1]] = at
         elif body.startswith("Previewed: "):
             self.previews += 1
+            self.last_outcome = at
             rnd = body.split()[-1].split("->")[0]
             if rnd in self.chooses:
                 self.selection_s.append((at, at - self.chooses.pop(rnd)))
@@ -93,12 +98,14 @@ class Tally:
             self._pending_speaks += 1
         elif body.startswith("Confirmed: "):
             self.confirms += 1
+            self.last_outcome = at
             if self._pending_maps > 1 or self._pending_speaks != 1:
                 self.double_outputs.append(
                     f"{body}: {self._pending_maps} map action(s), {self._pending_speaks} spoken line(s)")
             self._pending_maps = self._pending_speaks = 0
         elif body.startswith("Cancelled: ") or body.startswith("cleared (timeout)"):
             self.cancels += 1
+            self.last_outcome = at
             self._check_no_output(body)
         elif body.startswith("timing: confirm→map "):
             try:
@@ -148,7 +155,10 @@ class Soak:
         self.tally = Tally()
         self.samples: List[Sample] = []
         self.kill: Optional[dict] = None
-        self.t0 = time.monotonic()
+        self.kill_pending: Optional[dict] = None
+        self.stopping_at: Optional[float] = None
+        self.interrupted = False
+        self._log_open = False
         self._lock = threading.Lock()
         app_args = ["--input", "simulated", "--sim", script_for(args.minutes, args.p300)]
         if args.p300:
@@ -162,11 +172,17 @@ class Soak:
         if args.windowed:
             self.cmd.append("--windowed")
         self.cmd += ["--", *app_args]
+        self.t0 = time.monotonic()                      # after the help check: the run starts now
 
     @staticmethod
     def _app_supports(flag: str) -> bool:
-        out = subprocess.run([sys.executable, "-m", "signal2speech.app", "--help"], cwd=ROOT,
-                             capture_output=True, text=True, timeout=60).stdout
+        try:
+            out = subprocess.run([sys.executable, "-m", "signal2speech.app", "--help"], cwd=ROOT,
+                                 capture_output=True, text=True, timeout=180).stdout
+        except (subprocess.SubprocessError, OSError) as err:
+            print(f"soak: couldn't read the app's --help ({type(err).__name__}); "
+                  f"running without {flag}", flush=True)
+            return False
         return flag in out
 
     def now(self) -> float:
@@ -182,19 +198,25 @@ class Soak:
     def _read(self, stream, log) -> None:
         for raw in iter(stream.readline, ""):
             at = self.now()
-            log.write(f"{at:9.2f}  {raw}")
             with self._lock:
+                if self._log_open:
+                    log.write(f"{at:9.2f}  {raw}")
                 self.tally.feed(at, raw)
 
     def _app_process(self, launcher):
+        """The app's own interpreter. On Windows a venv's python.exe is a small launcher that
+        starts the real interpreter as its child, with the same command line, so take the
+        innermost match: that's where the memory is, and what has to die in the kill test."""
         import psutil
         try:
-            for child in psutil.Process(launcher.pid).children(recursive=True):
-                if "signal2speech.app" in " ".join(child.cmdline()):
-                    return child
+            matches = [c for c in psutil.Process(launcher.pid).children(recursive=True)
+                       if "signal2speech.app" in " ".join(c.cmdline())]
+            pids = {m.pid for m in matches}
+            inner = [m for m in matches
+                     if not any(c.pid in pids for c in m.children(recursive=True))]
+            return inner[0] if inner else None
         except psutil.Error:
             return None
-        return None
 
     def run(self) -> int:
         import psutil
@@ -204,6 +226,7 @@ class Soak:
         print(f"soak: {self.shown_command()}\nsoak: {self.args.minutes:g} min, report "
               f"{self.report_path.relative_to(ROOT)}", flush=True)
         with self.log_path.open("w", encoding="utf-8") as log:
+            self._log_open = True
             launcher = subprocess.Popen(self.cmd, cwd=ROOT, env=env, stdout=subprocess.PIPE,
                                         stderr=subprocess.STDOUT, text=True, encoding="utf-8",
                                         errors="replace", bufsize=1)
@@ -221,15 +244,19 @@ class Soak:
                                                            proc.memory_info().rss / 2**20))
                             except psutil.Error:
                                 pass
-                        next_sample += self.args.sample_s
+                        next_sample = max(next_sample + self.args.sample_s, self.now())
                         self._progress()
-                    if (self.args.kill_at is not None and self.kill is None
-                            and self.now() >= self.args.kill_at * 60):
-                        self._kill_once(launcher)
+                    self._kill_step(launcher)
                     time.sleep(0.2)
+            except KeyboardInterrupt:
+                self.interrupted = True                 # keep what was measured: write the report
+                print("soak: stopped early (Ctrl+C); writing the report", flush=True)
             finally:
+                self.stopping_at = self.now()
                 self._stop(launcher)
-                reader.join(timeout=5)
+                reader.join(timeout=15)
+                with self._lock:
+                    self._log_open = False
         with self._lock:
             self.tally.finish()
         self.report_path.write_text(self.report(launcher.returncode), encoding="utf-8")
@@ -244,40 +271,45 @@ class Soak:
                   f" · {len(t.double_outputs)} double outputs · {len(t.app_exits)} exits · {rss}",
                   flush=True)
 
-    def _kill_once(self, launcher) -> None:
-        proc = self._app_process(launcher)
-        if proc is None:
+    def _kill_step(self, launcher) -> None:
+        """The kill test, one step per loop pass, so sampling and progress carry on."""
+        if self.args.kill_at is None or self.kill is not None:
             return
-        pid, killed_at = proc.pid, self.now()
-        print(f"soak: killing the app on purpose (pid {pid})", flush=True)
-        proc.kill()
-        back: Optional[float] = None
-        while self.now() - killed_at < 60:
+        if self.kill_pending is None:
+            if self.now() < self.args.kill_at * 60:
+                return
+            proc = self._app_process(launcher)
+            if proc is None:
+                return                                  # not up yet (restarting): try next pass
+            self.kill_pending = {"at_min": self.now() / 60, "pid": proc.pid,
+                                 "process_back_s": None, "window_ready_s": None}
+            print(f"soak: killing the app on purpose (pid {proc.pid})", flush=True)
+            proc.kill()
+            return
+        k = self.kill_pending
+        since = self.now() - k["at_min"] * 60
+        if k["process_back_s"] is None:
             new = self._app_process(launcher)
-            if new is not None and new.pid != pid:
-                back = self.now() - killed_at
-                break
-            time.sleep(0.1)
-        ready = None
-        while back is not None and self.now() - killed_at < 300:
+            if new is not None and new.pid != k["pid"]:
+                k["process_back_s"] = since
+        if k["process_back_s"] is not None and k["window_ready_s"] is None:
             with self._lock:
-                starts = [s for s in self.tally.app_starts if s > killed_at]
+                starts = [s for s in self.tally.app_starts if s > k["at_min"] * 60]
             if starts:
-                ready = starts[0] - killed_at
-                break
-            time.sleep(0.2)
-        self.kill = {"at_min": killed_at / 60, "pid": pid, "process_back_s": back,
-                     "window_ready_s": ready}
+                k["window_ready_s"] = starts[0] - k["at_min"] * 60
+        if k["window_ready_s"] is not None or since > 300:
+            self.kill, self.kill_pending = k, None
 
     def _stop(self, launcher) -> None:
         import psutil
         if launcher.poll() is not None:
             return
         try:
-            procs = psutil.Process(launcher.pid).children(recursive=True)
+            top = psutil.Process(launcher.pid)
+            procs = top.children(recursive=True)
         except psutil.Error:
-            procs = []
-        for p in [*procs, psutil.Process(launcher.pid)]:
+            return                                      # the launcher already went
+        for p in [top, *procs]:                         # launcher first: it mustn't restart
             try:
                 p.terminate()
             except psutil.Error:
@@ -292,11 +324,14 @@ class Soak:
 
     # ── Verdict and report ───────────────────────────────────
     def crashes(self) -> List[Tuple[float, str]]:
-        """App exits other than the one we caused on purpose."""
+        """App exits other than the one we caused on purpose or by stopping the run."""
         exits = list(self.tally.app_exits)
-        if self.kill is not None:
-            k = self.kill["at_min"] * 60
+        planned = self.kill or self.kill_pending
+        if planned is not None:
+            k = planned["at_min"] * 60
             exits = [(t, b) for t, b in exits if not (k <= t <= k + 10)]
+        if self.stopping_at is not None:
+            exits = [(t, b) for t, b in exits if t < self.stopping_at]
         return exits
 
     def memory(self) -> List[dict]:
@@ -307,7 +342,13 @@ class Soak:
             by_pid.setdefault(s.pid, []).append(s)
         runs = []
         for run in by_pid.values():
-            settled = run[2:] if len(run) > 4 else run
+            settled = [s for s in run if s.at - run[0].at >= STARTUP_S]
+            if len(settled) < 2:                        # too short to judge growth
+                runs.append({"pid": run[0].pid, "samples": len(run), "start_mb": None,
+                             "end_mb": run[-1].rss_mb, "max_mb": max(s.rss_mb for s in run),
+                             "growth_mb": None, "from_min": run[0].at / 60,
+                             "to_min": run[-1].at / 60})
+                continue
             start, end = settled[0].rss_mb, settled[-1].rss_mb
             runs.append({"pid": run[0].pid, "samples": len(run), "start_mb": start,
                          "end_mb": end, "max_mb": max(s.rss_mb for s in run),
@@ -317,30 +358,66 @@ class Soak:
 
     @staticmethod
     def stable(run: dict) -> bool:
+        """True if stable, also when a process ran too briefly to judge (see the report)."""
+        if run["growth_mb"] is None:
+            return True
         return run["growth_mb"] <= max(50.0, 0.15 * run["start_mb"])
 
     def memory_ok(self) -> bool:
         return all(self.stable(r) for r in self.memory())
 
+    def speed(self) -> Tuple[Optional[float], Optional[float]]:
+        """Median selection time in the first and the last 10 minutes."""
+        span = self.stopping_at if self.stopping_at is not None else self.now()
+        return (window_median(self.tally.selection_s, 0.0, min(span, 600.0)),
+                window_median(self.tally.selection_s, max(0.0, span - 600.0), span + 1))
+
+    def problems(self) -> List[str]:
+        """Every reason the run fails. Empty means PASS."""
+        t, out = self.tally, []
+        if t.double_outputs:
+            out.append(f"{len(t.double_outputs)} double output(s)")
+        if t.errors:
+            out.append(f"{len(t.errors)} Python error(s)")
+        if self.crashes():
+            out.append(f"{len(self.crashes())} unplanned app exit(s)")
+        if t.confirms == 0:
+            out.append("no confirms at all")
+        if not self.memory_ok():
+            out.append("memory grew past the limit")
+        span = self.stopping_at if self.stopping_at is not None else self.now()
+        # 180 s covers the slowest normal gap: a restart plus its calibration (about 90 s).
+        if t.confirms and span - t.last_outcome > STALL_S:
+            out.append(f"no round finished in the last {span - t.last_outcome:.0f} s (stalled)")
+        first, last = self.speed()
+        if first and last and last > first * SLOWER:
+            out.append(f"selection got slower: {first:.2f} s -> {last:.2f} s")
+        if self.args.kill_at is not None:
+            if self.kill is None and self.kill_pending is None:
+                out.append("the kill test was asked for but never ran")
+            elif (self.kill or self.kill_pending)["process_back_s"] is None:
+                out.append("the launcher didn't restart the app after the kill")
+        if self.interrupted:
+            out.append("stopped early")
+        return out
+
     def passed(self) -> bool:
-        t = self.tally
-        return (not t.double_outputs and not t.errors and not self.crashes()
-                and t.confirms > 0 and self.memory_ok()
-                and (self.kill is None or self.kill["process_back_s"] is not None))
+        return not self.problems()
 
     def report(self, launcher_code: Optional[int]) -> str:
         t, a = self.tally, self.args
-        span = self.now()
+        span = self.stopping_at if self.stopping_at is not None else self.now()
         first = (0.0, min(span, 10 * 60))
         last = (max(0.0, span - 10 * 60), span + 1)
+        problems = self.problems()
 
         def fmt(v, unit, digits=1):
             return "—" if v is None else f"{v:.{digits}f} {unit}"
-        sel = [window_median(t.selection_s, *w) for w in (first, last)]
+        sel = list(self.speed())
         cmap = [window_median(t.confirm_map_ms, *w) for w in (first, last)]
         lines = [
             f"# Soak run · {time.strftime('%Y-%m-%d %H:%M')}", "",
-            f"**Verdict: {'PASS' if self.passed() else 'FAIL'}.** Input: **Simulated** "
+            f"**Verdict: {'PASS' if not problems else 'FAIL: ' + '; '.join(problems)}.** Input: **Simulated** "
             f"({'g.Pype Generator with the live P300 and alpha code path' if a.p300 else 'g.Pype simulated decoder'}). "
             "Nothing here is a live EEG result.", "",
             f"- **Command:** `python tests/soak/soak.py --minutes {a.minutes:g}"
@@ -360,21 +437,30 @@ class Soak:
             + "".join(f"\n  - at {x / 60:.1f} min: {b}" for x, b in self.crashes()),
             f"- **Python errors in the output:** {len(t.errors)}",
         ]
-        if self.kill is not None:
-            k = self.kill
+        k = self.kill or self.kill_pending
+        if k is not None:
             lines.append(f"- **Kill test:** killed the app at {k['at_min']:.1f} min. The launcher "
                          f"started a new app process after {fmt(k['process_back_s'], 's')}, and it was "
                          f"logging again after {fmt(k['window_ready_s'], 's')}.")
+        elif a.kill_at is not None:
+            lines.append(f"- **Kill test:** asked for at {a.kill_at:g} min, but the app was never "
+                         "found to kill.")
         else:
             lines.append("- **Kill test:** not run (add `--kill-at MINUTES`).")
         lines += ["", "## Memory (app process RSS)", "",
-                  f"Sampled every {a.sample_s:g} s. Each app process is judged after its first two "
-                  "samples (start-up). The limit is +50 MB or +15%, whichever is larger.", ""]
+                  f"Sampled every {a.sample_s:g} s. Each app process is judged from {STARTUP_S:.0f} s "
+                  "after it started (imports and calibration come first). The limit is +50 MB or "
+                  "+15%, whichever is larger.", ""]
         runs = self.memory()
         if runs:
             lines += ["| App process | Minutes | Start | End | Change | Max | |",
                       "| --- | --- | ---: | ---: | ---: | ---: | --- |"]
             for i, r in enumerate(runs, 1):
+                if r["growth_mb"] is None:
+                    lines.append(f"| {i} | {r['from_min']:.0f}–{r['to_min']:.0f} | — | "
+                                 f"{r['end_mb']:.0f} MB | — | {r['max_mb']:.0f} MB | "
+                                 "too short to judge |")
+                    continue
                 lines.append(f"| {i} | {r['from_min']:.0f}–{r['to_min']:.0f} | {r['start_mb']:.0f} MB | "
                              f"{r['end_mb']:.0f} MB | {r['growth_mb']:+.0f} MB | {r['max_mb']:.0f} MB | "
                              f"{'stable' if self.stable(r) else 'GROWING'} |")

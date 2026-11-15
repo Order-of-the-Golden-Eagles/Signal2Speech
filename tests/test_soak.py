@@ -75,10 +75,42 @@ def test_the_script_never_runs_out_and_mixes_confirm_and_cancel():
 def test_memory_is_judged_per_app_process():
     """A restart starts a new process; each one must stay stable after its start-up samples."""
     run = soak.Soak.__new__(soak.Soak)            # no launcher: just the bookkeeping
-    run.samples = ([soak.Sample(60.0 * i, 1, mb) for i, mb in enumerate([300, 226, 226, 230, 241])]
+    run.samples = ([soak.Sample(60.0 * i, 1, mb) for i, mb in enumerate([300, 280, 226, 230, 241])]
                    + [soak.Sample(60.0 * (30 + i), 2, mb)
-                      for i, mb in enumerate([310, 300, 300, 302, 303, 400])])
-    first, second = run.memory()
-    assert (first["start_mb"], first["end_mb"]) == (226, 241) and run.stable(first)
+                      for i, mb in enumerate([310, 300, 300, 302, 303, 400])]
+                   + [soak.Sample(60.0 * 50, 3, 20.0), soak.Sample(60.0 * 51, 3, 300.0)])
+    first, second, third = run.memory()
+    assert (first["start_mb"], first["end_mb"]) == (226, 241) and run.stable(first)   # from 90 s
     assert (second["start_mb"], second["end_mb"]) == (300, 400) and not run.stable(second)
+    assert third["growth_mb"] is None and run.stable(third)      # too short: no false GROWING
     assert run.memory_ok() is False
+
+
+def make_run(**args):
+    import argparse
+    run = soak.Soak.__new__(soak.Soak)
+    run.args = argparse.Namespace(**{"kill_at": None, **args})
+    run.tally, run.samples = soak.Tally(), []
+    run.kill = run.kill_pending = None
+    run.stopping_at, run.interrupted = 3600.0, False
+    return run
+
+
+def test_a_stalled_or_slower_app_fails():
+    run = make_run()
+    run.tally.confirms, run.tally.last_outcome = 50, 3000.0       # nothing in the last 10 min
+    run.tally.selection_s = [(60.0, 3.0), (3500.0, 3.1)]
+    assert any("stalled" in p for p in run.problems())
+    run.tally.last_outcome = 3590.0
+    assert run.problems() == []
+    run.tally.selection_s = [(60.0, 3.0), (3500.0, 6.0)]
+    assert any("slower" in p for p in run.problems())
+
+
+def test_a_kill_test_that_never_ran_fails_and_stopping_isnt_a_crash():
+    run = make_run(kill_at=30)
+    run.tally.confirms, run.tally.last_outcome = 5, 3590.0
+    assert "the kill test was asked for but never ran" in run.problems()
+    run.kill = {"at_min": 30.0, "pid": 1, "process_back_s": 1.1, "window_ready_s": 5.0}
+    run.tally.app_exits = [(1800.5, "app exited with code -9"), (3600.2, "app exited with code -15")]
+    assert run.crashes() == [] and run.problems() == []
