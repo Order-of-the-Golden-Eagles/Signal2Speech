@@ -346,8 +346,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Updated the script for what's on `main` now: the real map with its 8 s reveal, fullscreen, F1 key help, and the confirm countdown. Submission fields live only in `submission-checklist.md`
 - Checked: every relative link in the folder resolves. Docs only
 
-## 11/14/26 - 8:33 PM - MagicJester2764 - Git hook tests no longer touch your real repo ([PR #126](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/126))
+## 11/14/26 - 8:33 PM - MagicJester2764 - #10 Git hook tests no longer touch your real repo ([PR #126](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/126))
 - Found a nasty bug: when the pre-push hook runs the tests, one of them (`tests/test_githooks.py`) was making commits and changing settings in the developer's *real* repository instead of its own scratch copy
     - It switched the repo to "bare" (so `git status` stopped working), replaced your name and email with "Hook Test", and left a fake `.env` staged
 - Fixed by giving that test a clean environment, plus a new test that proves it can't reach an outer repo even when git's hook variables are set
+- The hook itself now clears git's variables before running the tests, so no other test or tool can do the same thing
+- Verified by pushing through the real pre-push hook: the tests passed, and the repo's settings, history, and staged files were unchanged afterwards. A new test also checks this on every run, in both ways a hook can set git's variables
 - If you pushed with the hooks turned on, check your repo with the steps in `docs/MEMORY.md`
