@@ -316,7 +316,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The size is only recalculated when the label or the window size changes, never during a flash, so the P300 flash timing isn't affected
 - Checked with screenshots at 1280×720 and 1536×864 using 12-word replies: they fit at 54–56 px. The demo labels stay at full size. Tests cover the 32 px floor, the flash, and the preview
 
-## 11/14/26 - 8:01 PM - MagicJester2764 - #103 Live EEG inside the app (PR pending)
+## 11/14/26 - 8:01 PM - MagicJester2764 - #103 Live EEG inside the app ([PR #120](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/120))
 - The headset can now drive the real demo app: `python -m signal2speech.app --input live`
     - It calibrates on the app's own tiles first (look at the named tile, then eyes open and eyes closed), then the brain's response picks a tile and closing your eyes confirms
 - The P300 chooser and the eye-closure switch share one headset connection, because the Unicorn can only be opened once
