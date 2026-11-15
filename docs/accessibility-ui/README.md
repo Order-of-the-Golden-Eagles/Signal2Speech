@@ -165,6 +165,16 @@ When nobody has touched the table for 60 s, the app loops a narrated walkthrough
 
 ![attract mode](media/193-attract.jpg)
 
+## Restart for the next visitor (#180)
+
+Press **R** for a fresh first question from any state: a preview, a confirm countdown, a map reveal, a flash sequence, a practice round, or the attract loop. Nothing is shown or spoken.
+
+- **It goes through the selection contract, never around it.** An open round is ended with `handler.cancel("restart")`, then a new Choose round opens with `begin_choice_round`. A decision still in flight for the old round, such as an EEG flash sequence that was already running, arrives stale and is rejected (`RejectedStaleRound`).
+- **It stops the map reveal, the confirm countdown, the app's own auto-reopen** (so exactly one new question opens), **and a reply still waiting for its sound cue.**
+- **The session report** counts it under **Other** (`Restarts (R): n`) and lists `restart (R)` in the timeline. A restart isn't counted as a cancel. The conversation shows "Restarted for the next visitor."
+- **Tests:** `tests/test_restart.py` covers a restart during a preview (no output, one new round), a late EEG decision after the restart (stale), a restart during a reveal (no second output), the real R shortcut and the report, and a restart during practice.
+- **Still to do for #180:** the welcome screen after a short idle period. #193's attract loop already takes over after 60 s, so how the two fit together is being agreed with Long on #180.
+
 ## Text size (#195)
 
 **Ctrl+=** and **Ctrl+-** step all app text through 80, 90, 100, 115, 130, 145, and 160%. **Ctrl+0** resets it. On macOS these are **Cmd+=**, **Cmd+-**, and **Cmd+0**. A toast shows the new size for 1.5 s. `--text-scale 1.3` starts at a given size.

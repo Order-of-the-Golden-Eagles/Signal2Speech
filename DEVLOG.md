@@ -638,3 +638,9 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The idle demo (#193) now stays off whenever a board is used, so it can't start over a wearer's 90-second eye check
 - The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
 - Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch
+
+## 11/15/26 - 5:24 AM - MagicJester2764 - #180 R restarts the demo for the next visitor (PR pending)
+- Between judges, one key press (R) brings back a fresh first question from wherever the app is: mid-preview, mid-reveal, mid-practice, or during the idle demo. Nothing is said
+- It uses the same rules as a normal cancel, so a brain decision still in flight from before the restart is thrown away instead of picking something on the new question
+- Each restart is counted in the session report, separately from cancels
+- Checked with keyboard and simulated input in tests. The welcome screen half of #180 is still open: Long's attract loop already uses the idle time, and we're agreeing on how the two fit
