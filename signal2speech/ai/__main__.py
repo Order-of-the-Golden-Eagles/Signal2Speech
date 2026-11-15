@@ -31,6 +31,13 @@ CHAT_SPLIT = (3, 2)
 CHAT_TILE_HEIGHT = 300
 CHAT_TILE_PX = (30, 20)        # title size on the reply cards: from, and down to for long replies
 CHAT_LOG_HEIGHT = 300          # the conversation box: room for one question and its answer
+SUITE_HELP = ("Could not read the headset from Unicorn Suite.
+"
+              "  1. Open Unicorn Suite, then Unicorn Recorder, and connect the headset there.
+"
+              "  2. In Unicorn Recorder, switch on its LSL output and start the acquisition.
+"
+              "  3. Run this again. A stream with another name: set SIGNAL2SPEECH_LSL_NAME to it.")
 READ_S = 17                     # headset: seconds to read the replies before the cards flash
 NASA_QUESTION = "Which county's AQI rose more when wildfire smoke reached southeast Michigan?"
 
