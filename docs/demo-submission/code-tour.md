@@ -62,6 +62,12 @@ Judges may ask anyone on the team to walk through the code. This page is that wa
 
 `InputSources` ([`core/contract.py:9`](../../signal2speech/core/contract.py#L9)) defines keyboard, simulated, recorded, and live-eeg. The judge strip always shows the current one ([`ui/window.py:202`](../../signal2speech/ui/window.py#L202)), and so does the window title ([`app.py:268`](../../signal2speech/app.py#L268)). Never call a simulated or recorded run live.
 
+## 8. PiEEG's simulator
+
+> "PiEEG's own simulator streams over Lab Streaming Layer into the same alpha confirm. The keyboard picks, and PiEEG's alpha burst confirms it."
+
+`python -m signal2speech.eeg.pieeg_lsl --demo` (#138), with PiEEG's starter `python python_quickstart.py --sim --lsl` running in another terminal. [`find_local_stream`](../../signal2speech/eeg/pieeg_lsl.py#L60) takes only this laptop's `Octopus16` stream, and [`PiEEGRelay`](../../signal2speech/eeg/pieeg_lsl.py#L77) republishes it under a unique name, so another team's simulator can't drive our app. `gp.LslReceiver` ([:109](../../signal2speech/eeg/pieeg_lsl.py#L109)) feeds it into `AlphaConfirm` ([:180](../../signal2speech/eeg/pieeg_lsl.py#L180)). PiEEG's simulators have no P300, so this path never drives the P300 chooser. It's labelled Simulated (PiEEG). The setup is in [pieeg.md](../eeg-hardware/pieeg.md).
+
 ## The three hardest judge questions
 
 From [judge-qa.md](judge-qa.md). Answer only with what's been measured.
