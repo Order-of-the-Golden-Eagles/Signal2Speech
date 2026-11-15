@@ -9,13 +9,14 @@ from __future__ import annotations
 from typing import Callable, Dict, Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QMainWindow, QSizePolicy,
                                QVBoxLayout, QWidget)
 
 from signal2speech.core import (Choice, InputAdapter, InputSources, Outcome, Round, RoundKind,
                                 SelectionEvent, SelectionHandler, TargetIds)
 
+from .fit import fit_pixel_size
 from .flash import FlashScheduler
 
 INPUT_LABELS = {InputSources.KEYBOARD: "Keyboard", InputSources.SIMULATED: "Simulated",
@@ -36,7 +37,14 @@ QLabel.strip { font-size: 20px; font-family: Menlo, Consolas, monospace; color: 
 
 
 class Tile(QLabel):
-    """One frozen choice tile. Flashing changes colour only: no resize, move, or relabel."""
+    """One frozen choice tile. Flashing changes colour only: no resize, move, or relabel.
+
+    Long labels shrink to fit (56 px down to 32 px, #95). The size is chosen on relabel and
+    resize only, never on a flash, so flash timing stays steady.
+    """
+
+    MAX_PX = 56
+    INSET = 28   # 4 px border + 24 px padding, each side
 
     def __init__(self, target_id: str, key: str, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -44,6 +52,7 @@ class Tile(QLabel):
         self.key = key
         self.lit = False
         self._label = ""
+        self.font_px = self.MAX_PX
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setWordWrap(True)
         self.setMinimumSize(300, 220)   # fits two tiles plus the map at 1280x720 (#94)
@@ -56,7 +65,22 @@ class Tile(QLabel):
     def set_label(self, label: str) -> None:
         self._label = label
         self.setText(f"{label}\n [{self.key}]" if label else "")
+        self._fit()
         self._apply()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self._fit():
+            self._apply()
+
+    def _fit(self) -> bool:
+        """Recompute font_px for the current text and size. True if it changed."""
+        font = QFont(self.font())
+        font.setBold(True)
+        px = fit_pixel_size(self.text(), font, self.width() - 2 * self.INSET,
+                            self.height() - 2 * self.INSET, self.MAX_PX)
+        changed, self.font_px = px != self.font_px, px
+        return changed
 
     def set_lit(self, lit: bool) -> None:
         self.lit = lit
@@ -70,7 +94,8 @@ class Tile(QLabel):
         else:
             bg, fg, border = "#1e2630", "#ffffff", "#475569"
         self.setStyleSheet(f"background:{bg}; color:{fg}; border:4px solid {border};"
-                           "border-radius:18px; font-size:56px; font-weight:700; padding:24px;")
+                           f"border-radius:18px; font-size:{self.font_px}px; font-weight:700;"
+                           "padding:24px;")
 
 
 class SelectionWindow(QMainWindow):
@@ -203,6 +228,7 @@ class SelectionWindow(QMainWindow):
         if rnd.kind is RoundKind.CONFIRM:
             self.prompt.setText("Say this?")
             self.preview.setText(self._preview_text())
+            self._fit_preview()
             self.preview.setVisible(True)
             self.hint.setText("Confirm: close your eyes for 2 s, or key 1   ·   "
                               "Cancel: key 2 or Esc")
@@ -241,6 +267,24 @@ class SelectionWindow(QMainWindow):
             self.prompt.setText("Confirmed · sent to output")
 
     # ── Helpers ──────────────────────────────────────────────
+    PREVIEW_MAX_PX = 44
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._fit_preview()
+
+    def _fit_preview(self) -> None:
+        """Shrink long preview text (44 px down to 32 px) so it leaves room for the tiles."""
+        if not hasattr(self, "preview"):
+            return
+        font = QFont(self.preview.font())
+        font.setBold(True)
+        width = max(self.width() - 64 - 32, 1)      # window margins, then label padding
+        height = max(int(self.height() * 0.28), 80)
+        self.preview_px = fit_pixel_size(self.preview.text(), font, width, height,
+                                         self.PREVIEW_MAX_PX)
+        self.preview.setStyleSheet(f"font-size: {self.preview_px}px;")
+
     def _preview_text(self) -> str:
         c = self._preview
         return (c.spoken_text or c.label) if c else ""
