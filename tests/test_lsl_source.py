@@ -114,7 +114,9 @@ def test_a_board_that_really_sends_244_per_second_still_checks_out(capsys):
     out = capsys.readouterr().out
     assert code == 0 and "READY" in out
     rate = float(out.split("data is arriving: ")[1].split(" ")[0])
-    assert 238 <= rate <= 250, rate
+    # The point is that a 244 Hz board is measured as roughly that and still passes the check.
+    # A loaded CI machine measured 254.8 over this short window, so allow 8 % either way.
+    assert 224 <= rate <= 264, rate
 
 
 def test_host_names_match_without_case_or_domain(monkeypatch):
