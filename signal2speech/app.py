@@ -339,7 +339,10 @@ class App:
             self._countdown.stop()
             self.window.set_countdown(None)
             return
-        self.window.set_countdown(math.ceil(self._confirm_timer.remainingTime() / 1000))
+        # Coarse timers can report a few ms more than the interval right after start; never
+        # show more seconds than the timeout itself.
+        left_ms = min(self._confirm_timer.remainingTime(), self.confirm_timeout_ms)
+        self.window.set_countdown(math.ceil(left_ms / 1000))
 
     def _arm_confirm_timeout(self, rnd: Round) -> None:
         if rnd.kind is RoundKind.CONFIRM and self.confirm_timeout_ms > 0:
