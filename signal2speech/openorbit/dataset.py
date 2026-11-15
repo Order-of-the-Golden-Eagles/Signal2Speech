@@ -89,6 +89,55 @@ class Dataset:
         return "Air quality: U.S. EPA AirData, daily AQI by county"
 
 
+@dataclass(frozen=True)
+class FirePoint:
+    lat: float
+    lon: float
+    date: str
+
+
+@dataclass(frozen=True)
+class Fires:
+    """Optional NASA FIRMS sample (#32): vegetation-fire detections over a wider region."""
+    image: Path
+    bbox: Dict[str, float]
+    width: int
+    height: int
+    dates: Tuple[str, ...]
+    points: Tuple[FirePoint, ...]   # type 0 ("presumed vegetation fire") only
+    sensor: str
+
+    def to_pixel(self, lat: float, lon: float) -> Tuple[float, float]:
+        b = self.bbox
+        return ((lon - b["west"]) / (b["east"] - b["west"]) * self.width,
+                (b["north"] - lat) / (b["north"] - b["south"]) * self.height)
+
+    @property
+    def credit(self) -> str:
+        return (f"Fire detections: NASA FIRMS, {self.sensor}. "
+                "Each dot is a hot satellite pixel, not a fire outline.")
+
+
+def load_fires(root: Optional[Path] = None) -> Optional[Fires]:
+    """Load data/openorbit/firms/ if it's there. Returns None when it's missing or unreadable,
+    so the core view never depends on it (#31)."""
+    folder = (Path(root) if root is not None else DATA_DIR) / "firms"
+    try:
+        summary = json.loads((folder / "summary.json").read_text(encoding="utf-8"))
+        image = folder / summary["image"]["file"]
+        if not image.is_file():
+            return None
+        with open(folder / summary["csv"], newline="", encoding="utf-8") as f:
+            points = tuple(FirePoint(float(r["latitude"]), float(r["longitude"]), r["acq_date"])
+                           for r in csv.DictReader(f) if r["type"] == "0")
+        return Fires(image=image, bbox={k: float(v) for k, v in summary["bbox"].items()},
+                     width=int(summary["image"]["width"]), height=int(summary["image"]["height"]),
+                     dates=tuple(summary["dates"]), points=points,
+                     sensor=summary.get("sensor", "VIIRS"))
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def load_dataset(root: Optional[Path] = None) -> Dataset:
     """Load data/openorbit/. Raises FileNotFoundError or ValueError with a rebuild hint."""
     root = Path(root) if root is not None else DATA_DIR

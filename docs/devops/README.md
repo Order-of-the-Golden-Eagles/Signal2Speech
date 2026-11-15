@@ -75,3 +75,14 @@ self.diag = Diagnostics.to_file().attach(h, input_source=input_source,
 - **Job summary:** each `ci (...)` job's summary shows the pytest exit code and result line, every skip with its reason, any FAILED or ERROR lines, the full smoke report with its exit code, and the manual checklist. It's written even when a step fails, so skips and failures are never silent. If the app can't even start, the smoke step fails instead of reporting a skip.
 - **Cancelling runs:** a new push cancels the older run only on PRs. Each commit on `main` keeps its own result. Before this change, a quick second merge cancelled the first merge's run ([example](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43646992188)).
 - **Linux packages** are the same list as in [platform notes](../dev-setup-docs/README.md#platform-notes). Only `espeak-ng` is installed, because pyttsx3 2.99 loads `libespeak-ng` and the legacy `libespeak1` isn't needed.
+
+### Verified: the PR check passes and fails (#38)
+
+| Run | Change | Result |
+| --- | --- | --- |
+| [43648496045](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43648496045) | #68 final commit | ✅ all 4 jobs green |
+| [43649217606](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43649217606) | #38: a deliberately failing test (`tests/test_zz_ci_canary.py`) | ❌ all 4 jobs red with `1 failed, 104 passed`. The assertion message shows in the log and the `FAILED` line in the job summary. The smoke and manual-check steps still ran. |
+| [43650157549](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43650157549) | #38: canary removed | ✅ all 4 jobs green |
+
+- **Matrix:** Ubuntu appears twice on purpose. See the comment on `matrix:` in [`tests.yml`](../../.github/workflows/tests.yml), which is the single source for why.
+- **Known flake (open, #48 owner):** `tests/test_evidence.py::test_generator_average_separates_target_from_nontarget` failed once on macOS. It compares a synthetic P300 peak gap against `> 2.5`, and got 2.41 ([run](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/actions/runs/43648196650)). The likely cause is a wall-clock capture that averages fewer epochs on a slow runner. The real fix is to wait for a fixed epoch count. Until then, re-run that job **once**. If it fails twice, or fails on any other OS, treat it as a real regression.
