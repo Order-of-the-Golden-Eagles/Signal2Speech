@@ -96,3 +96,19 @@ def test_keyboard_adapter_uses_open_round():
     assert kb.select_now(TargetIds.TARGET_1) is Outcome.Previewed
     assert kb.select_now(TargetIds.TARGET_1) is Outcome.Confirmed
     assert sink.actions[0].action_id == ActionIds.SHOW_SATELLITE
+
+
+def test_two_adapters_on_one_source_never_collide():
+    """P300 previews and the alpha switch confirms, each through its own live-eeg adapter (#23)."""
+    sink = RecordingSink()
+    h = SelectionHandler(sink)
+    h.live_eeg_confirm_armed = True
+    p300 = InputAdapter(h, InputSources.LIVE_EEG)
+    alpha = InputAdapter(h, InputSources.LIVE_EEG)
+    h.begin_choice_round(demo_choices())
+    p300.arm_capture()
+    assert p300.select_captured(TargetIds.TARGET_2) is Outcome.Previewed
+    alpha.arm_capture()
+    assert alpha.select_captured(TargetIds.TARGET_1) is Outcome.Confirmed
+    assert [a.action_id for a in sink.actions] == [ActionIds.COMPARE_AIR_QUALITY]
+    assert p300.create("r9", "target-1").eventId != alpha.create("r9", "target-1").eventId

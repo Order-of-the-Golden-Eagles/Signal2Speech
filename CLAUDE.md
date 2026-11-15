@@ -21,6 +21,7 @@ When you finish an issue, append one entry to the bottom of [DEVLOG.md](DEVLOG.m
 ```
 
 - Use Eastern time, the hackathon clock, from `date`. For the developer name, use what the developer asked for. If they haven't said, use `git config user.name`.
+- Put only the developer's name in the heading. Don't add "(with Claude)" or any other AI or tool credit there or in the bullets. The repo's AI disclosure lives in the submission checklist.
 - Write 3–7 bullets. Name commands and files in backticks. Don't use jargon a teammate outside your track wouldn't know.
 - Append only. Never edit or reorder other people's entries. `.gitattributes` sets `merge=union` on DEVLOG.md. When you merge `main` into your branch, keep both sides' entries in time order. `union` duplicates a line when both sides edited it, so check for repeated headings after a merge. GitHub's merge button ignores `union` and reports a DEVLOG conflict. Merge `main` locally and push.
 - If you add the entry before the PR exists, write `(PR pending)` and fix it once the PR is open.
@@ -49,3 +50,4 @@ gh project item-edit --id "$ITEM" --project-id PVT_kwDOFUMxq84BrozG \
 
 - Post long comments with `gh issue comment <n> --body-file <file>`, then run `gh issue close <n> --reason completed`. `gh issue close` has no body-file option.
 - Closing an issue or editing a teammate's PR is visible to the whole team. Confirm with the developer before doing it.
+- GitHub deletes a PR's branch automatically when it merges (repo setting). Locally, run `git fetch --prune`, then delete your branches that show `[gone]` in `git branch -vv`. Squash merges need `git branch -D`.

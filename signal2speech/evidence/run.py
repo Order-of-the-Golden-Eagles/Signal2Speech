@@ -30,11 +30,29 @@ def run(args: argparse.Namespace) -> int:
             recording.configure_recording(stem)
             detail += "   |   REC"
 
-    graph = build_evidence_graph(kind, label=label, oscar=oscar)
+    ev = session = header = None
+    box: dict = {}
+    if getattr(args, "p300", False):
+        from . import p300_mode
+
+        ev = p300_mode.build_p300_evidence(kind, label=label, oscar=oscar,
+                                           flashes_per_tile=args.flashes)
+        graph = ev.graph
+        detail = ("Live headset" if kind is SourceKind.HYBRIDBLACK else
+                  "Synthetic P300 after the attended tile's flashes") + \
+            "   |   P300 chooser drives the flashes" + \
+            ("   |   REC" if stem is not None else "")
+        session = p300_mode.P300Session(ev, calibration=args.calibration,
+                                        seed=args.seed)
+
+        def header(banner):
+            return p300_mode.make_header(banner, box)
+    else:
+        graph = build_evidence_graph(kind, label=label, oscar=oscar)
     graph.detail = detail
 
     flasher = None
-    if kind_arg != "replay" and not args.no_flasher:
+    if kind_arg != "replay" and not args.no_flasher and ev is None:
         flasher = Flasher(graph.marker)
 
     from .app import run_window
@@ -42,11 +60,15 @@ def run(args: argparse.Namespace) -> int:
     def started(app):
         if flasher is not None:
             flasher.start()
+        if session is not None:
+            if box:
+                p300_mode.wire_session(session, box)
+            session.start()
         if args.seconds is not None:
             _close_later(app, args.seconds, args.screenshot)
 
     try:
-        code = run_window(graph, on_started=started)
+        code = run_window(graph, on_started=started, header=header)
     finally:
         if flasher is not None:
             flasher.stop()

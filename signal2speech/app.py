@@ -37,6 +37,9 @@ from signal2speech.ui.__main__ import load_demo_choices
 
 ROOT = Path(__file__).resolve().parents[1]
 
+MAP_ACTIONS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY})
+CONFIRM_TIMEOUT_MS = 15_000   # longer than alpha calibration's ~1.5 s closure plus reading time
+
 BLOCKED_INPUTS = {
     InputSources.LIVE_EEG: "Live EEG is blocked: needs the P300 chooser (#46), alpha confirm "
                            "(#47), and the live run (#23).",
@@ -75,8 +78,10 @@ class AppSink:
         self.view = view
         self.speaker = speaker
         self.log = log
+        self.last_action: Optional[str] = None
 
     def execute(self, action: ConfirmedAction) -> None:
+        self.last_action = action.action_id
         if action.action_id == ActionIds.SHOW_SATELLITE:
             self.log(f"OUTPUT map: show_satellite()  [{action.source}]")
             self.view.show_satellite()
@@ -188,7 +193,9 @@ class App:
     def __init__(self, input_source: str = InputSources.KEYBOARD, *,
                  view: Optional[MapView] = None, speaker: Optional[Speaker] = None,
                  sim_script: Optional[List[int]] = None, mute: bool = False,
-                 echo: bool = True, reopen_ms: int = 2000, confirm_delay_ms: int = 2000):
+                 echo: bool = True, reopen_ms: int = 2000, confirm_delay_ms: int = 2000,
+                 reveal_ms: int = 8000,
+                 confirm_timeout_ms: int = CONFIRM_TIMEOUT_MS):
         if input_source in BLOCKED_INPUTS:
             raise ValueError(BLOCKED_INPUTS[input_source])
         if input_source not in (InputSources.KEYBOARD, InputSources.SIMULATED):
@@ -223,11 +230,22 @@ class App:
                                                        self.log, confirm_delay_ms)
             self.window.set_connection(sim_label)
 
+        # Contract: a Confirm round with no answer cancels on timeout (#26). 0 turns it off.
+        self.confirm_timeout_ms = confirm_timeout_ms
+        self._confirm_timer = QTimer(singleShot=True, interval=max(1, confirm_timeout_ms))
+        self._confirm_timer.timeout.connect(lambda: h.cancel("timeout"))
+        h.on_round_opened.append(self._arm_confirm_timeout)
+        h.on_cleared.append(lambda _r: self._confirm_timer.stop())
+        h.on_handled.append(lambda _e, o: self._confirm_timer.stop() if o is Outcome.Confirmed else None)
+
         # Rule 4: the app opens the next question after a cancel, disconnect, or confirm.
-        self._reopen = QTimer(singleShot=True, interval=reopen_ms)
+        # A map reveal stays up longer (reveal_ms) so the audience can read it.
+        self.reopen_ms, self.reveal_ms = reopen_ms, reveal_ms
+        self._reopen = QTimer(singleShot=True)
         self._reopen.timeout.connect(self.ask)
-        h.on_cleared.append(lambda _r: self._reopen.start())
-        h.on_handled.append(lambda _e, o: self._reopen.start() if o is Outcome.Confirmed else None)
+        h.on_cleared.append(lambda _r: self._reopen.start(self.reopen_ms))
+        h.on_handled.append(self._after_confirm)
+        h.on_round_opened.append(lambda _r: self._set_reveal(False))
 
         self.root = QWidget()
         self.root.setWindowTitle(f"Signal2Speech · {INPUT_LABELS[input_source]}")
@@ -243,6 +261,8 @@ class App:
         row.setContentsMargins(0, 0, 16, 0)
         row.addWidget(self.window, 3)
         row.addLayout(right, 2)
+        self._row = row
+        self.revealing = False
         self.root.resize(1700, 900)
 
         sc = QShortcut(QKeySequence("D"), self.root)   # rehearse a headset drop (#26)
@@ -264,6 +284,33 @@ class App:
     def ask(self) -> None:
         self.handler.begin_choice_round(self.choices)
 
+    def _after_confirm(self, _e, outcome: Outcome) -> None:
+        if outcome is not Outcome.Confirmed:
+            return
+        if self.sink.last_action in MAP_ACTIONS and isinstance(self.view, QWidget):
+            self._set_reveal(True)
+            self._reopen.start(self.reveal_ms)
+        else:
+            self._reopen.start(self.reopen_ms)
+
+    def _set_reveal(self, on: bool) -> None:
+        """Give the map most of the width while a reveal is on screen. The empty tiles hide;
+        the prompt and the judge strip (input label) stay visible."""
+        if on == self.revealing:
+            return
+        self.revealing = on
+        for tile in self.window.tiles.values():
+            tile.setVisible(not on)
+        self.window.hint.setVisible(not on)
+        self._row.setStretch(0, 1 if on else 3)
+        self._row.setStretch(1, 3 if on else 2)
+
+    def _arm_confirm_timeout(self, rnd: Round) -> None:
+        if rnd.kind is RoundKind.CONFIRM and self.confirm_timeout_ms > 0:
+            self._confirm_timer.start()
+        else:
+            self._confirm_timer.stop()
+
     def _log_round(self, rnd: Round) -> None:
         labels = ", ".join(f"{c.target_id}={c.label}" for c in rnd.choices)
         self.log(f"round {rnd.id} {rnd.kind.value}: {labels}")
@@ -281,6 +328,8 @@ def main(argv=None) -> int:
                                                 "(choose target-2, then confirm)")
     p.add_argument("--keys", default="", help="keyboard presses after start, e.g. '2,1'")
     p.add_argument("--mute", action="store_true", help="no audio (logs instead)")
+    p.add_argument("--confirm-timeout", type=float, default=CONFIRM_TIMEOUT_MS / 1000,
+                   help="seconds before an unanswered Confirm round cancels (0 = never)")
     p.add_argument("--screenshot", type=Path, help="save a PNG after the first confirm and exit")
     p.add_argument("--smoke", nargs="?", const="dev", choices=["dev", "judging"],
                    help="hardware-free smoke check, exit 0/1 (#41); 'judging' fails on any SKIP")
@@ -295,24 +344,33 @@ def main(argv=None) -> int:
 
     qapp = QApplication.instance() or QApplication(sys.argv[:1])
     script = [int(s) for s in args.sim.split(",") if s.strip()]
-    app = App(source, sim_script=script, mute=args.mute)
+    app = App(source, sim_script=script, mute=args.mute,
+              confirm_timeout_ms=int(args.confirm_timeout * 1000))
     qapp.aboutToQuit.connect(app.close)
+    guards: List[QTimer] = []   # stopped on return, so a later event loop in this process can't fire them
     if args.screenshot:
         def shoot(code: int) -> None:
             app.root.grab().save(str(args.screenshot))
             print(f"saved {args.screenshot}", flush=True)
             qapp.exit(code)
-        # Grab before the question reopens (reopen_ms = 2000).
+        # Grab while the reveal is still up (reveal_ms = 8000).
         app.handler.on_handled.append(
             lambda _e, o: QTimer.singleShot(1200, lambda: shoot(0)) if o is Outcome.Confirmed else None)
-        QTimer.singleShot(30000, lambda: shoot(1))
+        guard = QTimer(singleShot=True, interval=30000)
+        guard.timeout.connect(lambda: shoot(1))
+        guard.start()
+        guards.append(guard)
 
     app.root.show()
     app.ask()
     keymap = {"1": TargetIds.TARGET_1, "2": TargetIds.TARGET_2}
     for k in filter(None, (s.strip() for s in args.keys.split(","))):
         app.window.press_target(keymap[k])
-    return qapp.exec()
+    try:
+        return qapp.exec()
+    finally:
+        for g in guards:
+            g.stop()
 
 
 if __name__ == "__main__":
