@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import subprocess
 import sys
 import threading
 import time
@@ -40,6 +41,8 @@ from signal2speech.eeg import devices
 ROOT = Path(__file__).resolve().parents[2]
 OPTIONS = ("Yes", "No", "Compare counties", "Satellite view")
 NUMBER_WORDS = ("One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight")
+#: Run by the voice helper process. The text arrives as an argument, never inside the code.
+PYTTSX3_HELPER = "import sys, pyttsx3; e = pyttsx3.init(); e.say(sys.argv[1]); e.runAndWait()"
 
 
 # ── voice and beeps ─────────────────────────────────────────────────────────
@@ -84,14 +87,19 @@ class Voice:
             except Exception:
                 self._sapi = None
         if self.enabled:
-            try:                               # other platforms: a fresh engine per utterance
-                import pyttsx3
-                eng = pyttsx3.init()
-                eng.say(text)
-                eng.runAndWait()
-                eng.stop()
-            except Exception:
-                pass
+            self._say_in_helper(text)
+
+    def _say_in_helper(self, text: str) -> bool:
+        """Other platforms: pyttsx3, one short-lived helper process per cue. Inside one process
+        pyttsx3 speaks the first line and silently skips the rest, and ``pyttsx3.init()`` returns
+        the same engine again, so a "new" engine doesn't help. Waits until the words are done."""
+        try:
+            done = subprocess.run([sys.executable, "-c", PYTTSX3_HELPER, text], timeout=30,
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            return done.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            return False                       # no voice: the cue was still printed
 
     @staticmethod
     def estimate_s(text: str) -> float:
