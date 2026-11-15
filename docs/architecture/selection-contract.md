@@ -19,7 +19,7 @@ What is on `main` as of 2026-11-14. "Simulated" means g.Pype `Generator` or scri
 | Evidence view (#48) | `signal2speech/evidence/` | Merged. Runs on `Generator` and replay. **Needs the live headset** for real EEG. |
 | AI reply choices (#5, #27, #28) | `signal2speech/ai/` | Merged. Stub flow checked by hand. A live Claude call is unverified (no key yet). |
 | OpenOrbit data and view (#29, #30) | `data/openorbit/`, `signal2speech/openorbit/` | Not on `main` yet ([PR #65](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/65)). |
-| Live Unicorn input (#23) | Not started | `app.py` refuses `--input live` and `--input recorded`, and live EEG confirm stays disarmed. **Needs the live headset.** |
+| Live Unicorn input (#23, #103) | Wired in the app, verified on simulated input only | `--input live` runs one HybridBlack pipeline for the P300 chooser and the alpha switch (#103). `--input recorded` is still refused (#104), and live EEG confirm stays disarmed. **Needs the live headset.** |
 | CI (#37) | `.github/workflows/tests.yml` | Merged. `pytest` on Windows, macOS, and Ubuntu (Python 3.12, plus 3.13 on Ubuntu). |
 
 ## Vendor facts vs. app decisions

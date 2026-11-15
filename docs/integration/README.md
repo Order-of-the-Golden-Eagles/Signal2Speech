@@ -25,7 +25,8 @@ Add `--mute` for silent runs. `--confirm-timeout SECONDS` (default 15; 0 = never
 - **Still stand-ins, all labelled on screen:**
   - **Map (#30, merged in #65):** `load_view()` uses `signal2speech.openorbit.OpenOrbitView`. The dashed stand-in panel appears only if that import fails.
   - **Simulated input (#21):** `--input simulated` uses `signal2speech.eeg.simulated.SimulatedDecoder`, a real g.Pype `Generator` stream, whenever it imports. Ctrl+1 and Ctrl+2 pick for a waiting sequence, and the stream closes on exit. If it can't import, the app injects scripted decisions through the same `arm_capture()` and `select_captured()` path. The connection label says why it fell back: "#21 SimulatedDecoder not merged" or "g.Pype not installed". Events are labelled `simulated` either way.
-  - **Live and recorded input:** `--input live` and `--input recorded` exit with a message that they're blocked on #46, #47, #23, and #48.
+  - **Live input (#103):** `--input live` opens one Unicorn pipeline, calibrates on the app's own tiles, then runs the demo. The P300 chooses and the eye-closure switch confirms. See [EEG Hardware](../eeg-hardware/README.md#live-eeg-in-the-app-103).
+  - **Recorded input:** `--input recorded` still exits with a "blocked" message (#104). Record and replay work in the evidence view (#48).
 
 ## Rehearse without a headset: g.Pype simulated input (#21)
 

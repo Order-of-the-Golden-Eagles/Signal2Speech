@@ -315,3 +315,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Long AI replies now shrink to fit the tiles and the preview instead of getting cut off. The text never goes below 32 px, so it stays readable from the judge table
 - The size is only recalculated when the label or the window size changes, never during a flash, so the P300 flash timing isn't affected
 - Checked with screenshots at 1280×720 and 1536×864 using 12-word replies: they fit at 54–56 px. The demo labels stay at full size. Tests cover the 32 px floor, the flash, and the preview
+
+## 11/14/26 - 8:01 PM - MagicJester2764 - #103 Live EEG inside the app (PR pending)
+- The headset can now drive the real demo app: `python -m signal2speech.app --input live`
+    - It calibrates on the app's own tiles first (look at the named tile, then eyes open and eyes closed), then the brain's response picks a tile and closing your eyes confirms
+- The P300 chooser and the eye-closure switch share one headset connection, because the Unicorn can only be opened once
+- Eye-closure confirm stays off until the #23 live run says it's safe. Until then key 1 confirms, and the screen says so
+- With no headset, it now stops within about 15 seconds with pairing steps, instead of freezing forever (the headset library waits indefinitely when no device is there)
+- Rehearse the exact same path without the headset: `--input simulated --p300`. That run worked end to end (one preview, one eye-closure confirm, one spoken line). Nothing has been tried on a real wearer yet

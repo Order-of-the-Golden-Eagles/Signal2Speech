@@ -127,11 +127,11 @@ def test_speak_reply_speaks_without_map():
     assert view.calls == [] and speaker.said == ["Yes, please."]
 
 
-@pytest.mark.parametrize("source", [InputSources.LIVE_EEG, InputSources.RECORDED])
+@pytest.mark.parametrize("source", [InputSources.RECORDED])   # live is wired in by #103
 def test_unbuilt_inputs_are_refused(qapp, source):
     with pytest.raises(ValueError, match="blocked"):
         App(source, view=FakeView(), speaker=FakeSpeaker(), echo=False)
-    assert main(["--input", "live" if source == InputSources.LIVE_EEG else "recorded"]) == 2
+    assert main(["--input", "recorded"]) == 2
 
 
 def test_pending_view_is_labelled(qapp):
