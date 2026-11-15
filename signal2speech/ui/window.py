@@ -214,6 +214,20 @@ class Tile(QLabel):
         p.end()
 
 
+class WrapWhenLong(QLabel):
+    """A label that wraps only when its text is long. Short text keeps the height it always had;
+    long text wraps instead of forcing the window wider than the screen."""
+
+    def __init__(self, text: str = "", limit: int = 44, **kwargs):
+        super().__init__(**kwargs)
+        self.limit = limit
+        self.setText(text)
+
+    def setText(self, text: str) -> None:
+        self.setWordWrap(len(text) > self.limit)
+        super().setText(text)
+
+
 class SelectionWindow(QMainWindow):
     def __init__(self, handler: SelectionHandler, keyboard: InputAdapter, *,
                  input_source: str = InputSources.KEYBOARD, flash: bool = False,
@@ -240,8 +254,10 @@ class SelectionWindow(QMainWindow):
         col.setContentsMargins(P.XL, P.L, P.XL, 0)
         col.setSpacing(P.M)
 
-        self.prompt = QLabel("Waiting for a round", objectName="prompt")
-        self.prompt.setWordWrap(True)      # a long prompt wraps; it must never widen the window
+        # A long prompt wraps, so it can never widen the window past the screen. Short ones
+        # don't: a wrapping label asks for more height, and that pushed the preview screen over
+        # 720 at the largest text size.
+        self.prompt = WrapWhenLong("Waiting for a round", objectName="prompt")
         col.addWidget(self.prompt)
         # #175: the consent screen. What will happen, the exact words, and the confirm ring.
         self.preview_box = QWidget()
@@ -286,10 +302,10 @@ class SelectionWindow(QMainWindow):
         srow = QHBoxLayout(strip)
         srow.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
         srow.setSpacing(P.L)
-        self.input_label = self._strip_label()
-        # Two inputs and a device name make a long line (PiEEG, #172). It wraps, so the window
-        # never has to grow past the screen to fit it.
-        self.input_label.setWordWrap(True)
+        # Two inputs, a device name and a status make a long line (PiEEG, #172). Then it wraps,
+        # so the window never has to grow past the screen to fit it.
+        self.input_label = WrapWhenLong(limit=60)
+        self.input_label.setProperty("class", "strip")
         self.connection_label = self._strip_label()
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()
