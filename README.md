@@ -15,13 +15,16 @@ Python 3.12. Works with Wi-Fi off once installed.
 ```
 python -m venv .venv && .venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
 pip install -r requirements-lock.txt
-python -m signal2speech.app --input keyboard
+python -m signal2speech
 ```
 
-Press **2** (Compare counties), then **1** (confirm). The map changes and one line is spoken. Press **2** at the preview, or **Esc**, to cancel, and nothing happens.
+A launcher opens with a button for each tool, and each button says which input it uses. Click **Demo · Keyboard**, then press **2** (Compare counties), then **1** (confirm). The map changes and one line is spoken. Press **2** at the preview, or **Esc**, to cancel, and nothing happens.
+
+The same tools without the launcher (`python -m signal2speech --help` lists them):
 
 | Also try | Command |
 | --- | --- |
+| The demo with keyboard input | `python -m signal2speech.app --input keyboard` |
 | Simulated brain signals through a real g.Pype pipeline | `python -m signal2speech.app --input simulated --sim 2,1` |
 | AI reply suggestions for a typed question | `python -m signal2speech.ai` |
 | The g.Pype evidence view (scopes, OSCAR, averaged P300) | `python -m signal2speech.evidence --source generator` |
