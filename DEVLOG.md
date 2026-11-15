@@ -232,7 +232,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 
 ## 11/14/26 - 7:01 PM - MagicJester2764 - #40 Pre-headset checkpoint ([PR #90](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/90))
 - Wrote down where the demo stands before the headset arrives: `docs/sprint-operations/pre-headset-checkpoint.md`
-- The reveal works with no headset: InYoung's Wi-Fi-off keyboard run, plus a fresh simulated run where the real NASA/EPA view appears with one spoken line
+- The reveal works with no headset: InYoung's Wi-Fi-off keyboard run on her laptop (a slightly older build), plus a fresh simulated run on today's build where the real NASA/EPA view appears and one line is sent to speech (muted, so not heard)
+- Not yet checked: the simulated run with Wi-Fi off, and hearing the line on the judging laptop. That's my next job, since the judging laptop is mine
 - The smoke check is now fully green (7 of 7), now that the map and data have landed
 - The one thing left for a live demo: the headset isn't connected to the app yet. The P300 chooser and the eyes-closed confirm both work on their own, but nothing wires them into the app (#23)
 - Each developer is asked to confirm their row in #40
