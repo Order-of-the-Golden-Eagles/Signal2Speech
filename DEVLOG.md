@@ -327,6 +327,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - My code-review fixes for #26 were pushed a few minutes after its PR merged, so they never reached main. This puts them back
 - If a preview times out or is cancelled, the simulator repeats the whole choose-then-confirm step instead of getting out of order
 - The app's timers stop when it closes, the screenshot timer can't fire into a later run, and `--confirm-timeout` refuses values that would quietly turn it off
+
 ## 11/14/26 - 7:35 PM - Long Le - #95 Long replies fit their tiles ([PR #112](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/112))
 - Long AI replies now shrink to fit the tiles and the preview instead of getting cut off. The text never goes below 32 px, so it stays readable from the judge table
 - The size is only recalculated when the label or the window size changes, never during a flash, so the P300 flash timing isn't affected
