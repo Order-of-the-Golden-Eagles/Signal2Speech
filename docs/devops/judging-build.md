@@ -9,8 +9,8 @@ Part of [DevOps](README.md). Kept in its own file so it doesn't collide with oth
 1. Set up from a clean checkout with steps 1 to 5 of the [launch path](../dev-setup-docs/README.md#python-and-gpype-launch-path-19) (`pip install -r requirements-lock.txt` for the exact versions).
 2. Run `python tools/release_check.py`. Every check should pass. See [Security and Privacy](../security-privacy/README.md#release-check-10-35) for what the warnings mean. Then run `python -m signal2speech.app --smoke=judging` (#41). Any FAIL or SKIP stops the freeze.
 3. **Turn Wi-Fi off**, then run `python -m signal2speech.app --input keyboard`.
-   - Press **2**, then **1**. The county comparison appears and one line is spoken.
-   - The map fills most of the window and stays up for 8 seconds, then the next question appears (#81). Press **1**, then **1**. The June 28 satellite view appears and one line is spoken.
+   - Press **2**, then hold **1** for 2 s. The county comparison appears and one line is spoken.
+   - The map fills most of the window and stays up for 8 seconds, then the next question appears (#81). Press **1**, then hold **1** for 2 s. The June 28 satellite view appears and one line is spoken.
    - Press **2** during a preview to cancel. Nothing changes and nothing is spoken.
    - The transcript shows exactly one `OUTPUT map` and one `OUTPUT speak` per confirm.
 4. Turn Wi-Fi back on. Post the date, the laptop, the commit (`git rev-parse --short HEAD`), and the result in #39. That commit is the known-good commit.

@@ -31,7 +31,7 @@ import time
 from collections import deque
 from typing import Callable, Iterable, Optional
 
-from PySide6.QtCore import QCoreApplication, QTimer
+from PySide6.QtCore import QCoreApplication, Qt, QTimer
 
 from signal2speech.core import InputAdapter, InputSources, Round, RoundKind, TargetIds
 from signal2speech.eeg import alpha_confirm as am
@@ -484,7 +484,7 @@ class PiEEGConfirm:
     ``stream_is`` says what is publishing, because LSL can't prove it: ``live`` (a real board on a
     person), ``simulated`` (PiEEG's simulator or our self-test), or ``recorded`` (a replayed
     session). Eye-closure confirm switches on only after this session's #150 check passes
-    (``lsl_source.safe_to_arm``). Until then, and if it fails, key 1 confirms.
+    (``lsl_source.safe_to_arm``). Until then, and if it fails, holding key 1 confirms.
     """
 
     def __init__(self, handler, window, log: Callable[[str], None], *, stream_is: str,
@@ -554,7 +554,7 @@ class PiEEGConfirm:
         if self.armed:
             return f"Choose: Keyboard · Confirm: {self.confirm_label()}"
         state = "eye check not run yet" if not self.calibrated else "eye check failed"
-        return f"Choose: Keyboard · Confirm: key 1 · {self.confirm_label()}: {state}"
+        return f"Choose: Keyboard · Confirm: hold 1 · {self.confirm_label()}: {state}"
 
     def connection_label(self) -> str:
         parts = [f"PiEEG over LSL · stream '{self.relay.name if self.relay else self.stream}'"]
@@ -633,7 +633,7 @@ class PiEEGConfirm:
     def calibrate(self, labels: Optional[dict] = None) -> Optional[bool]:
         """Channel check, alpha calibration, rest and closures; arm only if it's clean.
 
-        Returns True if eye-closure confirm is on, False if the check failed (key 1 confirms),
+        Returns True if eye-closure confirm is on, False if the check failed (holding key 1 confirms),
         or None if the operator closed the window.
         """
         from signal2speech.eeg import devices
@@ -678,6 +678,10 @@ class PiEEGConfirm:
                     source=self._source(), channels=list(self.pick.channels),
                     sampling_rate=self.relay.rate)
                 self.alpha.bursts = self.publisher       # the self-test's eyes follow the prompts
+                if hasattr(self.alpha, "progress") and hasattr(self.window, "set_eye_progress"):
+                    # #175: the confirm ring follows this board's alpha switch.
+                    self.alpha.progress.connect(self.window.set_eye_progress,
+                                                Qt.ConnectionType.QueuedConnection)
                 self.alpha.start()
                 pump(self.no_data_s, until=lambda: closed() or self.alpha.power_count() > 0)
                 tick()
@@ -714,7 +718,7 @@ class PiEEGConfirm:
         self.window.eye_confirm = ok
         self.window.eye_off_reason = "the eye check failed"
         verdict = (f"Eye-closure confirm ON: {self.confirm_label()} passed the check"
-                   if ok else "Eye-closure confirm OFF, key 1 confirms: " + "; ".join(self.reasons))
+                   if ok else "Eye-closure confirm OFF, hold key 1 to confirm: " + "; ".join(self.reasons))
         self.window.prompt.setText(verdict)
         self.window.hint.setText("")
         self.log(f"check: false triggers {report.get('false_triggers')}, confirms per closure "

@@ -120,7 +120,7 @@ def test_a_failed_check_leaves_key_1_as_the_only_confirm(make, monkeypatch):
     assert not app.sim.armed and app.sim.alpha is None      # nothing from the board can confirm
     assert app.sim.reasons and ("channel check" in app.sim.reasons[0]
                                 or "calibration failed" in app.sim.reasons[0])
-    assert app.window.input_label.text().startswith("Choose: Keyboard · Confirm: key 1 · ")
+    assert app.window.input_label.text().startswith("Choose: Keyboard · Confirm: hold 1 · ")
     assert app.window.input_label.text().endswith("eye check failed")
     assert "the eye check failed" in app.window.confirm_hint()
 
@@ -138,7 +138,7 @@ def test_live_label_and_arming_follow_the_check(make):
     assert app.handler.live_eeg_confirm_armed is False and app.window.eye_confirm is False
     assert "the eye check hasn't run yet" in app.window.confirm_hint()
     assert app.window.input_label.text() == \
-        "Choose: Keyboard · Confirm: key 1 · Live EEG (PiEEG Octopus 16): eye check not run yet"
+        "Choose: Keyboard · Confirm: hold 1 · Live EEG (PiEEG Octopus 16): eye check not run yet"
     assert sim._finish({**CLEAN, "false_triggers": 1}) is False
     assert app.handler.live_eeg_confirm_armed is False
     assert sim._finish(CLEAN) is True

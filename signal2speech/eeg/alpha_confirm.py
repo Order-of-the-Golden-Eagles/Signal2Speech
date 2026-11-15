@@ -38,6 +38,7 @@ import gpype as gp
 import numpy as np
 from PySide6.QtCore import QCoreApplication, QObject, Qt, Signal, Slot
 
+from signal2speech.ui.confirm_ring import trailing_progress
 from signal2speech.core import (InputAdapter, InputSources, Round, RoundKind,
                                 SelectionHandler, TargetIds)
 
@@ -208,6 +209,9 @@ class AlphaConfirm(QObject):
 
     rising = Signal(float)    # monotonic time of a 0 -> 1 Threshold edge (worker thread)
     falling = Signal(float)   # 1 -> 0
+    # #175, read-only: how far the latest band power is through the dwell (0-1), for the
+    # preview's confirm ring. Emitted on the worker thread; it never affects the decision.
+    progress = Signal(float)
 
     def __init__(self, handler: SelectionHandler, *, input_source: str = InputSources.SIMULATED,
                  source=None, pipeline=None, upstream=None, bursts: Optional[AlphaBursts] = None,
@@ -231,6 +235,8 @@ class AlphaConfirm(QObject):
         self._power = deque(maxlen=int(self.frame_rate * 120))   # last 2 min of band power
         self._power_total = 0
         self._state = 0                      # worker-side Threshold state
+        self._level = UNCALIBRATED_LEVEL     # the Threshold's level, mirrored for progress
+        self._last_progress = 0.0
         self.state = 0                       # main-thread copy (lags behind the queued signals)
         self._armed_at: Optional[float] = None
         self._open_since: Optional[float] = None
@@ -281,6 +287,11 @@ class AlphaConfirm(QObject):
         with self._lock:
             self._power.extend(float(v) for v in rows[:, 0])
             self._power_total += len(rows)
+            recent = list(self._power)[-self.dwell:]
+        p = trailing_progress(recent, self._level, self.dwell)
+        if abs(p - self._last_progress) >= 0.02 or (p in (0.0, 1.0) and p != self._last_progress):
+            self._last_progress = p
+            self.progress.emit(p)
 
     def _on_state_rows(self, rows: np.ndarray) -> None:
         for v in rows[:, 0]:
@@ -346,6 +357,7 @@ class AlphaConfirm(QObject):
     def apply(self, cal: Calibration) -> Calibration:
         self.threshold.set_control({"level": cal.level, "release": cal.release,
                                     "dwell": self.dwell})
+        self._level = cal.level
         self.calibration = cal
         self._note("calibrated", asdict(cal))
         return cal
