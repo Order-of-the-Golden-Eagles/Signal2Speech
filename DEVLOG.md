@@ -434,7 +434,7 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The diagram shows the real path: headset → g.Pype (OSCAR) → P300 to choose and alpha to confirm → selection contract → speech and map, with keyboard and simulator input going through the same contract
 - Checked by eye at full size, and a test makes sure all three stay 1920×1080, under 500 KB, and linked from the shot list
 
-## 11/14/26 - 9:36 PM - Vasanth Anbukumar - #142 Real recorded brain data in the evidence view (PR pending)
+## 11/14/26 - 9:36 PM - Vasanth Anbukumar - #142 Real recorded brain data in the evidence view ([PR #149](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/149))
 - Judges can now see a real human P300 even though our headset was lost in transit: `python -m signal2speech.evidence --source dataset path/to/p300-speller/S4.mat`
     - It plays g.tec's own hackathon recording (five people, 8 channels at 250 Hz like the Unicorn, but with different electrode positions: P3 and P4 where the Unicorn has C3 and C4) through our filters and averaging. The red target line pulls away from the blue non-target line around 300–500 ms within a minute
     - The banner always says "RECORDED… recorded by g.tec, not our headset or wearer". It's never shown as live or as ours
