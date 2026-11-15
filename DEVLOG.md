@@ -303,3 +303,8 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Long AI replies now shrink to fit the tiles and the preview instead of getting cut off. The text never goes below 32 px, so it stays readable from the judge table
 - The size is only recalculated when the label or the window size changes, never during a flash, so the P300 flash timing isn't affected
 - Checked with screenshots at 1280×720 and 1536×864 using 12-word replies: they fit at 54–56 px. The demo labels stay at full size. Tests cover the 32 px floor, the flash, and the preview
+
+## 11/14/26 - 7:44 PM - Long Le - #96 Confirm countdown on the preview (PR pending)
+- The "Say this?" screen now shows how long is left before an unanswered preview cancels itself: "No answer cancels in 15 s"
+- It counts down from the same timer that does the cancelling (#26), so the number on screen always matches what happens
+- It disappears on confirm, cancel, disconnect, or the next question, and never appears with `--confirm-timeout 0`. Tests cover each case, including a real 2.5 s countdown that ends in the cancel. Fits 1280×720
