@@ -48,3 +48,10 @@ def test_nothing_fires_before_calibration():
     b = BlinkSwitch(fired.append, log=lambda s: None)
     b._on_rows(signal(3, blinks=(0.5, 1.0)))
     assert fired == []
+
+
+def test_a_blink_while_resting_does_not_spoil_calibration():
+    b = BlinkSwitch(lambda t: None, log=lambda s: None)
+    rest = np.abs(signal(6, blinks=(3.0,), seed=1)[:, 0])       # blinked once while "not blinking"
+    windows = [np.abs(signal(2.5, blinks=(0.3, 0.8), seed=s)[:, 0]) for s in (2, 3, 4)]
+    assert b.calibrate(rest, windows) > 0

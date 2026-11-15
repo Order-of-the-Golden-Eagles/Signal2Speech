@@ -24,7 +24,7 @@ CHANNEL = 0                    # Fz on the Unicorn Hybrid Black: closest to the 
 REFRACTORY_S = 0.25            # one blink is one event, however long its swing lasts
 PAIR_MIN_S, PAIR_MAX_S = 0.15, 0.9
 AFTER_DOUBLE_S = 1.5           # after a double blink, ignore blinks for a moment
-MIN_RATIO = 2.5                # blinks must stand this far above the resting signal
+MIN_RATIO = 1.5                # blinks must stand at least this far above the resting signal
 SMOOTH = 25                    # 0.1 s moving average: keeps the slow blink swing, drops the
                                # faster brain activity and noise that hide it on a dry electrode
 
@@ -103,7 +103,9 @@ class BlinkSwitch:
         are the samples recorded while the wearer blinked twice, one array per prompt."""
         if rest.size < self.rate * 2:
             raise BlinkError("not enough resting signal")
-        baseline = float(np.percentile(rest, 99))
+        # The 90th percentile, not the top: people blink anyway while "trying not to", and one
+        # blink in the resting window raised the old top-1 % baseline to the blinks' own size.
+        baseline = float(np.percentile(rest, 90))
         peaks = [float(np.max(w)) for w in blink_windows if len(w)]
         if len(peaks) < 2:
             raise BlinkError("not enough blink recordings")
@@ -115,13 +117,26 @@ class BlinkSwitch:
         # Each prompt should hold two blinks above the level, or the wearer won't be detected.
         caught = sum(1 for w in blink_windows if self._onsets(np.asarray(w), level) >= 2)
         if caught < max(1, len(peaks) - 1):
-            raise BlinkError(f"double blinks were found in only {caught} of {len(peaks)} tries")
+            raise BlinkError(f"double blinks were found in only {caught} of {len(peaks)} tries "
+                             f"(resting {baseline:.3g}, blinks {peak:.3g})")
+        # The real safety test: at that level, the resting window must hold no double blink.
+        if self._doubles(np.asarray(rest), level):
+            raise BlinkError(f"the resting signal already looks like a double blink at level {level:.3g} "
+                             f"(resting {baseline:.3g}, blinks {peak:.3g})")
         with self._lock:
             self.level = level
             self._last_blink = self._prev_blink = -1e9
         self.log(f"Blink switch calibrated: resting {baseline:.3g}, blinks {peak:.3g}, "
                  f"level {level:.3g}, double blinks found in {caught} of {len(peaks)} tries")
         return level
+
+    def _doubles(self, x: np.ndarray, level: float) -> int:
+        refractory, onsets = int(REFRACTORY_S * self.rate), []
+        for i in np.flatnonzero(x > level):
+            if not onsets or i - onsets[-1] >= refractory:
+                onsets.append(int(i))
+        gaps = np.diff(onsets) / self.rate
+        return int(np.sum((gaps >= PAIR_MIN_S) & (gaps <= PAIR_MAX_S)))
 
     def _onsets(self, x: np.ndarray, level: float) -> int:
         refractory, last, n = int(REFRACTORY_S * self.rate), -10 ** 9, 0
