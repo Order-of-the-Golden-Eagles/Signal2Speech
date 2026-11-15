@@ -46,6 +46,9 @@ AQI_COLORS = {
 }
 
 BLANK_HINT = "The map appears after a confirmed choice."
+#: Under the flowing image on the comparison screen: what the numbers do and don't cover.
+COMPARE_SCOPE_NOTE = ("Air quality below compares June 26 with June 28, the two days we hold EPA data for. "
+                      "The images start on June 24, the last day the ground was visible.")
 #: How faint the idle picture is. Low enough that nobody takes it for the revealed map.
 IDLE_OPACITY = 0.30
 # Text sizes in px. They keep the view inside the app's output panel (#4) next to the selection
@@ -600,6 +603,9 @@ class OpenOrbitView(QWidget):
         layout.addWidget(self.cmp_image, 1)
         layout.addWidget(_label(ds.nasa_credit, SMALL_PX, MUTED))
 
+        # The pictures run from June 24; the EPA numbers we hold are for June 26 and June 28
+        # only. Say so on screen, so nobody reads the table as covering all five days.
+        layout.addWidget(_label(COMPARE_SCOPE_NOTE, SMALL_PX + 1, MUTED))
         layout.addWidget(self._aqi_table())
         for line in self._summary_lines():
             layout.addWidget(_label(line, BODY_PX))

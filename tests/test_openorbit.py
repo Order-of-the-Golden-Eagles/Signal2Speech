@@ -368,6 +368,9 @@ def test_satellite_view_plays_the_days_in_order_and_ends_on_the_smoke(qapp, monk
     view.show_satellite()                                   # fades off (tests): straight to the last day
     assert view.sat_image.date == AFTER and "wildfire smoke" in view.sat_image.caption
     view.compare_air_quality()                              # the comparison flows the same way
+    from signal2speech.openorbit.view import COMPARE_SCOPE_NOTE
+    assert COMPARE_SCOPE_NOTE in visible_texts(view)        # images cover five days, numbers two
+    assert "June 26" in COMPARE_SCOPE_NOTE and "June 28" in COMPARE_SCOPE_NOTE and "June 24" in COMPARE_SCOPE_NOTE
     assert view.cmp_image.date == AFTER and view._lapse_image is view.cmp_image
     view.show_satellite()
     assert view.fires_map.until is None                     # every detection shown at the end
