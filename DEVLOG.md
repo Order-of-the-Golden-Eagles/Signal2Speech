@@ -337,6 +337,12 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - It counts down from the same timer that does the cancelling (#26), so the number on screen always matches what happens
 - It disappears on confirm, cancel, disconnect, or the next question, and never appears with `--confirm-timeout 0`. Tests cover each case, including a real 2.5 s countdown that ends in the cancel. Fits 1280×720
 
+## 11/14/26 - 7:58 PM - Long Le - #98 Tests pass on machines without g.Pype ([PR #117](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/117))
+- `pytest` is now green on machines that can't install g.Pype, such as macOS 12 and Intel Macs. The 8 tests that need g.Pype skip with a reason that says how to install it
+- Why: those 8 always failed on such machines, so the shared push hook blocked every push, and people had to skip it with `SKIP_TESTS=1`
+- Only the tests that really need g.Pype are skipped. The rest of `test_diagnostics.py` and `test_recovery.py` still runs everywhere, and CI still runs all of them on Windows, macOS, and Linux
+- Checked on macOS 12 without g.Pype: 183 passed, 0 failed, and the push hook passes again
+
 ## 11/14/26 - 8:07 PM - Long Le - #5 AI demo shows the map for map suggestions ([PR #118](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/118))
 - When Claude suggests a map answer (from #106), the AI demo window now shows the map and speaks the line once, just like the main app
 - Why: the AI demo had no map on purpose, because replies used to be spoken words only. With #106, picking "Compare counties (shows the map)" would have spoken the line but shown nothing, and logged a BUG line
