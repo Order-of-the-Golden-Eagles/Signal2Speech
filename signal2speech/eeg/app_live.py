@@ -185,8 +185,8 @@ class LiveEegInput:
                  alpha_calib_s: float = 10.0, arm_live_confirm: bool = False,
                  placeholder: Optional[p300.P300Model] = None, open_timeout_s: float = 20.0,
                  recorded: Optional[p300.RecordedResponses] = None):
-        if source not in ("hybridblack", "generator", "recorded"):
-            raise ValueError("source is hybridblack, generator or recorded")
+        if source not in ("hybridblack", "unicorn-lsl", "generator", "recorded"):
+            raise ValueError("source is hybridblack, unicorn-lsl, generator or recorded")
         script = [int(s) for s in script]
         if any(s not in (1, 2) for s in script):
             raise ValueError(f"script values are 1 or 2, got {script}")
@@ -195,6 +195,7 @@ class LiveEegInput:
         # "simulated" here means: no person is wearing a headset, so attention follows a script.
         self.simulated = source in ("generator", "recorded")
         self.enable_oscar = enable_oscar
+        self.via_suite = source == "unicorn-lsl"
         self.input_source = (InputSources.RECORDED if self.recorded else
                              InputSources.SIMULATED if self.simulated else InputSources.LIVE_EEG)
         self.script = deque(script)
@@ -265,6 +266,7 @@ class LiveEegInput:
         parts = [f"{self.nodes.synth.responses.short_name} · simulated eye closure"
                  if self.recorded else
                  "g.Pype Generator + synthetic P300 · alpha bursts" if self.simulated else
+                 "Unicorn Hybrid Black via Unicorn Suite (Unicorn Recorder, LSL)" if self.via_suite else
                  f"Unicorn Hybrid Black · {'OSCAR on' if self.enable_oscar else 'OSCAR off'}"]
         if self.p300_ok is False:
             parts.append("P300 off (calibration failed)")

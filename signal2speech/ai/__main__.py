@@ -458,6 +458,9 @@ def main(argv=None) -> int:
                    help="live: the Unicorn Hybrid Black headset chooses (P300); see --arm-live-confirm")
     p.add_argument("--p300", action="store_true",
                    help="with --input simulated: rehearse the headset path on simulated signals")
+    p.add_argument("--via-suite", action="store_true",
+                   help="live: read the headset from Unicorn Suite's Unicorn Recorder over LSL (start its "
+                        "LSL output first) instead of opening it directly")
     p.add_argument("--arm-live-confirm", action="store_true",
                    help="live: let eye closure confirm. Only after the guided check "
                         "(python -m signal2speech.eeg.live --source hybridblack) says it's safe")
@@ -514,7 +517,8 @@ def main(argv=None) -> int:
                              cues=not args.no_cues, reply_language=reply_language,
                              deadline_s=args.deadline, recording=recording,
                              p300=args.p300, arm_live_confirm=args.arm_live_confirm,
-                             live_options={"calibration_sequences": args.calibration})
+                             live_options={"calibration_sequences": args.calibration,
+                                           **({"source": "unicorn-lsl"} if args.via_suite else {})})
     except Exception as err:
         if not eeg_path:
             raise

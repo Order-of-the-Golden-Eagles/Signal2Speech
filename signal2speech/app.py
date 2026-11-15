@@ -416,9 +416,10 @@ class App:
             from signal2speech.eeg.app_live import LiveEegInput
             self.sim = LiveEegInput(
                 h, self.window, self.log,
-                source="generator" if input_source == InputSources.SIMULATED else "hybridblack",
+                source=("generator" if input_source == InputSources.SIMULATED
+                        else (live_options or {}).get("source", "hybridblack")),
                 script=sim_script or [2, 1], arm_live_confirm=arm_live_confirm,
-                **(live_options or {}))
+                **{k: v for k, v in (live_options or {}).items() if k != "source"})
             sim_label = self.sim.connection_label()
             if own_voice:
                 # Someone with their eyes closed can't read "Open your eyes": a low beep to close,

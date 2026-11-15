@@ -559,8 +559,8 @@ def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
     """
     # Check the arguments before building anything: a half-built pipeline that is never started
     # or closed crashed the interpreter at exit on Linux (a segfault after every test had passed).
-    if source not in ("generator", "recorded", "hybridblack"):
-        raise ValueError(f"Unknown source {source!r}: use generator, recorded or hybridblack")
+    if source not in ("generator", "recorded", "hybridblack", "unicorn-lsl"):
+        raise ValueError(f"Unknown source {source!r}: use generator, recorded, hybridblack or unicorn-lsl")
     if source == "recorded" and recorded is None:
         raise ValueError("source 'recorded' needs RecordedResponses")
     p = gp.Pipeline()
@@ -581,6 +581,15 @@ def build_pipeline(source: str = "generator", model: Optional[P300Model] = None,
         p.connect(src, synth)
         p.connect(marker, synth[SyntheticP300.PORT_TRIGGER])
         upstream = synth
+    elif source == "unicorn-lsl":
+        # Unicorn Suite's Unicorn Recorder holds the headset and streams it over LSL; we read that
+        # stream. Its first 8 channels are the EEG (then motion, battery, counter, validation).
+        import os
+        name = os.environ.get("SIGNAL2SPEECH_LSL_NAME")
+        src = (gp.LslReceiver(stream_name=name, name="p300_source") if name
+               else gp.LslReceiver(stream_type="EEG", name="p300_source"))
+        upstream = gp.ChannelSelector(indices=list(range(EEG_CHANNELS)), name="p300_eeg_only")
+        p.connect(src, upstream)
     else:
         src = gp.HybridBlack(enable_oscar=enable_oscar, name="p300_source")
         upstream = src
