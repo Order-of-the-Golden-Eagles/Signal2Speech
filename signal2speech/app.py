@@ -32,7 +32,7 @@ from signal2speech.core import (ActionIds, Choice, ConfirmedAction, EegClassMap,
                                 InputSources, Outcome, Round, RoundKind, SelectionEvent,
                                 SelectionHandler, TargetIds)
 from signal2speech.speech import MutedSpeaker, OfflineSpeaker, Speaker
-from signal2speech.ui import INPUT_LABELS, SelectionWindow
+from signal2speech.ui import INPUT_LABELS, KeyHelpOverlay, SelectionWindow
 from signal2speech.ui.__main__ import load_demo_choices
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -273,8 +273,27 @@ class App:
                 s2 = QShortcut(QKeySequence(seq), self.root)
                 s2.setAutoRepeat(False)
                 s2.activated.connect(lambda c=cls: self.sim.set_next(c))
+        # Operator keys (#94). Neither touches the handler.
+        rows = [("1 / 2", "Pick a tile. At the preview, 1 confirms and 2 cancels."),
+                ("Esc", "Cancel and clear the screen"),
+                ("D", "Pretend the headset disconnected"),
+                ("F11", "Fullscreen on or off"),
+                ("F1", "Show or hide this help")]
+        if hasattr(self.sim, "set_next"):
+            rows.insert(3, ("Ctrl+1 / Ctrl+2", "Pick for the simulated decoder"))
+        self.help = KeyHelpOverlay(self.root, rows, title=f"Keys · input: {INPUT_LABELS[input_source]}")
+        for seq, fn in (("F1", self.help.toggle), ("F11", self.toggle_fullscreen)):
+            s3 = QShortcut(QKeySequence(seq), self.root)
+            s3.setAutoRepeat(False)
+            s3.activated.connect(fn)
         self.log(f"input: {INPUT_LABELS[input_source]}" + (f" ({sim_label})" if sim_label else ""))
         self.log(f"speech: {getattr(self.speaker, 'backend', type(self.speaker).__name__)}")
+
+    def toggle_fullscreen(self) -> None:
+        if self.root.isFullScreen():
+            self.root.showNormal()
+        else:
+            self.root.showFullScreen()
 
     def close(self) -> None:
         """Stop the g.Pype stream if one is running (#21)."""
@@ -330,6 +349,7 @@ def main(argv=None) -> int:
     p.add_argument("--mute", action="store_true", help="no audio (logs instead)")
     p.add_argument("--confirm-timeout", type=float, default=CONFIRM_TIMEOUT_MS / 1000,
                    help="seconds before an unanswered Confirm round cancels (0 = never)")
+    p.add_argument("--fullscreen", action="store_true", help="start fullscreen (F11 toggles, F1 shows keys)")
     p.add_argument("--screenshot", type=Path, help="save a PNG after the first confirm and exit")
     p.add_argument("--smoke", nargs="?", const="dev", choices=["dev", "judging"],
                    help="hardware-free smoke check, exit 0/1 (#41); 'judging' fails on any SKIP")
@@ -361,7 +381,7 @@ def main(argv=None) -> int:
         guard.start()
         guards.append(guard)
 
-    app.root.show()
+    app.root.showFullScreen() if args.fullscreen else app.root.show()
     app.ask()
     keymap = {"1": TargetIds.TARGET_1, "2": TargetIds.TARGET_2}
     for k in filter(None, (s.strip() for s in args.keys.split(","))):
