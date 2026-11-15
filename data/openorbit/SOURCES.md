@@ -58,3 +58,9 @@ Pixel position: `x = (lon - west) / (east - west) * width`, `y = (north - lat) /
 **What a detection means:** a 375 m satellite pixel with at least one hot spot in it at the time of the overpass (UTC). It is not a fire outline or a burned area. The view draws only type 0 ("presumed vegetation fire"). The Canada row count for June 26 (7,959) matches an independent count, which confirms the byte-range download.
 
 **Why a wider map:** southeast Michigan had smoke but no wildfire detections. The fires were in Quebec and Ontario, more than 1,000 km away.
+
+## Audio (spoken lines, #97)
+
+**Files:** [`audio/show_satellite.wav`](audio/show_satellite.wav) and [`audio/compare_air_quality.wav`](audio/compare_air_quality.wav), about 7 s each, mono 22.05 kHz, under 350 KB.
+**Made with:** [espeak-ng](https://github.com/espeak-ng/espeak-ng) 1.52.0 (GPL-3.0), voice `en-us`, 145 words per minute, generated offline by [`audio/make_audio.py`](audio/make_audio.py). The generated audio isn't covered by espeak-ng's licence, so we can redistribute it.
+**Text:** the exact `spokenText` from `contracts/demo-round.json`, recorded in [`audio/manifest.json`](audio/manifest.json). `python data/openorbit/audio/make_audio.py --check` and `tests/test_audio.py` fail if the contract text, or the dataset's `spoken_comparison()`, changes without regenerating the audio.

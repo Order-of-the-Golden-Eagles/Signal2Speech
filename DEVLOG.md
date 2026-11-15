@@ -356,3 +356,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - It goes flash to P300 decision, eye-closure confirm, why nothing is spoken twice, where the map and voice run, then CI and the git hooks, with one sentence to say at each stop
 - Every pointer links to the exact line on `main` and was checked against the code
 - It ends with honest answers to the three hardest judge questions: accuracy (simulated only so far, live not yet measured), proof the brain is responding, and stimulus timing
+
+## 11/14/26 - 8:31 PM - Long Le - #97 Same voice on every laptop for the map lines ([PR #125](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/125))
+- The two OpenOrbit answers now play from bundled recordings, so they sound the same on every laptop, with or without Wi-Fi
+    - `data/openorbit/audio/compare_air_quality.wav` and `show_satellite.wav`, about 7 s each
+- They're made with espeak-ng, an open-source voice whose output we can share freely. It sounds robotic but clear. `python data/openorbit/audio/make_audio.py` regenerates them
+- A test fails if the contract wording or the dataset's comparison line changes without regenerating the audio, so the words heard always match the words on screen. AI replies still use the live OS voice
+- Checked on a Mac: the app played the bundled clip (Qt status Ready, played to the end), and the phonemes say "A-Q-I" and "Washtenaw" correctly. Not yet heard through the judging laptop's speakers
