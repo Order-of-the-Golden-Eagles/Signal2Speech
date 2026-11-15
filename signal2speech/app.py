@@ -42,8 +42,6 @@ MAP_ACTIONS = frozenset({ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY
 CONFIRM_TIMEOUT_MS = 15_000   # longer than alpha calibration's ~1.5 s closure plus reading time
 
 BLOCKED_INPUTS = {
-    InputSources.LIVE_EEG: "Live EEG is blocked on the #23 wiring: one HybridBlack pipeline "
-                           "shared by the P300 chooser (#46) and alpha confirm (#47), both merged.",
     InputSources.RECORDED: "Recorded replay is blocked: it isn't wired into the app yet. Record "
                            "and replay work in the evidence view (python -m signal2speech.evidence, #48).",
 }
@@ -197,10 +195,13 @@ class App:
                  sim_script: Optional[List[int]] = None, mute: bool = False,
                  echo: bool = True, reopen_ms: int = 2000, confirm_delay_ms: int = 2000,
                  reveal_ms: int = 8000,
-                 confirm_timeout_ms: int = CONFIRM_TIMEOUT_MS):
+                 confirm_timeout_ms: int = CONFIRM_TIMEOUT_MS,
+                 p300: bool = False, arm_live_confirm: bool = False,
+                 live_options: Optional[dict] = None):
         if input_source in BLOCKED_INPUTS:
             raise ValueError(BLOCKED_INPUTS[input_source])
-        if input_source not in (InputSources.KEYBOARD, InputSources.SIMULATED):
+        if input_source not in (InputSources.KEYBOARD, InputSources.SIMULATED,
+                                InputSources.LIVE_EEG):
             raise ValueError(f"Unknown input: {input_source}")
         self.input_source = input_source
 
@@ -216,7 +217,8 @@ class App:
         self.handler = SelectionHandler(self.sink)
         self.keyboard = InputAdapter(self.handler, InputSources.KEYBOARD)
         self.window = SelectionWindow(self.handler, self.keyboard, input_source=input_source,
-                                      flash=input_source == InputSources.SIMULATED)
+                                      flash=input_source in (InputSources.SIMULATED,
+                                                             InputSources.LIVE_EEG))
         self.choices: List[Choice] = load_demo_choices()
 
         h = self.handler
@@ -227,7 +229,17 @@ class App:
 
         self.sim = None
         sim_label = ""
-        if input_source == InputSources.SIMULATED:
+        if input_source == InputSources.LIVE_EEG or (input_source == InputSources.SIMULATED
+                                                     and p300):
+            # #103: P300 chooses and the alpha switch confirms, on one g.Pype pipeline.
+            from signal2speech.eeg.app_live import LiveEegInput
+            self.sim = LiveEegInput(
+                h, self.window, self.log,
+                source="generator" if input_source == InputSources.SIMULATED else "hybridblack",
+                script=sim_script or [2, 1], arm_live_confirm=arm_live_confirm,
+                **(live_options or {}))
+            sim_label = self.sim.connection_label()
+        elif input_source == InputSources.SIMULATED:
             self.sim, sim_label = make_simulated_input(h, self.window, sim_script or [2, 1],
                                                        self.log, confirm_delay_ms)
             self.window.set_connection(sim_label)
@@ -385,6 +397,14 @@ def main(argv=None) -> int:
     p.add_argument("--confirm-timeout", type=_timeout_seconds, default=CONFIRM_TIMEOUT_MS / 1000,
                    help="seconds before an unanswered Confirm round cancels (0 = never)")
     p.add_argument("--fullscreen", action="store_true", help="start fullscreen (F11 toggles, F1 shows keys)")
+    p.add_argument("--p300", action="store_true",
+                   help="with --input simulated: run the live path (#103) on the Generator")
+    p.add_argument("--arm-live-confirm", action="store_true",
+                   help="live: let eye closure confirm. Only after #23 says it's safe")
+    p.add_argument("--calibration", type=int, default=10,
+                   help="live/--p300: P300 calibration sequences before the demo")
+    p.add_argument("--alpha-calib-s", type=float, default=10.0,
+                   help="live/--p300: seconds of eyes open, then closed, for the alpha switch")
     p.add_argument("--screenshot", type=Path, help="save a PNG after the first confirm and exit")
     p.add_argument("--smoke", nargs="?", const="dev", choices=["dev", "judging"],
                    help="hardware-free smoke check, exit 0/1 (#41); 'judging' fails on any SKIP")
@@ -399,9 +419,27 @@ def main(argv=None) -> int:
 
     qapp = QApplication.instance() or QApplication(sys.argv[:1])
     script = [int(s) for s in args.sim.split(",") if s.strip()]
+    if any(s not in (1, 2) for s in script):
+        print(f"--sim takes 1s and 2s, e.g. 2,1; got {args.sim!r}", file=sys.stderr)
+        return 2
     app = App(source, sim_script=script, mute=args.mute,
-              confirm_timeout_ms=int(args.confirm_timeout * 1000))
+              confirm_timeout_ms=int(args.confirm_timeout * 1000),
+              p300=args.p300, arm_live_confirm=args.arm_live_confirm,
+              live_options={"calibration_sequences": args.calibration,
+                            "alpha_calib_s": args.alpha_calib_s})
     qapp.aboutToQuit.connect(app.close)
+    if hasattr(app.sim, "calibrate"):          # #103: open the stream and calibrate first
+        app.root.showFullScreen() if args.fullscreen else app.root.show()
+        try:
+            app.sim.start()
+        except Exception as err:               # g.Pype raises various errors for a missing device
+            from signal2speech.eeg.app_live import PAIRING_HELP
+            print(f"{type(err).__name__}: {err}\n{PAIRING_HELP}", file=sys.stderr)
+            app.close()
+            return 3
+        if app.sim.calibrate({c.target_id: c.label for c in app.choices}) is None:
+            app.close()                        # window closed during calibration
+            return 0
     guards: List[QTimer] = []   # stopped on return, so a later event loop in this process can't fire them
     if args.screenshot:
         def shoot(code: int) -> None:

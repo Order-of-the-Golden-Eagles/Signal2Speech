@@ -24,6 +24,8 @@ None of this is live EEG. Still unverified: simulated input with Wi-Fi off, and 
 
 ## Remaining live blocker
 
+**Update, 8:10 PM: wired in by #103.** `python -m signal2speech.app --input live` now runs the steps below, and it's verified on simulated input through the same code path. What's left is the slot itself (step 4). The original 7:00 PM text follows.
+
 **Live EEG isn't wired into the app.** `python -m signal2speech.app --input live` refuses to start. This PR updates that refusal message to name the real gap, because the old one blamed #46 and #47, which are merged. What's missing is the #23 wiring:
 
 1. Open one `HybridBlack(enable_oscar=True)` pipeline in `App`. Hang the P300 branch and `AlphaConfirm(pipeline=, upstream=)` off it, because the Unicorn opens only once.

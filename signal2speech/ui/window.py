@@ -225,6 +225,14 @@ class SelectionWindow(QMainWindow):
         self.handler.cancel()
 
     # ── Handler listeners ────────────────────────────────────
+    def confirm_hint(self) -> str:
+        """The Confirm-round hint. Live EEG eye confirm stays off until #23 arms it (#103)."""
+        if (self.input_source == InputSources.LIVE_EEG
+                and not self.handler.live_eeg_confirm_armed):
+            return ("Confirm: key 1  (eye-closure confirm is off until #23 says it's safe)   ·   "
+                    "Cancel: key 2 or Esc")
+        return "Confirm: close your eyes for 2 s, or key 1   ·   Cancel: key 2 or Esc"
+
     def show_round(self, rnd: Round) -> None:
         self.flasher.stop()
         for target, tile in self.tiles.items():
@@ -236,8 +244,7 @@ class SelectionWindow(QMainWindow):
             self.preview.setText(self._preview_text())
             self._fit_preview()
             self.preview.setVisible(True)
-            self.hint.setText("Confirm: close your eyes for 2 s, or key 1   ·   "
-                              "Cancel: key 2 or Esc")
+            self.hint.setText(self.confirm_hint())
         else:
             self._preview = None
             self.prompt.setText("Choose a reply")
