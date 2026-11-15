@@ -1,4 +1,5 @@
 """The repo's .githooks/pre-commit must block secrets and raw EEG on every OS (runs in CI on all three)."""
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -9,9 +10,25 @@ HOOKS = Path(__file__).resolve().parents[1] / ".githooks"
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
 
 
+def clean_env(extra=None):
+    """The environment minus every GIT_* variable, plus ``extra``.
+
+    Git exports GIT_DIR, GIT_INDEX_FILE, and friends to hooks. When pytest runs inside the
+    pre-push hook, a plain subprocess would inherit them, and these tests' git commands would
+    hit the developer's real repo: they set core.bare=true, overwrote user.name/email and
+    core.hooksPath, and committed "add ok.py" there. Stripping them pins every command to its
+    own temporary repo.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    # Ignore the developer's global and system config too (signing, global hooks, templates).
+    env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    env.update(extra or {})
+    return env
+
+
 def git(repo, *args, env=None):
     return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", env=env)
+                          encoding="utf-8", errors="replace", env=clean_env(env))
 
 
 @pytest.fixture
@@ -56,3 +73,27 @@ def test_raw_eeg_and_env_are_blocked(repo):
 
 def test_env_example_is_allowed(repo):
     assert commit(repo, ".env.example", "ANTHROPIC_API_KEY=\n").returncode == 0
+
+
+@pytest.mark.parametrize("work_tree", [False, True], ids=["GIT_DIR only", "GIT_DIR+WORK_TREE"])
+def test_hook_environment_cannot_reach_an_outer_repo(tmp_path, monkeypatch, work_tree):
+    """Regression: inside the pre-push hook, git exports GIT_DIR; these tests must ignore it."""
+    outer = tmp_path / "outer"
+    outer.mkdir()
+    git(outer, "init", "-q")
+    git(outer, "config", "user.name", "Real Developer")
+    monkeypatch.setenv("GIT_DIR", str(outer / ".git"))        # what a hook exports
+    if work_tree:
+        monkeypatch.setenv("GIT_WORK_TREE", str(outer))
+    inner = tmp_path / "inner"
+    inner.mkdir()
+    git(inner, "init", "-q")
+    git(inner, "config", "user.name", "Hook Test")
+    git(inner, "config", "user.email", "test@example.com")
+    git(inner, "config", "commit.gpgsign", "false")
+    r = commit(inner, "ok.py", "print('hello')\n")
+    assert r.returncode == 0, r.stdout + r.stderr
+    cfg = git(outer, "config", "--local", "--list").stdout
+    assert "user.name=Real Developer" in cfg and "core.bare=true" not in cfg
+    assert git(outer, "rev-parse", "--verify", "-q", "HEAD").returncode != 0   # no commits
+    assert git(inner, "log", "--oneline").stdout.count("add ok.py") == 1
