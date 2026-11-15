@@ -28,7 +28,9 @@ from .synthetic import NONTARGET_CODE, TARGET_CODE
 
 LABEL_DETAIL = "g.tec P300 Speller dataset"
 #: Electrode order in the dataset's montage.png. Not the Unicorn's order.
-CHANNELS = ("Fz", "Cz", "P3", "Pz", "P4", "PO7", "PO8", "Oz")
+from signal2speech.eeg.devices import GTEC_P300_DATASET  # noqa: E402
+
+CHANNELS = GTEC_P300_DATASET.channel_names
 
 
 @dataclass(frozen=True)

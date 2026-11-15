@@ -500,3 +500,13 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - Re-tested the AI demo window on the current code (Claude Sonnet 5.5 with grounded replies): a fresh question got two good replies in about 2 seconds, and the confirmed one was spoken once
 - The AQI question now answers correctly with the Compare counties map option, and confirming it shows the map and speaks the right numbers. The wrong "Wayne" answer from earlier is gone
 - With the AI provider unreachable, saved phrases appear right away, labelled offline. A real Wi-Fi-off run is still part of the judging-laptop session
+
+## 11/15/26 - 12:11 AM - Vasanth Anbukumar - #150 The program detects the EEG device and picks the right channels (PR pending)
+- One eyes-closed check now works on different amplifiers without anyone setting channel numbers: `python -m signal2speech.eeg.lsl_source --input live --demo`
+    - g.tec devices have a fixed electrode layout, so it uses the three back-of-head electrodes (PO7, Oz, PO8)
+    - The PiEEG Octopus 16 is a coin-sized puck with 16 pins on one spot. The check drops pins that aren't touching and averages every pin that responds when the wearer closes their eyes
+- Why: the confirm watched channels 6 to 8, which is right for the g.tec Unicorn and wrong for a 16-pin board. g.tec's g.Pype is still the whole pipeline; the PiEEG board is only an extra amplifier, read over LSL
+- Live confirm switches on only after a clean check on that wearer: no false triggers at rest and exactly one confirm per eye closure
+- Reviewers can reproduce our numbers on g.tec's own data with no hardware: `python -m signal2speech.evidence.dataset path/to/p300-speller` (new README section)
+- The library run sheet is in `docs/eeg-hardware/README.md`: power bank only while worn, close PiEEG Cloud first (one Bluetooth connection at a time), puck on the back of the head
+- Verified on our own simulated 16-pin stream: it found the flat pin and the loose pin, used the other 14, and confirmed once per closure. Not yet tried on a real board or a real person
