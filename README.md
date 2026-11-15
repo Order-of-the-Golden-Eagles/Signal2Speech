@@ -1,61 +1,85 @@
 # Signal2Speech
 
-**Hands-free communication with an EEG headset.**
+**Answer without speaking or typing: pick, preview, and confirm the exact words with a brain-computer interface.**
 
-Hack the Nest 2026 · Order of the Golden Eagles
+Hack the Nest 2026 · Order of the Golden Eagles · built on g.tec **[g.Pype](https://gpype.gtec.at)** and the **Unicorn Hybrid Black**
 
-Signal2Speech is an accessibility prototype for people who have difficulty speaking or typing. A conversation partner asks a question, AI offers a few short replies, and the headset wearer selects, previews, and confirms the words they want spoken.
+A conversation partner asks a question and the app offers two answers. The wearer picks one with their brain signals (P300), sees exactly what will be said, and confirms by closing their eyes for two seconds (alpha switch). Nothing is spoken or shown until they confirm, and then it happens exactly once.
 
-> The app suggests what to say. The wearer decides what gets said.
+![The app after a confirmed answer: NASA imagery and EPA county AQI on the right, the transcript below, and the input label "Keyboard" in the bottom strip](docs/demo-submission/media/app-compare-reveal.jpg)
 
-## What we’re building
+## Try it offline in three commands
 
-| Feature | Experience |
+Python 3.12. Works with Wi-Fi off once installed.
+
+```
+python -m venv .venv && .venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
+pip install -r requirements-lock.txt
+python -m signal2speech.app --input keyboard
+```
+
+Press **2** (Compare counties), then **1** (confirm). The map changes and one line is spoken. Press **2** at the preview, or **Esc**, to cancel, and nothing happens.
+
+| Also try | Command |
 | --- | --- |
-| **AI Answering** | A partner enters a question. The app offers possible replies. The wearer can choose one, ask for other options, or cancel. The app speaks the exact reply the wearer confirms. |
-| **OpenOrbit** | The wearer uses the same controls to explore Earth data and decide which evidence to show. A confirmed choice updates the satellite view and speaks a short, source-backed explanation. |
+| Simulated brain signals through a real g.Pype pipeline | `python -m signal2speech.app --input simulated --sim 2,1` |
+| AI reply suggestions for a typed question | `python -m signal2speech.ai` |
+| The g.Pype evidence view (scopes, OSCAR, averaged P300) | `python -m signal2speech.evidence --source generator` |
+| A hardware-free check of the whole demo | `python -m signal2speech.app --smoke` |
 
-**Interaction:** Question → choices → EEG selection → preview → confirmation → speech or on-screen action.
+g.Pype runs on Windows 10/11 x64, Linux x86_64, and macOS 13+ on Apple silicon. Intel Macs can't use the Unicorn driver. Full setup is in the [launch path](docs/dev-setup-docs/README.md#python-and-gpype-launch-path-19) and the [platform notes](docs/dev-setup-docs/README.md#platform-notes).
 
-New to the project? [Follow one answer through the app](docs/architecture/README.md) for a plain-language walkthrough and architecture diagram.
+## What works today
 
-## Live demo
+We label every input honestly, in the app's bottom strip and in this table.
 
-**“Which county’s AQI rose more when wildfire smoke reached southeast Michigan?”**
+| Input | Status |
+| --- | --- |
+| **Keyboard** | ✅ The full flow in the app: choose, preview, confirm or cancel, map reveal, and speech |
+| **Simulated** (g.Pype `Generator`) | ✅ The same flow driven by a real g.Pype pipeline. ✅ Evidence view with a synthetic P300. |
+| **Recorded** (g.Pype replay) | ✅ The evidence view replays a recorded session. Replay inside the app isn't built. |
+| **Live EEG** (Unicorn Hybrid Black) | 🔧 The P300 chooser, alpha switch, evidence view, and a guided live-run harness (`python -m signal2speech.eeg.live --source hybridblack`) are built and pass on simulated input. They **haven't run on a real wearer yet**. Live input inside the app stays switched off until that run proves it's safe ([#23](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/issues/23)). |
+| **AI Answering** | ✅ Claude (`claude-opus-5-5`) suggests replies when an API key is in `.env`. Without a key, or offline, it uses clearly labelled practice replies or saved phrases. A real Claude reply hasn't been verified yet. |
 
-The wearer chooses **Compare counties** and confirms. OpenOrbit switches from the June 26, 2023 satellite image to June 28, shows the EPA’s daily county AQI values, and reads the result aloud.
+## The demo question
 
-| Michigan county | June 26 | June 28 | Change |
+**"Which county's AQI rose more when wildfire smoke reached southeast Michigan?"**
+
+| Michigan county | June 26, 2023 | June 28, 2023 | Change |
 | --- | ---: | ---: | ---: |
 | Washtenaw (Eastern Michigan University) | 32 | 218 | **+186** |
 | Wayne (Detroit) | 58 | 226 | **+168** |
 
-**Washtenaw’s AQI rose 18 points more. Wayne’s June 28 AQI was 8 points higher.** NASA imagery shows how the region looked from orbit. The EPA data reports air quality at ground level.
+The app answers out loud: *"Washtenaw's AQI rose 186 points. Wayne's rose 168 points."* NASA imagery shows the smoke from orbit. EPA data measures air quality at ground level.
 
-## Proposed tech stack
+## How it works
 
-| Layer | Current plan |
-| --- | --- |
-| EEG hardware | **g.tec Unicorn Hybrid Black** |
-| EEG acquisition and processing | **[g.Pype](https://gpype.gtec.at)** (Python): the `HybridBlack` source, **OSCAR** artifact removal, filters, and scopes. Cross-platform. |
-| Selection | **P300** chooser (our flashing tiles → `Epochs` → LDA) plus a deliberate **alpha switch** to confirm |
-| Interface | **PySide6** (Qt), the same toolkit g.Pype's GUI uses: tiles, preview, judge strip, evidence scopes |
-| Local integration | One Python process through the shared [selection contract](docs/architecture/selection-contract.md). UDP and LSL out are available for other apps. |
-| AI Answering | Short reply suggestions with explicit wearer confirmation. **Model, provider, and integration TBD.** |
-| Speech | Bundled audio for the OpenOrbit demo. Offline speech synthesis with **pyttsx3** for generated replies. |
-| OpenOrbit data | Locally bundled **NASA MODIS imagery** and **EPA AirData daily county AQI**. **NASA FIRMS fire detections** are a planned extension. |
-| Testing | Keyboard rehearsal, simulated input, then live EEG validation |
+```
+Unicorn Hybrid Black ─▶ g.Pype (OSCAR artifact removal, filters)
+                          ├─▶ Epochs on our tiles' flashes ─▶ LDA ─▶ "choose tile 2"    (P300)
+                          ├─▶ alpha band power ─▶ threshold ─▶ "confirm"                (eyes closed)
+                          └─▶ scopes and averaged P300 for the judges                   (evidence)
+keyboard / simulator ─────┘
+        every input ─▶ one selection contract ─▶ preview ─▶ confirm ─▶ exactly one map action + one spoken line
+```
 
-Use platform APIs and hardware-required packages. Keep the OpenOrbit demo assets local for offline rehearsal.
+- **Choose with P300, confirm with alpha.** They're different brain signals, so a leftover flash response can't confirm by accident.
+- **One selection contract** for every input. Rounds, late or duplicate signals, and cancels are handled in one place ([selection contract](docs/architecture/selection-contract.md)).
+- **One Python process**, fully offline: PySide6 for the screens, offline OS speech, and bundled NASA and EPA data. CI runs the tests on Windows, macOS, and Linux.
 
-## Implementation status
+A plain-language walkthrough is in [How Signal2Speech works](docs/architecture/README.md).
 
-**Prototyping.** The selection contract and tests are on `main` (`pytest`). Setup is in the [launch path](docs/dev-setup-docs/README.md#python-and-gpype-launch-path-19). The AI provider is **TBD**. The first milestone is a keyboard-driven selection that produces one confirmed map-and-speech reveal. The live milestone is the same flow driven by two deliberate EEG selections, one to preview and one to confirm.
+## Team, credits, and AI use
 
-## Resources
+- **Team:** Vasanth Anbukumar ([@vas2000-personal](https://github.com/vas2000-personal)), In Young Song ([@InYoung-Song](https://github.com/InYoung-Song)), Long Le ([@LongNguyenThanhLe](https://github.com/LongNguyenThanhLe)), [@MagicJester2764](https://github.com/MagicJester2764)
+- **EEG:** g.tec [g.Pype](https://gpype.gtec.at) and the Unicorn Hybrid Black ([hackathon resources](https://github.com/unicorn-bi/Hackathon))
+- **Imagery:** NASA GIBS / Worldview, MODIS Terra Corrected Reflectance
+- **Air quality:** U.S. EPA AirData, daily AQI by county, 2023 ([sources and checks](data/openorbit/SOURCES.md))
+- **AI use:** we used Claude (Anthropic) as a coding assistant, and the app can use Claude for reply suggestions. The wearer always previews and confirms the exact words. The EEG decoding is our own g.Pype pipeline, not an AI model.
 
-- [g.tec Hackathon resources](https://github.com/unicorn-bi/Hackathon)
-- [g.Pype documentation](https://gpype.gtec.at) and [GitHub](https://github.com/gtec-medical-engineering/gpype)
-- [NASA GIBS imagery documentation](https://nasa-gibs.github.io/gibs-api-docs/access-basics/)
-- [EPA AirData 2023 daily county AQI download](https://aqs.epa.gov/aqsweb/airdata/daily_aqi_by_county_2023.zip)
-- [NASA FIRMS historical fire detections](https://firms.modaps.eosdis.nasa.gov/download/)
+## For developers
+
+- [Engineering docs](docs/README.md), split by area, with the [shared memory](docs/MEMORY.md)
+- [DEVLOG](DEVLOG.md): plain-language notes on every finished issue
+- Tests: `pip install -e ".[dev]"`, then `pytest`. The repo's git hooks: `git config core.hooksPath .githooks`
+- [Judging build runbook and rollback](docs/devops/judging-build.md)

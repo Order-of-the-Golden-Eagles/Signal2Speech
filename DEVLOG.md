@@ -263,3 +263,10 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - One sitting produces the evidence to close #39 and #4 and rehearses #42's rollback. Each step has a ready-to-paste result comment for the right issue
 - Turned on GitHub's "delete branch after merge" setting, and cleaned up the merged branches
 - Not run yet: it needs the judging laptop
+
+## 11/14/26 - 7:12 PM - Long Le - #93 Judge-facing README ([PR #99](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/99))
+- A judge opening the repo now sees what Signal2Speech does, a screenshot, and a three-command offline quickstart at the top of `README.md`
+    - `pip install -r requirements-lock.txt`, then `python -m signal2speech.app --input keyboard`
+- A status table says honestly what works with keyboard, simulated, recorded, and live EEG input. The live headset tools are built but haven't run on a real wearer yet
+- Added team and data credits (NASA GIBS MODIS, EPA AirData) and a short AI-use note. The screenshot is 180 KB in `docs/demo-submission/media/`
+- Checked: every relative link resolves, and `tools/release_check.py --quick` passes apart from the known commit-email warning (#33)
