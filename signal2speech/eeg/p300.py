@@ -643,13 +643,22 @@ class _TestTiles:
     """
 
     def __init__(self):
-        from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
+        from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
         self.window = QWidget()
         self.window.setWindowTitle("Signal2Speech P300 test tiles (#46)")
-        layout = QHBoxLayout(self.window)
+        outer = QVBoxLayout(self.window)
+        # Big instruction line, so the wearer never has to read the terminal.
+        self.banner = QLabel("")
+        self.banner.setWordWrap(True)
+        self.banner.setMinimumHeight(110)
+        self.banner.setStyleSheet("background:#101820; color:#ffd060; font-size:26px; "
+                                  "font-weight:bold; padding:12px; qproperty-alignment:AlignCenter;")
+        outer.addWidget(self.banner)
+        layout = QHBoxLayout()
+        outer.addLayout(layout)
         self.labels = {}
         for tile in FLASH_CODES:
-            lab = QLabel(tile)
+            lab = QLabel(tile.replace("target-", "Tile "))
             lab.setMinimumSize(300, 300)
             lab.setStyleSheet(self._style(False))
             layout.addWidget(lab)
@@ -663,6 +672,11 @@ class _TestTiles:
         bg = "#ffffff" if lit else "#202020"
         fg = "#000000" if lit else "#cccccc"
         return f"background:{bg}; color:{fg}; border:{border}; font-size:28px; qproperty-alignment:AlignCenter;"
+
+    def set_message(self, text: str) -> None:
+        """Show an instruction above the tiles."""
+        self.banner.setText(text)
+        self.banner.repaint()
 
     def set_cue(self, tile: Optional[str]) -> None:
         self.cue = tile

@@ -32,3 +32,5 @@ Type the question and press Enter, then use keys 1/2 and Esc as usual. **Other r
   | What was the AQI in Ann Arbor in July 2021? (not in the data) | 1.93 s | "I don't know the Ann Arbor AQI for July 2021." | "Give me a moment, please. I'm not sure about that." |
 
 - **Not verified yet:** the live call inside the full app with a headset. The panel flow is unit-tested with a fake client.
+
+**Map suggestions in the AI demo window.** When Claude suggests `show_satellite` or `compare_air_quality` (#106), `python -m signal2speech.ai` reveals the real OpenOrbit map and speaks its line once, the same as `python -m signal2speech.app`. The demo used to have no map on purpose, and that would have dropped the reveal.
