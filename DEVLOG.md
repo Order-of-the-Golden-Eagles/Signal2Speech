@@ -417,4 +417,4 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
     - In `docs/demo-submission/submission-checklist.md`. A person still has to submit it on Devpost and in the event app before midnight
 - Every claim was checked against the code. Two were fixed: we don't have "required" CI checks (just CI on every change), and the AI-reply wording depends on whether #116 is merged when we submit
 - The text never says the headset was used on a real wearer, because it hasn't been yet
-- The status log has rows for who submitted and when
+- Two AI answers are ready, one for each state of #116, so we never claim a feature that isn't merged when we submit

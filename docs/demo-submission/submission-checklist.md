@@ -15,15 +15,18 @@ Deadlines are Eastern time: **draft on Devpost and the event app by Saturday mid
 | Video link | YouTube or Vimeo, 3:00 or less (g.tec's rules cap it at 2:30). See [shot-list.md](shot-list.md). Leave it empty for the draft. | Not recorded (#34) |
 | Thumbnail | `docs/demo-submission/media/app-compare-reveal.jpg` (JPG, PNG, or GIF up to 5 MB) | Ready |
 | Tagline | Answer without speaking or typing: pick, preview, and confirm the exact words with a brain-computer interface. | Draft |
-| Built with | `Python`, `g.Pype`, `g.tec Unicorn Hybrid Black`, `PySide6`, `Qt`, `scikit-learn`, `NumPy`, `SciPy`, `Claude`, `Anthropic API`, `NASA GIBS`, `EPA AirData`, `pytest`, `GitHub Actions`. Type each and pick it from the dropdown. | Ready |
+| Built with | `Python`, `g.Pype`, `g.tec Unicorn Hybrid Black`, `PySide6`, `Qt`, `Qt TextToSpeech`, `pyttsx3`, `scikit-learn`, `NumPy`, `SciPy`, `Claude`, `Anthropic API`, `NASA MODIS`, `NASA GIBS`, `EPA AirData`, `pytest`, `GitHub Actions`. Type each and pick it from the dropdown. NASA MODIS imagery is fetched through GIBS, matching the video credits. | Ready |
 | AI disclosure | See below | Draft, needs team sign-off |
 
 ### AI disclosure (draft)
 
-Paste this into "Generative AI in your hack", and select Claude under "AI tools used". The model and grounding wording depend on #116:
+Paste one of these into "Generative AI in your hack", and select Claude under "AI tools used". **Check #116 first:** use the first version while #116 is open, and the second only once it's merged.
 
-- **Use `claude-sonnet-5-5`** and keep the grounding clause only once #116 (Grounded Claude replies) is merged.
-- **If #116 isn't merged at submission time,** main uses `claude-opus-5-5` and doesn't ground the replies. Use that model name and drop the clause "grounded in our verified NASA/EPA dataset so it can't invent numbers".
+**While #116 is open** (what `main` does today: `claude-opus-5-5`, replies not grounded):
+
+> We used Claude (Anthropic) as a coding assistant during the hackathon. In the app, AI Answering uses Claude (`claude-opus-5-5`, through the Anthropic API) to suggest two short reply options for a typed question. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with an LDA classifier, and the alpha switch) is our own g.Pype signal-processing pipeline, not a generative model.
+
+**Only after #116 merges:**
 
 > We used Claude (Anthropic) as a coding assistant during the hackathon. In the app, AI Answering uses Claude (`claude-sonnet-5-5`, through the Anthropic API) to suggest two short reply options for a typed question, grounded in our verified NASA/EPA dataset so it can't invent numbers. The wearer always previews and explicitly confirms the exact words before anything is spoken, and offline saved phrases are used when the AI is unavailable. The EEG decoding (P300 with an LDA classifier, and the alpha switch) is our own g.Pype signal-processing pipeline, not a generative model.
 
@@ -45,13 +48,13 @@ Paste this into "Generative AI in your hack", and select Claude under "AI tools 
    - Prizes: only the ones we qualify for.
    - Schools.
    - AI tools: Claude.
-   - The AI answer above.
+   - The AI answer above. **Check #116 first:** if it's still open, use the first AI answer and leave the story's AI bullet as written. If it has merged, use the second answer and add the grounding sentence from the note under the story.
 6. **Submit.** Review the team, links, and prizes. Tick the terms box, click **Submit project**, and check that the confirmation appears. Then add the project to the **event app**.
 7. **Log it** in the status log below: when, who, and the result.
 
 ### Paste-ready story
 
-Fact-checked against `main` on 11/14 at 9:40 PM ET (see the table after the story).
+Fact-checked against `main` at `758f830` (see the table after the story).
 
 **Inspiration**
 People who can't speak or type still have things to say. Most assistive tools either take a long time to spell a sentence or put words in the user's mouth. We wanted a brain-computer interface where the person stays in control: the app suggests, and the wearer decides exactly what gets said.
@@ -63,11 +66,11 @@ A conversation partner asks a question. Signal2Speech offers two answers. The we
 Communication without speech or movement, with consent built in. Every answer is previewed and explicitly confirmed, so a stray, late, or repeated brain signal can never speak for the wearer.
 
 **How we built it**
-- **Signal processing:** g.tec's g.Pype (Python) for the Unicorn Hybrid Black. It provides OSCAR artifact removal, filtering, flash-locked epochs, and an LDA classifier for the P300. A separate alpha-band threshold is the confirm switch. They're two different brain signals, so one can't trigger the other. Both run on one headset connection.
+- **Signal processing:** g.tec's g.Pype (Python) for the Unicorn Hybrid Black. It provides OSCAR artifact removal, filtering, flash-locked epochs, and an LDA classifier for the P300. A separate alpha-band threshold, from eyes closed for two seconds, is the confirm switch. It's a different brain signal from the choice, and a confirm only counts in its own, separate step after the preview. Both run on one headset connection.
 - **One selection contract:** keyboard, simulated signals, recorded sessions, and live EEG all feed the same small state machine (choose → preview → confirm), which rejects stale, duplicate, and late inputs.
 - **App:** one offline Python process with a PySide6 interface, offline speech, and bundled NASA and EPA data.
 - **Evidence view:** live scopes, the frequency spectrum, and the averaged target vs. non-target brain response, so judges can see the signal and not just the result.
-- **AI Answering:** Claude suggests two short replies. The wearer still previews and confirms. *(If #116 is merged, add: "grounded in our verified dataset, so it can't state a fact that isn't in the data.")*
+- **AI Answering:** Claude suggests two short replies. The wearer still previews and confirms.
 - **Engineering:** over 280 automated tests, CI on Windows, macOS, and Linux for every change, and git hooks that block secrets and raw EEG.
 
 **Challenges we ran into**
@@ -87,13 +90,16 @@ How P300 and alpha signals work in practice, why stimulus timing matters, how to
 **What's next**
 Verify on a real wearer with the Unicorn, add more than two choices per round, stream decisions to other apps over UDP or LSL so any g.tec device can drive any app, and test with people who use assistive communication.
 
-### Fact check (11/14, 9:40 PM ET)
+**Note, not part of the paste:** if #116 has merged when you submit, add this sentence to the AI Answering bullet above: "The replies are grounded in our verified dataset, so it can't state a fact that isn't in the data."
+
+### Fact check (against `main` at `758f830`)
 
 | Claim | Status | Source |
 | --- | --- | --- |
 | Live path built | ✅ On main | #124 (`--input live`, #103). **Not run on a wearer.** The text never claims it was. |
 | 0.03 ms flash jitter on the judging laptop | ✅ Measured with `--tiles gl` on Vasanth's laptop, which he confirmed is the judging laptop | #101 |
-| Over 280 tests; CI on Windows, macOS, and Linux | ✅ 283 collected. Every PR runs the fast suite on Windows and Ubuntu; main runs the full matrix, including macOS. | `.github/workflows/tests.yml` |
+| Over 280 tests; CI on Windows, macOS, and Linux | ✅ 283 collected. Every PR and every push to `main` runs on Windows, Ubuntu, and macOS. PRs run the full suite on Windows and Ubuntu (py3.12), and the fast suite on macOS and Ubuntu (py3.13). `main` runs the full suite everywhere. | `.github/workflows/tests.yml` |
+| Alpha confirm is a different signal from the P300 choice | ✅ The story doesn't claim one can't affect the other, only that a confirm counts only in its own separate step | `SelectionHandler` rounds |
 | "Required CI" | ❌ Not used. `main` has no branch protection, so the story says "CI on every pull request". Auto-merge is enabled. | repo settings |
 | Grounded replies, Sonnet 5.5 | ⏳ Only after #116 merges. Until then, use the conditional wording above. | #116 |
 | Spoken calibration cues | ✅ In the guided live run | `signal2speech/eeg/live.py` (#78) |
