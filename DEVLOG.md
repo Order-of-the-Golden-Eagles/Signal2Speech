@@ -665,3 +665,11 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - How we kept it honest: each test uses a separate stretch of the recording from the one the classifier learned on, and with the labels scrambled the same code falls to chance (42 to 46 %)
 - This is offline analysis of five people who are not our wearer, labelled Recorded. It shows the method works on real human brain responses. It doesn't predict a live wearer's accuracy
 - Verified on the judging laptop against the real dataset; one new test uses a made-up recording, since the dataset is never committed
+
+## 11/15/26 - 7:36 AM - Vasanth Anbukumar - #143 The two-minute script and judge answers now match what we can actually show (PR pending)
+- `docs/demo-submission/stage-script.md` opens with a judging-day plan for no headset: one command to start, what to say second by second, and what never to say
+    - Start it before the judge arrives: `python -m signal2speech.app --input recorded --sim 2,1,1,1,2,1,1,1 --fullscreen`. Setup takes about 70 seconds and is silent
+    - That script gives four exchanges of about 15 seconds each. Restart for the next judge
+- `docs/demo-submission/judge-qa.md` has straight answers to the questions we'll get: is this live, is the choice faked, how accurate is it, did you try real hardware, and why not a blink
+- Why: the old script assumed someone wearing a g.tec headset. Reading from it at the table would have meant saying things that aren't true today
+- Checked on the judging laptop: the four-exchange command ran and the recorded data picked the scripted tile all four times (2, 1, 2, 1). The older live-wearer plan is kept below the new section for reference
