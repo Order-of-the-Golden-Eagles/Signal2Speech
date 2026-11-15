@@ -17,7 +17,7 @@ Part of [DevOps](README.md). Kept in its own file so it doesn't collide with oth
 
 **Bundled assets (all offline):** `data/openorbit/` (two NASA MODIS images, the EPA AQI rows, marker places, and `SOURCES.md`) and `contracts/demo-round.json`. The spoken lines use the offline Windows voice (WinRT, with Microsoft David, Zira, and Mark installed). A file at `data/openorbit/audio/<action_id>.wav` plays instead if it exists. None is bundled yet.
 
-**Headset prerequisites (live run, #23):** pair the Unicorn Hybrid Black in Windows Bluetooth settings, then follow step 7 of the launch path. Live input in the app stays blocked until #46, #47, and #23 land.
+**Headset prerequisites (live run, #23):** pair the Unicorn Hybrid Black in Windows Bluetooth settings, then follow step 7 of the launch path. Then run `python -m signal2speech.app --input live` (#103). Key 1 confirms. Eye-closure confirm stays off until #23 passes.
 
 **Verified on 2026-11-14 (dev laptop, Windows 11, 1920×1080 at 125%):**
 - `release_check.py` passes.

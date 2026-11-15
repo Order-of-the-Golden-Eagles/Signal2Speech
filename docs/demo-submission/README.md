@@ -15,6 +15,6 @@ Own the two-minute walkthrough, live recording, and submission checklist.
 | [Pre-flight](preflight.md) | What to do before and during the 8:15 PM headset slot |
 | [Submission checklist](submission-checklist.md) | The one home for Devpost fields, the AI disclosure, final checks, the draft and final status, and the rehearsal log |
 
-**Honest status (2026-11-14):** keyboard and simulated runs work end to end, including the OpenOrbit map (#30). Live EEG in the app is blocked on #23. The alpha confirm (#47) runs standalone (`python -m signal2speech.eeg.alpha_confirm --source hybrid-black`), but live confirm inside the app still waits on #23. A real-wearer P300 average needs the P300 chooser's tiles to drive the evidence view's markers (the #46 ↔ #48 seam). Nothing here has been run with a real headset yet.
+**Honest status (2026-11-15):** keyboard and simulated runs work end to end, including the OpenOrbit map (#30). Live EEG runs in the app (`--input live`, #103): the P300 chooser picks and key 1 confirms. Eye-closure confirm inside the app stays off until #23. The alpha confirm (#47) also runs standalone (`python -m signal2speech.eeg.alpha_confirm --source hybrid-black`). A real-wearer P300 average needs the P300 chooser's tiles to drive the evidence view's markers (the #46 ↔ #48 seam). Nothing here has been run with a real headset yet.
 
 **Still open:** recording the video waits on live input (#23). The team still has to confirm the exact track names on the event page and sign off on the AI disclosure.

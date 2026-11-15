@@ -1,6 +1,7 @@
 """Signal2Speech integration entry point (#4, #25).
 
     python -m signal2speech.app --input keyboard|simulated [--sim 2,1] [--mute]
+    python -m signal2speech.app --input live          # Unicorn; key 1 confirms until #23
 
 One flow: Choose -> Preview (no output) -> Confirm (one map action + one spoken line) or
 Cancel (nothing). Every input goes InputAdapter -> SelectionHandler. Only AppSink.execute
@@ -13,7 +14,9 @@ Dependencies still missing on main are labelled, never faked:
   SimulatedDecoder (a real g.Pype Generator stream) when it imports. Otherwise it injects
   scripted decisions through the same arm_capture()/select_captured() path and says why.
 - Speech lives in signal2speech/speech/ (bundled OpenOrbit clip, else the offline OS voice).
-- #23 live EEG and #48 recorded replay: refused with a clear message.
+- #103 live EEG: --input live runs signal2speech.eeg.app_live.LiveEegInput. Eye-closure
+  confirm stays disarmed (key 1 confirms) until #23 passes (--arm-live-confirm).
+- #48 recorded replay: refused with a clear message.
 """
 from __future__ import annotations
 
