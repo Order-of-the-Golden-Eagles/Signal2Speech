@@ -34,8 +34,8 @@ _MAP_ACTIONS = {ActionIds.SHOW_SATELLITE, ActionIds.COMPARE_AIR_QUALITY}
 
 
 class _KeyOne(QObject):
-    """App-wide filter for key 1, so a hold can be told apart from a tap (#175). Typing a 1 in a
-    text field (the AI question box) is left alone."""
+    """App-wide filter for keys 1 and 2, so a hold can be told apart from a tap (#175). Typing a
+    1 or 2 in a text field (the AI question box) is left alone."""
 
     def __init__(self, window):
         super().__init__(window)
@@ -45,14 +45,22 @@ class _KeyOne(QObject):
         t = event.type()
         if t not in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
             return False
-        if event.key() != Qt.Key.Key_1 or event.isAutoRepeat() or event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier:
+        if (event.key() not in (Qt.Key.Key_1, Qt.Key.Key_2) or event.isAutoRepeat()
+                or event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier):
             return False
         if isinstance(QApplication.focusWidget(), (QLineEdit, QTextEdit, QPlainTextEdit)):
             return False
         if not self.window.isVisible() and not getattr(self.window, "_test_keys", False):
             return False
-        self.window.key_one(t == QEvent.Type.KeyPress)
+        pressed = t == QEvent.Type.KeyPress
+        if event.key() == Qt.Key.Key_1:
+            self.window.key_one(pressed)
+        else:
+            self.window.key_two(pressed)
         return True
+
+
+CAPTION_ROW = 40
 
 
 class Tile(QLabel):
@@ -65,10 +73,14 @@ class Tile(QLabel):
     Long titles shrink to fit (56 px down to 32 px, #95), recomputed on relabel and resize only.
     """
 
-    MAX_PX = P.DISPLAY
     INSET = P.BORDER_W + P.L          # border + padding, each side
     TOP = 64                          # icon and key badge row
-    BOTTOM = 40                       # one-line description
+
+    MAX_PX = P.DISPLAY                # tile titles at full size, before the text scale (#195)
+
+    @property
+    def BOTTOM(self) -> int:          # one-line description row
+        return max(40, P.px(CAPTION_ROW))
 
     def __init__(self, target_id: str, key: str, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -80,8 +92,10 @@ class Tile(QLabel):
         self.action_id: Optional[str] = None
         self.icon: Optional[str] = None
         self.description = ""
+        self.note: Optional[str] = None   # replaces the description (practice round, #196)
+        self.highlight = False            # accent outline: "look here" (practice round, #196)
         self.font_px = self.MAX_PX
-        self.setMinimumSize(300, 220)   # fits two tiles plus the map at 1280x720 (#94)
+        self.setMinimumSize(300, 210)   # fits two tiles plus the map at 1280x720 (#94, #195)
 
     @property
     def label(self) -> str:
@@ -100,6 +114,8 @@ class Tile(QLabel):
         self.action_id = action_id
         self.icon, self.description = P.ACTION_INFO.get(action_id, (None, "")) if label else (None, "")
         self.selected = False
+        self.note = None
+        self.highlight = False
         self.setText(label)
         self._fit()
         self.update()
@@ -126,7 +142,7 @@ class Tile(QLabel):
         font.setBold(True)
         r = self.title_rect()
         px = fit_pixel_size(self._label, font, int(r.width()), int(max(r.height(), 40)),
-                            self.MAX_PX, P.TILE_TITLE_MIN)
+                            P.px(self.MAX_PX), P.TILE_TITLE_MIN)
         changed, self.font_px = px != self.font_px, px
         return changed
 
@@ -138,6 +154,8 @@ class Tile(QLabel):
             "selected": (P.TILE_SELECTED_BG, P.TILE_SELECTED_TEXT, P.TILE_SELECTED_BORDER, P.TILE_SELECTED_TEXT),
             "idle": (P.TILE_BG, P.TILE_TEXT, P.TILE_BORDER, P.MUTED),
         }[state]
+        if self.highlight and state == "idle":
+            border = P.ACCENT
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         half = P.BORDER_W / 2
@@ -151,9 +169,10 @@ class Tile(QLabel):
         if state == "waiting":
             p.setPen(QColor(fg))
             f = QFont(self.font())
-            f.setPixelSize(P.BODY)
+            f.setPixelSize(P.px(P.BODY))
             p.setFont(f)
-            p.drawText(inner, int(Qt.AlignmentFlag.AlignCenter), "Waiting for the next question")
+            p.drawText(inner, int(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap),
+                       "Waiting for the next question")
             p.end()
             return
         # Top row: icon on the left, key badge on the right.
@@ -170,7 +189,7 @@ class Tile(QLabel):
         p.drawRoundedRect(badge, P.RADIUS_S, P.RADIUS_S)
         p.setPen(QColor(P.TILE_LIT_TEXT if state == "lit" else P.ON_ACCENT))
         f = QFont(self.font())
-        f.setPixelSize(P.CAPTION + 8)
+        f.setPixelSize(P.px(P.CAPTION + 8))
         f.setBold(True)
         p.setFont(f)
         p.drawText(badge, int(Qt.AlignmentFlag.AlignCenter), self.key)
@@ -183,10 +202,11 @@ class Tile(QLabel):
         p.drawText(self.title_rect(), int(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap),
                    self._label)
         # One-line description at the bottom, elided if too long.
-        description = "Sent to output" if state == "selected" else self.description
+        description = ("Sent to output" if state == "selected"
+                       else self.note if self.note is not None else self.description)
         if description:
             f = QFont(self.font())
-            for px in range(P.CAPTION + 2, 14, -1):        # shrink a little before eliding
+            for px in range(P.px(P.CAPTION + 2), 14, -1):  # shrink a little before eliding
                 f.setPixelSize(px)
                 if QFontMetrics(f).horizontalAdvance(description) <= inner.width():
                     break
@@ -197,6 +217,20 @@ class Tile(QLabel):
             p.drawText(QRectF(inner.left(), inner.bottom() - self.BOTTOM + 8, inner.width(), self.BOTTOM - 8),
                        int(Qt.AlignmentFlag.AlignCenter), text)
         p.end()
+
+
+class WrapWhenLong(QLabel):
+    """A label that wraps only when its text is long. Short text keeps the height it always had;
+    long text wraps instead of forcing the window wider than the screen."""
+
+    def __init__(self, text: str = "", limit: int = 44, **kwargs):
+        super().__init__(**kwargs)
+        self.limit = limit
+        self.setText(text)
+
+    def setText(self, text: str) -> None:
+        self.setWordWrap(len(text) > self.limit)
+        super().setText(text)
 
 
 class SelectionWindow(QMainWindow):
@@ -215,6 +249,7 @@ class SelectionWindow(QMainWindow):
         self.eye_confirm: Optional[bool] = None   # False once eye-closure calibration failed (#103)
         self.eye_off_reason = "its calibration failed"   # shown when eye_confirm is False (#172)
         self._preview: Optional[Choice] = None
+        self.on_escape: Optional[Callable[[], bool]] = None   # return True to consume Esc
         self.setWindowTitle("Signal2Speech")
         self.setStyleSheet(_STYLE)
         self.resize(1280, 800)
@@ -224,7 +259,10 @@ class SelectionWindow(QMainWindow):
         col.setContentsMargins(P.XL, P.L, P.XL, 0)
         col.setSpacing(P.M)
 
-        self.prompt = QLabel("Waiting for a round", objectName="prompt")
+        # A long prompt wraps, so it can never widen the window past the screen. Short ones
+        # don't: a wrapping label asks for more height, and that pushed the preview screen over
+        # 720 at the largest text size.
+        self.prompt = WrapWhenLong("Waiting for a round", objectName="prompt")
         col.addWidget(self.prompt)
         # #175: the consent screen. What will happen, the exact words, and the confirm ring.
         self.preview_box = QWidget()
@@ -241,6 +279,10 @@ class SelectionWindow(QMainWindow):
         prow.addWidget(self.preview, 1)
         self.ring = ConfirmRing()
         self.ring.handlers["keyboard"] = lambda: self.press_target(TargetIds.TARGET_1)
+        # Cancelling takes the same deliberate hold as confirming: a stray tap on 2 must not
+        # throw away what the wearer just chose.
+        self.ring.handlers["cancel"] = lambda: self.press_target(TargetIds.TARGET_2)
+        self._held_key: Optional[int] = None       # which key is filling the ring: 1 or 2
         prow.addWidget(self.ring, 0, Qt.AlignmentFlag.AlignVCenter)
         pcol.addLayout(prow)
         self.preview_box.setVisible(False)
@@ -262,18 +304,25 @@ class SelectionWindow(QMainWindow):
 
         self.hint = QLabel("", objectName="hint")
         self.hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.hint.setWordWrap(True)       # large text (#195) must wrap, not widen the window
         col.addWidget(self.hint)
 
         strip = QFrame(objectName="strip")
         srow = QHBoxLayout(strip)
         srow.setContentsMargins(P.M, P.S + 2, P.M, P.S + 2)
         srow.setSpacing(P.L)
-        self.input_label = self._strip_label()
+        # Two inputs, a device name and a status make a long line (PiEEG, #172). Then it wraps,
+        # so the window never has to grow past the screen to fit it.
+        self.input_label = WrapWhenLong(limit=60)
+        self.input_label.setProperty("class", "strip")
         self.connection_label = self._strip_label()
         self.round_label = self._strip_label()
         self.outcome_label = self._strip_label()
         srow.addWidget(self.input_label)
-        srow.addWidget(self.round_label)
+        # At large text sizes (#195) the round id may clip; the input label never does.
+        self.round_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.round_label.setMinimumWidth(1)
+        srow.addWidget(self.round_label, 1)
         # The last outcome can be long; let it clip instead of forcing the window wide.
         # The transcript and the tooltip keep the full text.
         self.outcome_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
@@ -294,9 +343,9 @@ class SelectionWindow(QMainWindow):
                                       on_sequence_started=on_sequence_started,
                                       on_sequence_finished=on_sequence_finished, parent=self)
 
-        # Ambient keys; auto-repeat off so a held "2" can't preview and then cancel.
-        for seq, fn in (("2", lambda: self.press_target(TargetIds.TARGET_2)),
-                        ("Esc", self.press_cancel)):
+        # Esc is the operator's instant cancel. Keys 1 and 2 go through the key filter below,
+        # because in a Confirm round both must be held.
+        for seq, fn in (("Esc", self.press_cancel),):
             sc = QShortcut(QKeySequence(seq), self)
             sc.setAutoRepeat(False)
             sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
@@ -350,6 +399,8 @@ class SelectionWindow(QMainWindow):
         return outcome
 
     def press_cancel(self) -> None:
+        if self.on_escape is not None and self.on_escape():
+            return                         # e.g. Esc ended a practice round (#196)
         self.handler.cancel()
 
     # ── Handler listeners ────────────────────────────────────
@@ -357,12 +408,12 @@ class SelectionWindow(QMainWindow):
         """The Confirm-round hint, matching what really confirms (#103)."""
         if self.eye_confirm is False:
             return (f"Confirm: hold 1  (eye-closure confirm is off: {self.eye_off_reason})   ·   "
-                    "Cancel: key 2 or Esc")
+                    "Cancel: hold 2, or Esc")
         if (self.input_source == InputSources.LIVE_EEG
                 and not self.handler.live_eeg_confirm_armed):
             return ("Confirm: hold 1  (eye-closure confirm is off until #23 says it's safe)   ·   "
-                    "Cancel: key 2 or Esc")
-        return "Confirm: close your eyes for 2 s, or hold 1   ·   Cancel: key 2 or Esc"
+                    "Cancel: hold 2, or Esc")
+        return "Confirm: close your eyes for 2 s, or hold 1   ·   Cancel: hold 2, or Esc"
 
     def eyes_can_confirm(self) -> bool:
         """Whether an eye closure can confirm right now (mirrors confirm_hint)."""
@@ -380,17 +431,29 @@ class SelectionWindow(QMainWindow):
 
     def key_one(self, pressed: bool) -> None:
         """Physical key 1. Choose round: a tap picks. Confirm round: hold to fill the ring."""
+        self._hold_or_tap(1, pressed, "keyboard", TargetIds.TARGET_1)
+
+    def key_two(self, pressed: bool) -> None:
+        """Physical key 2. Choose round: a tap picks. Confirm round: hold to cancel."""
+        self._hold_or_tap(2, pressed, "cancel", TargetIds.TARGET_2)
+
+    def _hold_or_tap(self, key: int, pressed: bool, ring_source: str, target: str) -> None:
+        if not pressed:
+            if self._held_key == key:               # letting go early empties the ring
+                self._held_key = None
+                self.ring.release()
+            return
         rnd = self.handler.current
         if rnd is not None and rnd.kind is RoundKind.CONFIRM:
-            if pressed:
-                self.ring.start_hold("keyboard", HOLD_S)
-            else:
-                self.ring.release()
-        elif pressed:
-            self.press_target(TargetIds.TARGET_1)
+            if self._held_key is None:              # the first key down owns the ring
+                self._held_key = key
+                self.ring.start_hold(ring_source, HOLD_S)
+        else:
+            self.press_target(target)
 
     def show_round(self, rnd: Round) -> None:
         self.flasher.stop()
+        self.prompt.setVisible(True)
         for target, tile in self.tiles.items():
             c = rnd.find(target)
             tile.set_label(c.label if c else "", c.action_id if c else None)
@@ -402,8 +465,8 @@ class SelectionWindow(QMainWindow):
             self.preview.setText(f"“{self._preview_text()}”")
             self.ring.reset()
             self.ring.label = "Hold 1\nor close eyes" if self.eyes_can_confirm() else "Hold 1"
-            self._fit_preview()
             self.preview_box.setVisible(True)
+            self._fit_preview()
             self.hint.setText(self.confirm_hint())
         else:
             self._preview = None
@@ -430,9 +493,11 @@ class SelectionWindow(QMainWindow):
         self.ring.reset()
         self.preview_box.setVisible(False)
         self.preview.setText("")
+        self.preview.setMinimumHeight(0)
         self.preview_header.setText("")
         self.hint.setText("")
         self.prompt.setText("Waiting for a round")
+        self.prompt.setVisible(True)
         self._set_round_text(None)
         if reason:
             self.outcome_label.setText(f"Last: Cleared ({reason})")
@@ -460,7 +525,15 @@ class SelectionWindow(QMainWindow):
                 tile.set_selected(True)
 
     # ── Helpers ──────────────────────────────────────────────
-    PREVIEW_MAX_PX = P.PREVIEW
+    PREVIEW_MAX_PX = P.PREVIEW        # before the text scale (#195)
+
+    def apply_text_scale(self) -> None:
+        """Re-style after theme.set_scale (#195). Tiles and preview refit; flashing is untouched."""
+        self.setStyleSheet(P.window_qss())
+        for tile in self.tiles.values():
+            tile._fit()
+            tile.update()
+        self._fit_preview()
 
     def add_outcome_note(self, note: str) -> None:
         """Append e.g. "map 3 ms · speech 180 ms" to the last outcome in the strip (#130)."""
@@ -490,8 +563,21 @@ class SelectionWindow(QMainWindow):
         width = max(self.width() - 2 * P.XL - 2 * P.M - 6 - 150 - P.L, 1)   # margins, accent bar, ring
         height = max(int(self.height() * 0.28), 80)
         self.preview_px = fit_pixel_size(self.preview.text(), font, width, height,
-                                         self.PREVIEW_MAX_PX, P.TILE_TITLE_MIN)
+                                         P.px(self.PREVIEW_MAX_PX), P.TILE_TITLE_MIN)
         self.preview.setStyleSheet(f"font-size: {self.preview_px}px;")
+        # Reserve the fitted text's height, so the layout squeezes the tiles, never the words.
+        font.setPixelSize(self.preview_px)
+        text = QFontMetrics(font).boundingRect(0, 0, width, 10_000, int(Qt.TextFlag.TextWordWrap),
+                                               self.preview.text())
+        rnd = self.handler.current
+        confirming = rnd is not None and rnd.kind is RoundKind.CONFIRM and bool(self.preview.text())
+        self.preview.setMinimumHeight(text.height() + 2 * P.M + 4 if confirming else 0)
+        # At large text sizes (#195) the header already says what's happening; drop the
+        # "Say this?" prompt during a preview so everything fits a 1280x720 screen.
+        if self.preview_box.isVisibleTo(self) and self.prompt.text() == "Say this?":
+            self.prompt.setVisible(P.SCALE <= 1.2)
+        elif not self.prompt.isVisibleTo(self):
+            self.prompt.setVisible(True)
 
     def _preview_header(self) -> str:
         c = self._preview

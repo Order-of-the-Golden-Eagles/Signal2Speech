@@ -578,6 +578,15 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - The tones are generated in code, so there's no audio file to download or license
 - Verified with the keyboard and in headless tests with a fake sound player (11 new tests: wording for cancel, timeout, and disconnect; one cue per event; confirm cue before speech; exactly one speech). I haven't listened to the tones' volume on the judging laptop's speakers yet.
 
+## 11/15/26 - 1:48 AM - Long Le - #193 #194 #195 #196 #197 Attract mode, reply language, text size, practice round, help phrase ([PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203))
+- When the table sits idle for 60 s, a clearly labelled simulated demo now loops on its own. Any key stops it and returns to a clean first question.
+    - `--no-attract` turns it off; the loop never reaches the real session or its report counts
+- The AI demo can suggest and speak replies in another language. If no voice for that language is installed, it says so and stays in English.
+    - `python -m signal2speech.ai --reply-language es`, and `F3` switches back
+- `Ctrl+=` / `Ctrl+-` / `Ctrl+0` scale all text from 80% to 160%. Everything still fits a 1280×720 screen.
+- `P` (or `--practice`) runs a 30 s "look at tile 1 and count its flashes" warm-up that never sends anything
+- Holding `H` for 2 s says "I need help, please." from any screen, at most once every 10 s, without touching the current question. `--help-by-eyes` adds a long eye closure as a trigger, off by default.
+- Verified with the keyboard and the simulated input in 27 new headless tests (no false help triggers in 400 random key taps; attract stops with no leftover speech; practice uses no simulated picks). Not yet tried: the Spanish voice on Windows, the eye-closure help trigger on the headset, and practice feeding live calibration (needs #23).
 ## 11/15/26 - 1:53 AM - Vasanth Anbukumar - #199 The board session's spoken cues work off Windows too ([PR #202](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/202))
 - On macOS or Linux, the voice-guided board session (`python -m signal2speech.eeg.board_session`) would have spoken its first instruction and gone silent for the rest. It now speaks every cue
     - Same cause and same fix as the app's backup voice: each cue is spoken from its own short-lived helper process
@@ -614,3 +623,24 @@ Plain-language notes on what changed and why, one entry per finished issue. The 
 - On all five of g.tec's recorded subjects, the biggest blink and movement swings got 14–65% smaller, while the rest of the signal barely changed. Classification stayed the same or improved (one subject went from 0.72 to 0.81)
 - We found that OSCAR delays the signal by about a third of a second and g.Pype doesn't shift the flash markers to match. Ignoring that costs up to 0.14 accuracy, so the docs say how to handle it, and the headset session should check it on the live path
 - Measured on g.tec's recordings replayed through g.Pype (Recorded, not our wearer, not live). The g.tec data stays out of git
+## 11/15/26 - 2:57 AM - Vasanth Anbukumar - #150 The board session speaks with the natural voice, and repeats itself less ([PR #209](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/209))
+- The voice-guided board session (`python -m signal2speech.eeg.board_session`) now gives its instructions in the same natural voice as the app, when that voice is installed
+    - `--standard-voice` goes back to the operating system's voice
+    - A new line takes a second or two to make the first time and is kept afterwards, so do one dry run before the real session
+- Calibration says "eyes open" and "eyes closed" on the first round only. After that the beeps are enough, because the introduction already explains them
+- Fixed the voice briefly switching to the old one mid-session: too many lines were being made at once, so one arrived late. They're now made two at a time
+- In the app and the session, dates are now read as dates: "June 28, 2023" is spoken as "June twenty-eighth, twenty twenty-three"
+- In the app, the PiEEG eye check can now be followed with closed eyes. It speaks one sentence, playing the low and high beep as examples as it names them, then uses beeps alone, then says "Ready." After that the app speaks only the replies the wearer confirms
+    - The screen shows the same words the voice says
+    - One rule everywhere, including the board session: low beep, close your eyes; high beep, open them
+- Fixed the app window growing past the screen during the eye check: a long status line forced it to 1841 wide on a 1536-wide screen. Long lines now wrap
+- Verified on the judging laptop: a full spoken dry run of the board session from a cold start with no cue falling back to the old voice, and the app in PiEEG mode on our simulated board staying 1520 wide. Seven new tests. Not yet run on a real board
+
+## 11/15/26 - 3:58 AM - Vasanth Anbukumar - #210 Cancelling on the preview screen now needs a hold, like confirming
+- On the preview screen, key 2 must now be held for two seconds to cancel, the same as holding key 1 to confirm. A stray tap no longer throws away what the wearer just chose
+    - The ring fills while you hold and shows "Cancel". Letting go early empties it
+    - When choosing between the two tiles, key 2 still picks at once. Esc is still an instant cancel for the operator
+- It works the same with a board connected: the eye closure confirms, and cancelling is a hold of key 2, Esc, or the timeout
+- The idle demo (#193) now stays off whenever a board is used, so it can't start over a wearer's 90-second eye check
+- The screen-size tests now measure at the 1280 x 720 they claim to check, and tests on the judging laptop find real fonts. Before, those tests failed on this laptop and could not be trusted here (#200)
+- Verified with keys on the judging laptop. One new test. This entry is part of [PR #203](https://github.com/Order-of-the-Golden-Eagles/Signal2Speech/pull/203), which also carries the merge of `main` into that branch

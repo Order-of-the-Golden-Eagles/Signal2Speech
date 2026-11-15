@@ -23,6 +23,7 @@ step turns that brain path off (keys still work) and the prompt and strip say wh
 """
 from __future__ import annotations
 
+import re
 import gc
 import shutil
 import tempfile
@@ -484,6 +485,76 @@ Rehearse without the board: python -m signal2speech.app --input pieeg --pieeg-se
 PIEEG_STREAM_IS = ("live", "simulated", "recorded")
 
 
+def check_cue(text: str) -> Optional[str]:
+    """What an on-screen eye-check prompt asks the wearer to do: ``"close"``, ``"open"``, or None
+    when nothing changes (keep your eyes open, a result line)."""
+    if "->" in text or text.lower().startswith("false triggers"):
+        return None
+    if "CLOSE" in text:
+        return "close"
+    if re.match(r"^\s*Open\b", text):
+        return "open"
+    return None
+
+
+class SpokenCheck:
+    """Lets a wearer with closed eyes follow the eye check. Without it the prompts are on screen
+    only, and nobody with their eyes shut can read "Open your eyes".
+
+    Kept to a minimum: one spoken sentence before the first prompt, then beeps alone (low: close
+    your eyes, high: open them), then one short line with the result. After that the app is
+    silent apart from the replies the wearer confirms.
+    """
+
+    #: The one spoken sentence, in pieces: each beep is played right after it is named, so the
+    #: wearer has heard both before they matter.
+    INTRO_PARTS = (("Setup. Keep your eyes open. On each low beep,", "go"),
+                   ("close your eyes. On the high beep,", "stop"),
+                   ("open them.", None))
+    INTRO = " ".join(words for words, _ in INTRO_PARTS)
+    PASSED = "Ready."
+    FAILED = "Setup did not pass. Hold key one to confirm."
+    #: What the screen shows for each cue. It always says the same thing the wearer hears.
+    ON_SCREEN = {"close": "Close your eyes  (low beep)", "open": "Open your eyes  (high beep)",
+                 None: "Keep your eyes open"}
+
+    def __init__(self, voice):
+        self.voice = voice                               # board_session.Voice: say() waits, beep()
+        self.heard: list = []                            # what the wearer heard, in order
+        self._introduced = False
+
+    def __call__(self, text: str, show: Optional[Callable[[str, str], None]] = None) -> None:
+        """``show(big, small)`` puts words on screen. The big line always matches what is heard;
+        the small line keeps the step's detail for whoever is running the session."""
+        if not self._introduced:
+            self._introduced = True
+            if show is not None:
+                show(self.INTRO, "Setup")
+            self.heard.append(self.INTRO)
+            warm = getattr(self.voice, "warm", None)
+            if warm is not None:                         # no gap between the pieces
+                warm([words for words, _ in self.INTRO_PARTS] + [self.PASSED, self.FAILED])
+            for words, example in self.INTRO_PARTS:
+                self.voice.say(words)
+                if example:
+                    self.voice.beep(example)
+        cue = check_cue(text)
+        if show is not None:
+            show(self.ON_SCREEN[cue], text)
+        if cue is not None:
+            self.heard.append(f"beep:{cue}")
+            self.voice.beep("go" if cue == "close" else "stop")
+
+    def result(self, armed: bool, show: Optional[Callable[[str, str], None]] = None,
+               detail: str = "") -> None:
+        line = self.PASSED if armed else self.FAILED
+        if show is not None:
+            show(line, detail)
+        self.heard.append(line)
+        self.voice.say(line)
+        self.voice.beep("ok" if armed else "stop")
+
+
 class PiEEGConfirm:
     """Eye-closure confirm from a PiEEG Octopus 16 over LSL; the keyboard chooses (#172).
 
@@ -502,9 +573,11 @@ class PiEEGConfirm:
                  channels: Optional[str] = None, self_test: bool = False,
                  auto_eyes: Optional[bool] = None, probe_s: float = 8.0,
                  alpha_calib_s: float = 10.0, rest_s: float = 20.0, closures: int = 3,
-                 find_timeout_s: float = 5.0, no_data_s: float = 8.0):
+                 find_timeout_s: float = 5.0, no_data_s: float = 8.0,
+                 announce: Optional[Callable[[str], None]] = None):
         from signal2speech.eeg import lsl_source as lsl
 
+        self.announce = announce                         # says each check prompt aloud (SpokenCheck)
         if self_test:
             stream_is = "simulated"                      # our own publisher: never Live
         if stream_is not in PIEEG_STREAM_IS:
@@ -664,7 +737,10 @@ class PiEEGConfirm:
             w.prompt.setText(text)
             w.hint.setText("Eye-closure check (#150). Don't press anything.")
             self.log(f"check: {text}")
-            tick()
+            tick()                                       # show the words before speaking them
+            if self.announce is not None:
+                self.announce(text, self._show)          # returns when the words or beep are done
+                tick()
 
         for t in TILES:
             w.tiles[t].set_label("")
@@ -734,7 +810,15 @@ class PiEEGConfirm:
         self.log(f"check: false triggers {report.get('false_triggers')}, confirms per closure "
                  f"{report.get('edges_per_closure')} -> {'armed' if ok else 'not armed'}")
         self._show_label()
+        if self.announce is not None and hasattr(self.announce, "result"):
+            self.announce.result(ok, self._show, verdict)
         return ok
+
+    def _show(self, big: str, small: str) -> None:
+        """Put the words being spoken on screen, and paint them before the voice starts."""
+        self.window.prompt.setText(big)
+        self.window.hint.setText(small)
+        QCoreApplication.processEvents()
 
     # ── Self-test eyes ───────────────────────────────────────
     def _on_round_opened(self, rnd: Round) -> None:

@@ -41,6 +41,41 @@ SAVED_PHRASES: List[Tuple[str, str]] = [
 ]
 
 
+# ── Reply language (#194) ────────────────────────────────────
+LANGUAGES: Dict[str, str] = {
+    "en": "English", "es": "Spanish", "fr": "French", "de": "German", "pt": "Portuguese",
+    "it": "Italian", "vi": "Vietnamese", "zh": "Chinese", "ja": "Japanese", "ko": "Korean",
+    "hi": "Hindi", "ar": "Arabic",
+}
+# Offline replies that exist in a language. Anything else falls back to English and says so.
+SAVED_PHRASES_BY_LANGUAGE: Dict[str, List[Tuple[str, str]]] = {
+    "es": [
+        ("Sí.", "No."),
+        ("Dame un momento, por favor.", "¿Puede repetir la pregunta?"),
+        ("Gracias.", "Necesito ayuda, por favor."),
+        ("Estoy bien.", "Me duele."),
+        ("Estoy de acuerdo.", "No estoy de acuerdo."),
+        ("Hablemos más tarde.", "Por favor, siga."),
+    ],
+}
+HELP_PHRASES: Dict[str, str] = {"en": "I need help, please.", "es": "Necesito ayuda, por favor."}
+
+
+def language_code(text: str) -> str:
+    """"es", "ES", or "Spanish" -> "es". Raises ValueError for a language we don't list."""
+    t = text.strip().lower()
+    if t in LANGUAGES:
+        return t
+    for code, name in LANGUAGES.items():
+        if name.lower() == t:
+            return code
+    raise ValueError(f"unknown reply language {text!r}; use one of: {', '.join(LANGUAGES)}")
+
+
+def language_name(code: str) -> str:
+    return LANGUAGES.get(code, code)
+
+
 class ProviderError(Exception):
     """A provider could not produce two usable replies. The message is shown to judges."""
 
@@ -154,8 +189,11 @@ class SavedPhrases:
     def __init__(self, pairs: Sequence[Tuple[str, str]] = tuple(SAVED_PHRASES)):
         self.pairs = list(pairs)
         self.index = 0
+        self.english_only_note = ""   # set when the reply language has no saved phrases (#194)
 
     def current(self, note: str = "") -> ReplySet:
+        if self.english_only_note:
+            note = f"{note}; {self.english_only_note}" if note else self.english_only_note
         return ReplySet(to_choices(self.pairs[self.index]), SAVED, note)
 
     def next_page(self, note: str = "") -> ReplySet:
@@ -224,12 +262,19 @@ FACT_RULES = (
 )
 
 
-def system_prompt(facts: Optional[OpenOrbitFacts]) -> str:
-    """Byte-stable for a given dataset (no timestamps), so every call sends the same prompt."""
+def system_prompt(facts: Optional[OpenOrbitFacts], language: str = "en") -> str:
+    """Byte-stable for a given dataset and language (no timestamps), so every call sends the
+    same prompt. A non-English language asks for the replies in that language (#194)."""
+    base = SYSTEM_PROMPT
+    if language != "en":
+        name = language_name(language)
+        base = base.replace("Use plain spoken English", f"Write both replies in plain spoken {name}")
+        base += (f" The person will hear the replies in {name}, so never mix in English. For an "
+                 "app action the app speaks its own verified English line.")
     if facts is None:
-        return (SYSTEM_PROMPT + "\n\nNo verified facts are available. Never state facts or "
+        return (base + "\n\nNo verified facts are available. Never state facts or "
                 "numbers, and use \"speak_reply\" for both replies.")
-    return SYSTEM_PROMPT + "\n\n" + FACT_RULES + "\n\n" + facts.block
+    return base + "\n\n" + FACT_RULES + "\n\n" + facts.block
 
 
 REPLY_SCHEMA = {
@@ -247,13 +292,19 @@ class ClaudeProvider:
     name = CLAUDE
 
     def __init__(self, api_key: str, model: str = MODEL, timeout: float = TIMEOUT_S,
-                 client=None):
+                 client=None, language: str = "en"):
         import anthropic  # lazy: the app runs offline without the SDK
         self._anthropic = anthropic
         self.model = model
         self.client = client or anthropic.Anthropic(api_key=api_key, timeout=timeout,
                                                     max_retries=0)
-        self.system = system_prompt(openorbit_facts())
+        self.set_language(language)
+
+    def set_language(self, code: str) -> bool:
+        """Claude can write in any listed language: the language goes in the prompt (#194)."""
+        self.language = code
+        self.system = system_prompt(openorbit_facts(), code)
+        return True
 
     def replies(self, question: str, avoid: Sequence[str] = ()) -> List[Tuple[str, str]]:
         """Two (text, action) pairs. ReplySuggester maps actions to app Choices."""
@@ -303,16 +354,27 @@ class StubProvider:
     PAIRS = [("Yes, that works for me.", "No, I'd rather not."),
              ("I think so, yes.", "I'm not sure yet."),
              ("That sounds good.", "Can we talk about it later?")]
+    PAIRS_BY_LANGUAGE = {"es": [("Sí, me parece bien.", "No, prefiero que no."),
+                                ("Creo que sí.", "Todavía no lo sé."),
+                                ("Suena bien.", "¿Podemos hablarlo más tarde?")]}
 
     def __init__(self, delay: float = 0.0):
         self.delay = delay
         self._i = -1
+        self.language = "en"
+
+    def set_language(self, code: str) -> bool:
+        """True if the stub has replies in `code`; otherwise it stays English."""
+        ok = code == "en" or code in self.PAIRS_BY_LANGUAGE
+        self.language = code if ok else "en"
+        return ok
 
     def replies(self, question: str, avoid: Sequence[str] = ()) -> List[str]:
         if self.delay:
             time.sleep(self.delay)
-        self._i = (self._i + 1) % len(self.PAIRS)
-        return list(self.PAIRS[self._i])
+        pairs = self.PAIRS_BY_LANGUAGE.get(self.language, self.PAIRS)
+        self._i = (self._i + 1) % len(pairs)
+        return list(pairs[self._i])
 
 
 # ── Setup ────────────────────────────────────────────────────
@@ -360,6 +422,30 @@ class ReplySuggester:
     def __init__(self, provider=None, saved: Optional[SavedPhrases] = None):
         self.provider = provider
         self.saved = saved or SavedPhrases()
+        self._saved_by_language = {"en": self.saved}
+        self.language = "en"
+
+    def set_language(self, code: str) -> str:
+        """Ask the provider and the saved phrases for `code` (#194). Returns a note naming
+        anything that stays English, or "" if everything switched."""
+        notes = []
+        if self.provider is not None and hasattr(self.provider, "set_language"):
+            if not self.provider.set_language(code):
+                notes.append(f"{self.provider.name} replies are English only")
+        if code not in self._saved_by_language:
+            if code in SAVED_PHRASES_BY_LANGUAGE:
+                sp = SavedPhrases(SAVED_PHRASES_BY_LANGUAGE[code])
+                sp.source = f"built-in {language_name(code)}"
+            else:
+                sp = SavedPhrases(self._saved_by_language["en"].pairs)
+                sp.source = getattr(self._saved_by_language["en"], "source", "built-in")
+                sp.english_only_note = "saved phrases are English only"
+            self._saved_by_language[code] = sp
+        self.saved = self._saved_by_language[code]
+        if self.saved.english_only_note:
+            notes.append(self.saved.english_only_note)
+        self.language = code
+        return "; ".join(notes)
 
     def suggest(self, question: str, avoid: Sequence[str] = ()) -> ReplySet:
         if not question.strip():

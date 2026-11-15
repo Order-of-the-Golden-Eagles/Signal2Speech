@@ -73,18 +73,11 @@ class QuestionPanel(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setStyleSheet(
-            f"QLabel{{color:{T.STRIP_TEXT};font-size:{T.CAPTION + 2}px;}}"
-            f"QLineEdit{{background:{T.SURFACE};color:{T.TEXT};font-size:{T.BODY}px;padding:{T.S}px;"
-            f"border:2px solid {T.BORDER};border-radius:{T.RADIUS_S}px;}}"
-            f"QPushButton{{background:{T.RAISED};color:{T.TEXT};font-size:{T.CAPTION}px;"
-            f"padding:{T.S}px {T.M}px;border:2px solid {T.BORDER};border-radius:{T.RADIUS_S}px;}}"
-            f"QPushButton:disabled{{color:{T.QUIET};}}")
         col = QVBoxLayout(self)
         col.setContentsMargins(0, 0, 0, 0)
-        title = QLabel("Question from the conversation partner")
-        title.setStyleSheet(f"color:{T.MUTED};font-size:{T.BODY}px;font-weight:600;")
-        col.addWidget(title)
+        self.title = QLabel("Question from the conversation partner")
+        col.addWidget(self.title)
+        self.restyle()
         self.question = QLineEdit(placeholderText="Type a question, then press Enter")
         col.addWidget(self.question)
         row = QHBoxLayout()
@@ -98,12 +91,26 @@ class QuestionPanel(QWidget):
         self.origin = QLabel()
         self.origin.setWordWrap(True)
         col.addWidget(self.origin)
+        self.language = QLabel("Reply language: English")   # #194
+        self.language.setWordWrap(True)
+        col.addWidget(self.language)
         self.alt_btn.setEnabled(False)
 
         self.question.returnPressed.connect(self._ask)
         self.ask_btn.clicked.connect(self._ask)
         self.alt_btn.clicked.connect(self.alternatives_requested)
         self.saved_btn.clicked.connect(self.saved_requested)
+
+    def restyle(self) -> None:
+        """Apply the current text scale (#195)."""
+        self.setStyleSheet(
+            f"QLabel{{color:{T.STRIP_TEXT};font-size:{T.px(T.CAPTION + 2)}px;}}"
+            f"QLineEdit{{background:{T.SURFACE};color:{T.TEXT};font-size:{T.px(T.BODY)}px;padding:{T.S}px;"
+            f"border:2px solid {T.BORDER};border-radius:{T.RADIUS_S}px;}}"
+            f"QPushButton{{background:{T.RAISED};color:{T.TEXT};font-size:{T.px(T.CAPTION)}px;"
+            f"padding:{T.S}px {T.M}px;border:2px solid {T.BORDER};border-radius:{T.RADIUS_S}px;}}"
+            f"QPushButton:disabled{{color:{T.QUIET};}}")
+        self.title.setStyleSheet(f"color:{T.MUTED};font-size:{T.px(T.BODY)}px;font-weight:600;")
 
     def _ask(self) -> None:
         text = self.question.text().strip()
@@ -122,3 +129,6 @@ class QuestionPanel(QWidget):
         note = f" · {rs.note}" if rs.note else ""
         self.origin.setText(f"<span style='color:{color};font-weight:700'>Replies: {rs.origin}"
                             f"</span>{note}")
+
+    def set_language(self, text: str) -> None:
+        self.language.setText(text)

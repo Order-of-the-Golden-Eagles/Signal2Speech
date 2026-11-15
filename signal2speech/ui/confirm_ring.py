@@ -151,8 +151,9 @@ def _qt_widget():
             r = QRectF(self.rect()).adjusted(12, 12, -12, -12)
             p.setPen(QPen(QColor(T.DIVIDER), 12))
             p.drawEllipse(r)
+            cancelling = m.source == "cancel"
             if m.progress > 0:
-                colour = T.SUCCESS if m.completed else T.ACCENT
+                colour = T.MUTED if cancelling else T.SUCCESS if m.completed else T.ACCENT
                 pen = QPen(QColor(colour), 12)
                 pen.setCapStyle(Qt.PenCapStyle.RoundCap)
                 p.setPen(pen)
@@ -160,11 +161,12 @@ def _qt_widget():
             f = QFont(self.font())
             f.setBold(True)
             if m.completed:
-                text = "✓"
+                text = "✕" if cancelling else "✓"
                 f.setPixelSize(T.TITLE + 8)
-                p.setPen(QColor(T.SUCCESS))
+                p.setPen(QColor(T.MUTED if cancelling else T.SUCCESS))
             elif m.holding or m.progress > 0:
-                text = f"{m.progress * HOLD_S:.1f} s" if m.source in ("keyboard", "simulated") else "eyes…"
+                text = (f"Cancel\n{m.progress * HOLD_S:.1f} s" if cancelling else
+                        f"{m.progress * HOLD_S:.1f} s" if m.source in ("keyboard", "simulated") else "eyes…")
                 f.setPixelSize(T.BODY)
                 p.setPen(QColor(T.TEXT))
             else:

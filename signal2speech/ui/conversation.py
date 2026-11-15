@@ -22,6 +22,8 @@ KINDS = {
     "said": ("Said aloud", T.SUCCESS),
     "shown": ("Showed the map and said", T.SUCCESS),
     "nothing": ("Nothing was said", T.QUIET),
+    "note": ("Note", T.MUTED),
+    "help": ("Asked for help", T.ACCENT),
 }
 
 
@@ -31,8 +33,13 @@ class ConversationView(QTextBrowser):
         self.entries: List[Tuple[str, str, Optional[str]]] = []   # (kind, text, input label)
         self._stamps: List[str] = []
         self.setOpenLinks(False)
+        self.restyle()
+
+    def restyle(self) -> None:
+        """Apply the current text scale (#195)."""
         self.setStyleSheet(f"QTextBrowser {{ background: {T.SURFACE}; color: {T.TEXT}; border: none;"
-                           f" border-radius: {T.RADIUS_M}px; padding: {T.M}px; font-size: {T.BODY - 2}px; }}")
+                           f" border-radius: {T.RADIUS_M}px; padding: {T.M}px; font-size: {T.px(T.BODY - 2)}px; }}")
+        self._render()
 
     def add(self, kind: str, text: str, input_label: Optional[str] = None) -> None:
         self.entries.append((kind, text, input_label))
@@ -55,12 +62,19 @@ class ConversationView(QTextBrowser):
             source = f"<span style='color:{T.QUIET}'> · {html.escape(src)}</span>" if src else ""
             parts.append(
                 f"<p style='margin:0 0 {T.M}px 0'>"
-                f"<span style='color:{T.QUIET}; font-size:{T.CAPTION - 2}px'>{stamp}</span>"
+                f"<span style='color:{T.QUIET}; font-size:{T.px(T.CAPTION - 2)}px'>{stamp}</span>"
                 f"&nbsp;&nbsp;<b style='color:{colour}'>{html.escape(label)}</b>{source}<br>"
                 f"<span style='color:{T.TEXT}'>{html.escape(text)}</span></p>")
         self.setHtml("".join(parts))
         bar = self.verticalScrollBar()
         bar.setValue(bar.maximum())
+
+    def truncate(self, n: int) -> None:
+        """Drop entries after the first n (attract mode's entries never stay, #193)."""
+        if len(self.entries) > n:
+            del self.entries[n:]
+            del self._stamps[n:]
+            self._render()
 
     def last(self) -> Optional[Tuple[str, str, Optional[str]]]:
         return self.entries[-1] if self.entries else None

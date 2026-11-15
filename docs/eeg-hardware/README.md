@@ -442,13 +442,13 @@ The board is on the library's first floor. Take the judging laptop there.
 | 6 | **The voice-guided session:** `python -m signal2speech.eeg.board_session --input live --consent` | The voice takes over. About 5 minutes (`--quick`: about 3). |
 | 7 | **In the real app (#172):** `python -m signal2speech.app --input pieeg --pieeg live`. Close step 6 first: both read the same stream. | The same check, prompted on screen. Then key 2 previews "Compare counties", a two-second eye closure confirms, and the map changes and the line is spoken once. The strip says `Choose: Keyboard · Confirm: Live EEG (PiEEG Octopus 16)`. This is the footage to record. |
 
-**What the session does.** The wearer only listens. Each instruction is spoken, then a beep starts the timed part, so timing never depends on reading speed. A low beep means "do it now", a high beep means "stop", and a double beep means "registered". Raw data is recorded from the first second and saved after every phase.
+**What the session does.** The wearer only listens. Each instruction is spoken, then a beep starts the timed part, so timing never depends on reading speed. A low beep means "close your eyes" (or "start"), a high beep means "open your eyes" (or "stop"), and a double beep means "registered". Raw data is recorded from the first second and saved after every phase.
 
 | Phase | The wearer hears | What we get |
 | --- | --- | --- |
 | 1. Contact | Nothing, unless too few pins touch. Then it gives advice and checks again. | Good pins out of 16, and the real sample rate |
 | 2. Channel pick | "Keep your eyes open… now close your eyes…" | Which pins respond |
-| 3. Calibration | "Eyes open." / "Eyes closed." three times. It tries once more with advice if the difference is too small. | The switch threshold, and labelled open/closed data |
+| 3. Calibration | The introduction plays each beep once as an example. "Eyes open." / "Eyes closed." on the first round, then the beeps alone for the rest. The rule is the same in every phase: low beep, close your eyes; high beep, open them. It tries once more with advice if the difference is too small. | The switch threshold, and labelled open/closed data |
 | 4. Rest | "Rest for 30 seconds. Keep your eyes open. Blink normally." | False triggers at rest |
 | 5. Switch test | Five low beeps. Close on the low beep, open on the high one. | Closures caught, and the delay |
 | 6. Choice test | "One: Yes. Two: No. Three: Compare counties. Four: Satellite view", repeating. Close your eyes on your target, then again when it asks "Confirm?" | Right choices out of 4, and seconds per selection |
@@ -458,6 +458,7 @@ At the end it prints a summary, says whether live confirm is safe to switch on (
 - **Consent:** `--consent` means the wearer agreed to their raw EEG being saved. Without it the session still runs, but saves the report only.
 - **Where it saves:** `recordings/<date>_<device>_live/` (gitignored): `eeg.npz` (raw 16-channel data with time stamps), `events.json` (every cue, stamped at its beep), and `report.json`.
 - **Before you leave the board:** `python -m signal2speech.eeg.board_session --verify recordings/<folder>` reads the files back and says whether the recording is complete and usable.
+- **Voice:** the session speaks with the natural voice when it's installed ([setup](../text-to-speech/README.md#a-natural-voice-piper-optional)), and prints `voice: natural voice, Piper (...)` at the start. A new line takes a second or two to make the first time and is kept after that, so do one dry run before the real session and every cue plays at once. `--standard-voice` goes back to the operating system's voice.
 - **Dry run with no board:** `python -m signal2speech.eeg.board_session --self-test` (add `--no-voice` for silence with the same timing).
 - **A shorter check with prompts in the terminal** is still there: `python -m signal2speech.eeg.lsl_source --input live --demo`.
 
